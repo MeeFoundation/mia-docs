@@ -38,7 +38,7 @@ The key question is how to design a storage strategy that balances performance, 
 * [SurrealDB](https://surrealdb.com/)
 * [SparrowDB](https://github.com/ryaker/SparrowDB)
 * [petgraph](https://docs.rs/petgraph/latest/petgraph/)
-
+* [FalkorDB](https://www.falkordb.com/)
 
 ## Decision Outcome
 
@@ -177,6 +177,19 @@ Embeddable?: Yes
 * Neutral, because petgraph is a graph data structure library rather than a full database system, which gives developers maximum implementation freedom but also shifts responsibility for persistence, indexing, querying, concurrency, and durability to the application layer.
 
 * Bad, because petgraph lacks native database features such as persistent storage, ACID transactions, vector indexing, declarative query languages, replication, and semantic retrieval capabilities that are typically required for production-grade AI memory platforms.
+
+
+### [FalkorDB](https://www.falkordb.com/)
+
+Is in Rust?: No
+Embeddable?: No?
+
+{example | description | pointer to more information | …}
+
+* Good, because FalkorDB is purpose-built for graph workloads with efficient relationship traversal and Cypher query support, making it suitable for AI memory, knowledge graph, and agent reasoning systems.
+* Good, because FalkorDB extends the Redis ecosystem and benefits from in-memory performance characteristics, enabling low-latency graph queries and real-time AI interaction patterns.
+* Neutral, because FalkorDB is tightly coupled with Redis infrastructure and operational patterns, which simplifies adoption for Redis-based stacks but may constrain architectural flexibility for teams seeking fully standalone graph-native systems.
+* Bad, because FalkorDB primarily focuses on graph traversal and querying rather than integrated AI-native features such as vector search, semantic retrieval orchestration, or ontology-centric memory modeling, which may require additional external components for advanced RAG systems.
 
 
 **## More Information**
