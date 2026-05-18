@@ -83,7 +83,7 @@ Embeddable?: Yes
 * Bad, because Grafeo is still an early-stage project with a relatively small ecosystem, limited production adoption, and evolving tooling compared to mature graph databases such as Neo4j or RDF-focused platforms.
 
 
-### [fluree](https://flur.ee/)
+### [fluree](https://labs.flur.ee/)
 
 Is in Rust?: Yes
 Embeddable?: 
