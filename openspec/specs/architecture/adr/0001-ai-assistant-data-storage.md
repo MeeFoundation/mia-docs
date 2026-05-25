@@ -56,7 +56,7 @@ WIP - no decision made so far
 Is in Rust?: No
 Embeddable?: Yes
 
-{example | description | pointer to more information | …}
+LPG. `CREATE NODE TABLE` / `CREATE REL TABLE` with typed columns — strong typing enforced at write time, primary key constraints
 
 * Good, because LadybugDB is specifically designed for AI memory workloads, combining graph traversal, vector search, typed schemas, and semantic querying in a single embedded database engine. This aligns closely with the platform’s long-term memory and RAG requirements. 
 
@@ -72,7 +72,7 @@ Embeddable?: Yes
 Is in Rust?: Yes
 Embeddable?: Yes
 
-{example | description | pointer to more information | …}
+LPG (GQL). Data Validation - None — schema-free, no DDL.
 
 * Good, because Grafeo supports both Labeled Property Graph (LPG) and RDF data models together with multiple query languages including GQL, Cypher, Gremlin, GraphQL, SPARQL, and SQL/PGQ. This provides strong flexibility for evolving AI memory and knowledge graph architectures. 
 
@@ -88,7 +88,8 @@ Embeddable?: Yes
 Is in Rust?: Yes
 Embeddable?: 
 
-{example | description | pointer to more information | …}
+RDF triplestore. Fluree is an RDF/JSON-LD database. Data is always inserted as JSON-LD values, and the fluree-db-api crate provides no derive macro.
+SHACL is Fluree's own schema validation mechanism — it's the W3C standard for constraining RDF graphs, and it's what Fluree natively understands. SHACL (sh:NodeShape) validates class membership, cardinality, datatypes, node kinds
 
 * Good, because Fluree combines graph semantics, linked data, and blockchain-inspired immutability, providing strong auditability and trusted historical state management for AI memory and knowledge systems.
 * 
@@ -120,7 +121,7 @@ Embeddable?: Yes
 Is in Rust?: Yes
 Embeddable?: Yes
 
-{example | description | pointer to more information | …}
+RDF triplestore. No native SHACL support — schema-free in practice (could layer external SHACL validation, but the engine doesn't enforce it).
 
 * Good, because Oxigraph is a lightweight and high-performance RDF and SPARQL graph database implemented in Rust, making it well suited for embedded semantic knowledge graph applications and local AI systems.
 
@@ -136,7 +137,7 @@ Embeddable?: Yes
 Is in Rust?: Yes
 Embeddable?:
 
-{example | description | pointer to more information | …}
+Multi-model (document + graph + relational). `DEFINE TABLE SCHEMAFULL` + `DEFINE FIELD ... TYPE ...` — enforced at write time, per-field type constraints + ASSERT expressions. 
 
 * Good, because SurrealDB provides a multi-model architecture combining document, graph, key-value, and relational capabilities in a single database engine, which can simplify AI platform architectures and reduce infrastructure fragmentation.
 
@@ -152,7 +153,7 @@ Embeddable?:
 Is in Rust?: Yes
 Embeddable?: Yes
 
-{example | description | pointer to more information | …}
+LPG (Cypher). None — schema-free, no DDL.
 
 * Good, because SparrowDB is designed as a lightweight embedded graph database implemented in Rust, making it suitable for local-first applications, edge deployments, and low-overhead AI memory experimentation.
 
@@ -192,17 +193,40 @@ Embeddable?: No?
 * Bad, because FalkorDB primarily focuses on graph traversal and querying rather than integrated AI-native features such as vector search, semantic retrieval orchestration, or ontology-centric memory modeling, which may require additional external components for advanced RAG systems.
 
 
-**## More Information**
+## More Information
+
+### [fluree](https://labs.flur.ee/)
+
+Benchmark with SHACL:
+ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8906
+
+The fluree-db-api crate doesn't provide Rust-level type safety through struct mapping either; data gets passed around as JSON-LD values using a builder pattern, with no derive macros for automatic schema binding. We could technically skip SHACL validation entirely and insert data without any constraints, but then we'd have no schema enforcement at the database level. Still, there's JSON-SCHEMA option, right?
+
+### [SurrealDB](https://surrealdb.com/)
+
+Much longer compilation time compared to fluree.
+Unlike Fluree, has questionable support for bulk jsonld data import. It can be technically implemented via SCHEMALESS tables, but from what I read, SCHEMAFULL tables are preferred. 
+In the SurrealDB benchmark, we use #[derive(SurrealValue)] on Rust structs and DEFINE TABLE SCHEMAFULL DDL. The schema is enforced by SurrealDB's type system and the Rust structs map directly to SurrealDB records.
+Metrics
+
+Benchmark with Rust Structure Mapping:
+ingest complete: graph_objects=157550, claims=100000, elapsed_ms=14347
 
 
-{You might want to provide additional evidence/confidence for the decision outcome here and/or
+### [Grafeo](https://grafeo.dev/)
 
- document the team agreement on the decision and/or
+The benchmark does not terminate in a reasonable amount of time. 
 
- define when and how this decision should be realized and if/when it should be re-visited and/or
 
- how the decision is validated.
+### [LadybugDB](https://ladybugdb.com/)
 
- Links to other decisions and resources might appear here as well.}
+LadyBug doesn't support SHACL (it's a property graph, not RDF), so its schema lives as Cypher DDL constants.
+The benchmark does not terminate in a reasonable amount of time. 
 
- 
+
+### [Oxigraph](https://github.com/oxigraph/oxigraph)
+No ShaCL support, raw JSONLD ingestion
+ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8779
+
+### [SparrowDB](https://github.com/ryaker/SparrowDB)
+The benchmark does not terminate in a reasonable amount of time. 
