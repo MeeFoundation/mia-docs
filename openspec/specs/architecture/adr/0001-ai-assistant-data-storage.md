@@ -105,7 +105,7 @@ SHACL is Fluree's own schema validation mechanism — it's the W3C standard for 
 Is in Rust?: Yes
 Embeddable?: Yes
 
-{example | description | pointer to more information | …}
+Out of consideration due to low maintainability
 
 * Good, because IndraDB is implemented in Rust with a lightweight architecture focused on high-performance graph storage and traversal, making it attractive for embedded or resource-constrained AI systems.
 
@@ -202,6 +202,7 @@ ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8906
 
 The fluree-db-api crate doesn't provide Rust-level type safety through struct mapping either; data gets passed around as JSON-LD values using a builder pattern, with no derive macros for automatic schema binding. We could technically skip SHACL validation entirely and insert data without any constraints, but then we'd have no schema enforcement at the database level. Still, there's JSON-SCHEMA option, right?
 
+
 ### [SurrealDB](https://surrealdb.com/)
 
 Much longer compilation time compared to fluree.
@@ -220,6 +221,7 @@ After rewrite into native Rust objects + 1 transaction for the whole bulk, the r
 ingest complete: graph_objects=157550, claims=100000, elapsed_ms=5169
 Once again, it has Rust data shape validation only, no validation on the DB side.
 
+
 ### [LadybugDB](https://ladybugdb.com/)
 
 LadyBug doesn't support SHACL (it's a property graph, not RDF), so its schema lives as Cypher DDL constants.
@@ -227,8 +229,11 @@ The benchmark does not terminate in a reasonable amount of time.
 
 
 ### [Oxigraph](https://github.com/oxigraph/oxigraph)
+
 No ShaCL support, raw JSONLD ingestion
 ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8779
 
+
 ### [SparrowDB](https://github.com/ryaker/SparrowDB)
+
 The benchmark does not terminate in a reasonable amount of time. 
