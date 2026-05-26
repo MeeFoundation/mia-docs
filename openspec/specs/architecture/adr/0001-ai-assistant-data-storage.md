@@ -216,7 +216,9 @@ ingest complete: graph_objects=157550, claims=100000, elapsed_ms=14347
 ### [Grafeo](https://grafeo.dev/)
 
 The benchmark does not terminate in a reasonable amount of time. 
-
+After rewrite into native Rust objects + 1 transaction for the whole bulk, the result is as follows:
+ingest complete: graph_objects=157550, claims=100000, elapsed_ms=5169
+Once again, it has Rust data shape validation only, no validation on the DB side.
 
 ### [LadybugDB](https://ladybugdb.com/)
 
