@@ -237,3 +237,10 @@ ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8779
 ### [SparrowDB](https://github.com/ryaker/SparrowDB)
 
 The benchmark does not terminate in a reasonable amount of time. 
+
+| Database | Bulk Insert Time | Peak Memory | Nested Query Time | 
+| ---      | ---              | ---         | ---               |
+|[fluree](https://labs.flur.ee/)| | | |
+|[SurrealDB](https://surrealdb.com/)|141061||14|
+|[Grafeo](https://grafeo.dev/)|43218||134|
+|[Oxigraph](https://github.com/oxigraph/oxigraph)|105452||9|
