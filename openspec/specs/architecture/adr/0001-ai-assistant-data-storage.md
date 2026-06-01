@@ -12,21 +12,17 @@ informed: {list everyone who is kept up-to-date on progress; and with whom there
 
 ## Context and Problem Statement
 
-The AI Assistant platform requires a reliable and scalable approach for storing conversation history, user preferences, embeddings, and operational metadata. 
+The AI Assistant platform requires a reliable and scalable approach for storing user data as defined in the mia-ontology. 
 
-The key question is how to design a storage strategy that balances performance, security, cost, and maintainability while supporting future AI capabilities such as long-term memory, analytics, and retrieval-augmented generation (RAG).
 
 ## Decision Drivers
 
-* Scalability to support growing conversation volume, embeddings, and analytics workloads
+* Scalability to support growing user data volume
 * Low-latency access for real-time AI assistant interactions and retrieval operations
-* Data consistency and reliability across user sessions and distributed services
 * Security, privacy, and compliance requirements for sensitive user data
-* Cost efficiency for long-term storage and high-throughput operations
 * Support for future AI capabilities such as RAG, memory persistence, and semantic search
-* Operational simplicity, maintainability, and observability for platform teams
 * Embeddable
-* Rust-first
+* Rust-compatible
 
 ## Considered Options
 
@@ -246,9 +242,10 @@ ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8779
 
 The benchmark does not terminate in a reasonable amount of time. 
 
-| Database | Bulk Insert Time | Peak Memory | Nested Query Time | 
+| Database | Bulk Insert Time | Peak Memory | Nested Query Time | Nested Query RAM Cold Start|
 | ---      | ---              | ---         | ---               |
-|[fluree](https://labs.flur.ee/)| | | |
-|[SurrealDB](https://surrealdb.com/)|141061||14|
-|[Grafeo](https://grafeo.dev/)|43218||134|
-|[Oxigraph](https://github.com/oxigraph/oxigraph)|105452||9|
+|[fluree](https://labs.flur.ee/)| Timeout | | | |
+|[SurrealDB](https://surrealdb.com/)|155,594 ms|11,748,776 KB|136ms| 185,300 KB|
+|[Grafeo](https://grafeo.dev/)|51,481 ms|3,891,744 KB|156 ms|3,588,864 KB |
+|[Oxigraph](https://github.com/oxigraph/oxigraph)|126,152 ms|14,343,484 KB|9 ms|9,232,032 KB |
+|[LadybugDB](https://ladybugdb.com/)Timeout|||| |
