@@ -55,6 +55,7 @@ WIP - no decision made so far
 
 Is in Rust?: No
 Embeddable?: Yes
+License: MIT
 
 LPG. `CREATE NODE TABLE` / `CREATE REL TABLE` with typed columns — strong typing enforced at write time, primary key constraints
 
@@ -71,6 +72,7 @@ LPG. `CREATE NODE TABLE` / `CREATE REL TABLE` with typed columns — strong typi
 
 Is in Rust?: Yes
 Embeddable?: Yes
+License: Apache2
 
 LPG (GQL). Data Validation - None — schema-free, no DDL.
 
@@ -86,7 +88,8 @@ LPG (GQL). Data Validation - None — schema-free, no DDL.
 ### [fluree](https://labs.flur.ee/)
 
 Is in Rust?: Yes
-Embeddable?: 
+Embeddable?: Yes
+License: BUSL
 
 RDF triplestore. Fluree is an RDF/JSON-LD database. Data is always inserted as JSON-LD values, and the fluree-db-api crate provides no derive macro.
 SHACL is Fluree's own schema validation mechanism — it's the W3C standard for constraining RDF graphs, and it's what Fluree natively understands. SHACL (sh:NodeShape) validates class membership, cardinality, datatypes, node kinds
@@ -120,6 +123,7 @@ Out of consideration due to low maintainability
 
 Is in Rust?: Yes
 Embeddable?: Yes
+License: Apache 2 / MIT
 
 RDF triplestore. No native SHACL support — schema-free in practice (could layer external SHACL validation, but the engine doesn't enforce it).
 
@@ -135,7 +139,8 @@ RDF triplestore. No native SHACL support — schema-free in practice (could laye
 ### [SurrealDB](https://surrealdb.com/)
 
 Is in Rust?: Yes
-Embeddable?:
+Embeddable?: Yes
+License: BUSL
 
 Multi-model (document + graph + relational). `DEFINE TABLE SCHEMAFULL` + `DEFINE FIELD ... TYPE ...` — enforced at write time, per-field type constraints + ASSERT expressions. 
 
@@ -152,6 +157,7 @@ Multi-model (document + graph + relational). `DEFINE TABLE SCHEMAFULL` + `DEFINE
 
 Is in Rust?: Yes
 Embeddable?: Yes
+License: MIT
 
 LPG (Cypher). None — schema-free, no DDL.
 
@@ -168,6 +174,7 @@ LPG (Cypher). None — schema-free, no DDL.
 
 Is in Rust?: Yes
 Embeddable?: Yes
+License: Apache 2 / MIT
 
 {example | description | pointer to more information | …}
 
@@ -184,6 +191,7 @@ Embeddable?: Yes
 
 Is in Rust?: No
 Embeddable?: No?
+License: SSPL
 
 {example | description | pointer to more information | …}
 
