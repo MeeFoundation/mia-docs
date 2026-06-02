@@ -55,9 +55,7 @@ License: MIT
 
 LPG. `CREATE NODE TABLE` / `CREATE REL TABLE` with typed columns — strong typing enforced at write time, primary key constraints
 
-* Good, because LadybugDB is specifically designed for AI memory workloads, combining graph traversal, vector search, typed schemas, and semantic querying in a single embedded database engine. This aligns closely with the platform’s long-term memory and RAG requirements. 
-
-* Good, because the embedded architecture eliminates network overhead and deployment complexity while supporting ACID transactions, low-latency queries, and portable local-first AI applications. 
+* Good, because LadybugDB is specifically designed for AI memory workloads, combining graph traversal, vector search, typed schemas, and semantic querying in a single embedded database engine.  
 
 * Neutral, because LadybugDB uses a strict structured property graph model with mandatory schemas and Cypher queries, which improves consistency and type safety but requires upfront ontology and schema design discipline. 
 
@@ -78,7 +76,7 @@ LPG (GQL). Data Validation - None — schema-free, no DDL.
 
 * Neutral, because Grafeo aims to unify RDF and LPG ecosystems, which increases interoperability and modeling flexibility but can also introduce additional architectural complexity and multiple querying paradigms for developers to manage. 
 
-* Bad, because Grafeo is still an early-stage project with a relatively small ecosystem, limited production adoption, and evolving tooling compared to mature graph databases such as Neo4j or RDF-focused platforms.
+* Bad, because Grafeo is still an early-stage project.
 
 
 ### [fluree](https://labs.flur.ee/)
@@ -91,8 +89,6 @@ RDF triplestore. Fluree is an RDF/JSON-LD database. Data is always inserted as J
 SHACL is Fluree's own schema validation mechanism — it's the W3C standard for constraining RDF graphs, and it's what Fluree natively understands. SHACL (sh:NodeShape) validates class membership, cardinality, datatypes, node kinds
 
 * Good, because Fluree combines graph semantics, linked data, and blockchain-inspired immutability, providing strong auditability and trusted historical state management for AI memory and knowledge systems.
-* 
-* Good, because Fluree supports semantic web standards such as RDF and JSON-LD, enabling interoperable ontologies, linked knowledge graphs, and integration with external semantic ecosystems.
 
 * Neutral, because Fluree’s immutable ledger-style architecture improves traceability and temporal reasoning but introduces a more opinionated data model and operational paradigm than traditional property graph databases.
 
@@ -125,10 +121,6 @@ RDF triplestore. No native SHACL support — schema-free in practice (could laye
 
 * Good, because Oxigraph is a lightweight and high-performance RDF and SPARQL graph database implemented in Rust, making it well suited for embedded semantic knowledge graph applications and local AI systems.
 
-* Good, because Oxigraph fully embraces semantic web standards such as RDF, SPARQL, and RDF-star, enabling interoperability, linked data modeling, and standards-based ontologies for structured AI memory systems.
-
-* Neutral, because Oxigraph focuses strongly on RDF and semantic graph capabilities rather than broader multi-model database features, which is beneficial for standards compliance but may require complementary systems for vector search or operational application data.
-
 * Bad, because Oxigraph currently lacks native AI-oriented capabilities such as integrated vector embeddings, semantic similarity indexing, and hybrid graph-vector retrieval workflows that modern RAG and long-term AI memory systems often require.
 
   
@@ -146,7 +138,7 @@ Multi-model (document + graph + relational). `DEFINE TABLE SCHEMAFULL` + `DEFINE
 
 * Neutral, because SurrealDB emphasizes schema flexibility and developer ergonomics, which accelerates prototyping and iteration but may require additional governance and validation practices for large-scale ontology-driven AI memory systems.
 
-* Bad, because SurrealDB’s graph functionality is less specialized than dedicated graph or semantic databases, and its ecosystem and operational maturity are still developing compared to long-established database platforms.
+* Bad, because SurrealDB’s graph functionality is less specialized than dedicated graph or semantic databases.
 
   
 ### [SparrowDB](https://github.com/ryaker/SparrowDB)
@@ -229,7 +221,7 @@ Once again, it has Rust data shape validation only, no validation on the DB side
 ### [LadybugDB](https://ladybugdb.com/)
 
 LadyBug doesn't support SHACL (it's a property graph, not RDF), so its schema lives as Cypher DDL constants.
-The benchmark does not terminate in a reasonable amount of time. 
+The benchmark does not terminate in a reasonable amount of time, therefore it was rewritten to make use of COPY FROM.
 
 
 ### [Oxigraph](https://github.com/oxigraph/oxigraph)
@@ -243,9 +235,9 @@ ingest complete: graph_objects=157550, claims=100000, elapsed_ms=8779
 The benchmark does not terminate in a reasonable amount of time. 
 
 | Database | Bulk Insert Time | Peak Memory | Nested Query Time | Nested Query RAM Cold Start|
-| ---      | ---              | ---         | ---               |
+| ---      | ---              | ---         | ---               | ---                        |
 |[fluree](https://labs.flur.ee/)| Timeout | | | |
 |[SurrealDB](https://surrealdb.com/)|155,594 ms|11,748,776 KB|136ms| 185,300 KB|
 |[Grafeo](https://grafeo.dev/)|51,481 ms|3,891,744 KB|156 ms|3,588,864 KB |
 |[Oxigraph](https://github.com/oxigraph/oxigraph)|126,152 ms|14,343,484 KB|9 ms|9,232,032 KB |
-|[LadybugDB](https://ladybugdb.com/)Timeout|||| |
+|[LadybugDB](https://ladybugdb.com/)|10,750ms|3.2GB|31 ms|276,780 KB |
