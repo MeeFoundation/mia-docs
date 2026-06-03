@@ -1,106 +1,105 @@
 ---
 status: proposed
-date: 2026-06-02
+date: 2026-06-03
 ---
-# Use iroh-docs without Willow: untrusted sync + a PDN-side validation gate
+# Use iroh-docs without Willow: our own iroh-docs variant with a capability-gated ingest
 
 ## Context and Problem Statement
 
 The planned path ([ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md)) puts a *forked* Willow layer between the PDN node and iroh, so that fine-grained, revocable, MeeId-bound capabilities ([ADR-0004](0004-capabilities-should-refer-to-mee-id.md), [ADR-0007](0007-uwill.md)) are enforced natively at the sync layer. Forking Willow and integrating UWill into its authorization is a large, open-ended effort.
 
-Can we ship document replication **sooner** by using `iroh-docs` as-is — deferring or avoiding the Willow fork — without weakening UWill's guarantees? Two hard constraints frame the answer: we will **not fork iroh**, and we will **not write our own sync protocol**. iroh-docs must do the syncing, unchanged.
+Can we ship document replication **sooner** by syncing over `iroh-docs` — deferring or avoiding the Willow fork — *without* giving up native, write-time capability enforcement? Two constraints frame the answer: we will **not fork iroh** (the endpoint / transport / set-reconciliation engine) and we will **not write our own sync protocol**. iroh-docs must remain the thing that syncs.
 
-Facts verified against iroh-docs 0.100:
+The obvious answer is to treat iroh-docs as an immutable black box: sync everything unchanged into an *untrusted* store, and authorize after the fact at a PDN-side promotion gate. That works, but it buys shipping speed with a permanent tax: no prevention (the untrusted store can be spammed and must be GC'd), data duplicated across an untrusted and a trusted copy, and an observe-then-evict window between "synced" and "trusted". The sharper question the black-box assumption skips: **iroh-docs is small — a multi-writer KV store plus automerge-style reconciliation — so do we actually have to treat it as immutable?**
 
-1. A remote entry is accepted on **namespace+author Ed25519 signature, namespace-id match, and timestamp ≤ now+10min** — nothing else. There is **no injectable pre-persist authorization/validation hook** for incoming entries: the ingest gate (`validate_entry`) is hardcoded, and we can only observe writes *after* they land via `subscribe`. A genuine veto would require forking that seam — ruled out by the constraints.
-2. iroh share tickets are **bearer tokens with no expiry and no revocation**: once a `Write` ticket is handed out, the holder can produce namespace-signed entries indefinitely.
-3. Therefore iroh-docs cannot, by itself, enforce per-claim, time-bound, revocable, MeeId-scoped capabilities. Whatever it stores must be treated as **untrusted**.
+Facts verified against iroh-docs 0.100 (local checkout):
 
-The forcing question: if iroh's store is untrusted, *where* does authorization happen, and *how* is trusted state derived from it?
+1. Ingest funnels through **one** validation chokepoint: `validate_entry()` (`src/sync.rs:622`), called by both the direct `insert_remote_entry → insert_entry` path (`src/sync.rs:452`) and the live-sync path. It accepts on **namespace+author Ed25519 signature, namespace-id match, and timestamp ≤ now+10min** (`MAX_TIMESTAMP_FUTURE_SHIFT`, `src/sync.rs:48`) — nothing else.
+2. That chokepoint sits on top of an **already-existing, per-entry, pre-persist accept/reject callback**. The set-reconciliation engine's `process_message()` takes a `validate_cb(&store, &entry, content_status) -> bool` (`src/ranger.rs:324`, doc at `:314`); when it returns `false` the entry is **dropped and never stored** (the `put` at `src/ranger.rs:394` is guarded by it). iroh-docs simply hardwires that callback to `validate_entry(...).is_ok()` (`src/sync.rs:548–555`) and does **not** expose it through its public API.
+3. iroh share tickets are **bearer tokens with no expiry and no revocation**: once a `Write` ticket is handed out, the holder can produce namespace-signed entries indefinitely.
+
+So while iroh-docs exposes no injectable pre-persist hook through its public API, internally the veto already exists, it is clean (one boolean per entry, evaluated before `put`), and it sits exactly where iroh-docs already does signature/timestamp validation. The forcing question becomes: **do we author our own variant of iroh-docs that runs our capability check at that seam — accepting or rejecting each entry at write time — or do we keep iroh-docs verbatim and pay the untrusted-store tax forever?**
 
 ## Decision Drivers
 
-* Ship replication sooner — save the Willow-fork implementation cost.
-* No fork of iroh; no bespoke sync protocol (iroh-docs unchanged).
-* Preserve UWill's guarantees (per-claim, expiring, revocable, MeeId-bound) regardless of what the transport enforces.
-* A *cheap* pre-filter for metadata sync — "could this even have reached me?", i.e. does a connection with this MeeId exist at all — without running full UWill validation on every gossiped record.
-* Untrusted input is adversarial: forged / replayed / spam entries must never become trusted state; eviction and GC must be possible.
-* Confidentiality: the untrusted store is readable by every peer that can sync it.
+* Ship replication sooner than the Willow fork — but keep **prevention** (reject bad entries before they persist), not just post-hoc cleanup.
+* No fork of **iroh** (transport / endpoint / set-reconciliation); no bespoke sync protocol.
+* Keep the modification to iroh-docs **minimal and upstream-trackable** — a thin seam we re-apply across releases, not a divergent rewrite. iroh-docs is a KV-store + automerge, small enough that this is cheap (unlike Willow).
+* Preserve UWill's guarantees (per-claim, expiring, revocable, MeeId-bound), enforced at the sync layer rather than bolted on afterwards.
+* Capabilities are **data we control** — a verifiable key/delegation chain ([ADR-0007](0007-uwill.md)) — not iroh ACLs; iroh tickets cannot carry expiry or revocation.
+* The gate needs the issued capabilities on hand when data arrives → a way to deliver them ahead of / alongside the data.
 
 ## Considered Options
 
 * **Fork Willow now and enforce UWill at the sync layer** — the [ADR-0006](0006-why-fork-of-willow.md) path.
-* **Fork iroh-docs** to inject a pre-persist authorization callback at the `validate_entry` seam.
-* **Use iroh-docs unchanged as an untrusted store; validate at a PDN-side gate** (observe-then-reconcile into trusted storage). ← chosen
+* **iroh-docs verbatim as an untrusted store + a PDN-side promotion gate** (observe-then-reconcile).
+* **Our own minimal iroh-docs variant with a capability-gated ingest** — inject the UWill/Peering check at the existing `validate_entry` / `validate_cb` seam, so each entry is accepted (auto-merged) or rejected at write time. ← chosen
 
 ## Decision Outcome
 
-Chosen option: **iroh-docs unchanged as an untrusted store, with a PDN-side validation gate**, because it is the only option that satisfies both hard constraints (no iroh fork, no custom sync) while preserving UWill — and it *defers* rather than deletes the Willow fork.
+Chosen option: **our own minimal variant of iroh-docs with a capability-gated ingest**, because it restores native, write-time capability enforcement at the cost of a *thin, well-located* modification — far cheaper than the Willow fork, and without the untrusted-store tax of the verbatim option.
 
-The model (working names — see open questions):
+It is a **fork in the git sense, but deliberately not a divergent one**: we do not re-architect iroh-docs, we vendor it and own a single seam ("свой вариант", not a rewrite). We still do **not** fork iroh itself, and the change is small enough to re-base onto upstream iroh-docs releases. The `iroh-docs-experiment` crate, building against a local checkout of the variant, is the staging ground.
 
-**Three locations across two trust tiers.**
+**The seam.** `validate_entry()` (`src/sync.rs:622`) — the single chokepoint both ingest paths already call — gains a capability check. Equivalently/additionally, the ranger's `validate_cb` (`src/ranger.rs:324`) is plumbed out to a PDN-supplied validator instead of being hardwired to `validate_entry(...).is_ok()`. The callback already returns `bool` and already runs before `put`, so the semantics are exactly: **valid capability chain → auto-merge into the persistent store; invalid → turned away, never stored.** No separate untrusted store, no GC of junk, no observe-then-evict window.
 
-1. **Untrusted store** — one or more `iroh-docs` replicas. iroh-docs owns *all* networking, gossip, and reconciliation. We assume every record here is adversarial; iroh's signature / namespace / timestamp checks are the only floor.
-2. **Trusted metadata store** — local, non-replicated. Admission gated by **Peering** (the lightweight connection capability): we keep metadata only for MeeIds we actually have a connection with. Answers "could this legitimately have reached me?".
-3. **Trusted data store** — local, non-replicated. Admission gated by **UWill**: per-claim, expiring, revocable, MeeId-bound payload admission.
+**Capabilities are a verifiable key-chain, carried as payload/metadata — not transport ACLs.**
 
-**The gate (promotion).** A trusted PDN-side task drains the untrusted store (via `subscribe` / reads), validates each record, and only then writes into the trusted metadata / data stores. Because iroh-docs has no pre-write veto, the gate is **promotion-time, observe-then-reconcile** — not write-time. Records that fail validation are never promoted and are GC'd from the untrusted store; revocations (themselves records) cause already-promoted state to be **evicted** on recompute. Trusted state is thus a deterministic projection of the validated subset of the untrusted log — rebuildable and revocation-aware.
+* **UWill** ([ADR-0007](0007-uwill.md)) — the heavyweight, per-claim, expiring, revocable, MeeId-bound capability: a delegation chain of keys plus a `MeeIdentityProof`, verifiable offline. Checked at the gate; governs admission of **data** entries.
+* **Peering** — the lightweight connection capability ("does a connection with this MeeId exist"): a cheap pre-filter, carrying its own expiry/revocation since iroh tickets cannot. Governs admission of **metadata** entries.
 
-**Two capability tiers, carried as payload data (not transport ACLs).**
+**Capability delivery (metadata channel).** For the gate to validate a data entry, the relevant capability must already be local. Issued capabilities are therefore delivered to the peer **as metadata** ahead of the data they authorize: a dedicated metadata store/namespace, reachable by its own ticket, into which capabilities are written (and themselves Peering-gated on ingest). When data entries then arrive, the data-side validator looks the chain up locally. This matters because `validate_cb` sees the entry's record (key, author, content hash, timestamp, `ContentStatus`) but **not necessarily the blob content** — so authorization cannot depend on downloading the payload first.
 
-* **UWill** ([ADR-0007](0007-uwill.md)) — the heavyweight, per-claim, expiring, revocable, MeeId-bound capability. Verified at the gate; governs admission into the trusted **data** store.
-* **Peering** — the lightweight connection capability. Proves only that a **connection with a given MeeId exists**, i.e. that a piece of *metadata* could legitimately have reached us. A cheap pre-filter on metadata sync before (or instead of) full UWill evaluation; governs admission into the trusted **metadata** store. It must carry **its own** expiry / revocation, since iroh tickets cannot.
-
-**iroh tickets are demoted to transport bootstrap only** — "can this peer reach / append to the untrusted store", never "is this peer authorized". Their lack of expiry / revocation is acceptable *precisely because* untrusted-store access grants no trusted access; authority lives entirely in the two capability tiers above, which we control.
+**iroh tickets are demoted to transport bootstrap only** — "can this peer reach / write to this store", never "is this peer authorized". Their lack of expiry/revocation is acceptable because authority lives entirely in the capability chains we check at the gate.
 
 ### Consequences
 
-* Good, because we ship on iroh-docs unchanged — no Willow fork, no iroh fork, no custom sync on the critical path.
-* Good, because UWill's guarantees are independent of the transport: forever-tickets and unauthenticated relays cannot forge trusted state.
-* Good, because trusted state is a rebuildable projection → revocation and conflict resolution fall out as recompute / evict.
-* Good, because Peering rejects metadata from non-connections cheaply, without full UWill on every record.
-* Bad, because there is no *prevention*: the untrusted store can be spammed / polluted; we can only refuse to promote and then GC. Needs quotas / TTL / cleanup.
-* Bad, because validated data is duplicated (untrusted copy + trusted copy) and the gate adds latency / eventual consistency between "synced" and "trusted".
-* Bad, because confidentiality requires encrypting payloads in the untrusted store (world-readable to syncing peers); the gate also has to decrypt.
-* Neutral, because the Willow fork is deferred, not abandoned — if native sync-layer enforcement later proves worth it, this gate becomes the spec for what the fork must enforce.
-* Known gap: Peering is named but not yet specified; untrusted-store topology and promotion timing are open (see below).
+* Good — **prevention, not cleanup**: forged / unauthorized / expired entries are rejected before they persist. No untrusted holding store, no spam-GC, no observe-then-evict window, no untrusted⇄trusted duplication.
+* Good — native UWill enforcement at sync time, but at a fraction of the Willow-fork cost: the change is one boolean seam over a KV-store-plus-automerge.
+* Good — still no iroh (transport) fork and no custom sync protocol; iroh-docs still does the syncing.
+* Good — capabilities stay transport-independent: forever-tickets and unauthenticated relays cannot forge admitted state, because admission is our check, not iroh's signature floor.
+* Bad — **we now own a variant of iroh-docs** and must track upstream (0.100 → later). Mitigated by keeping the change minimal and localized to `validate_entry` / `validate_cb`; the standing risk is that upstream reworks that seam.
+* Bad — **revocation after admission is not covered by an ingest gate alone.** A capability valid at write time can be revoked later; a pre-persist veto stops bad *new* entries but does not retract an already-merged one. We still need revocations-as-entries to trigger eviction / re-validation of previously admitted state (the one thing the observe-then-reconcile model got for free).
+* Bad — **bootstrapping order**: the metadata/capability channel must be populated before the data it authorizes, or valid data is rejected as un-authorizable and must be re-offered.
+* Bad — confidentiality unchanged: entries are readable by every peer that can sync the store; sensitive payloads still need encryption, and the gate must decrypt to validate where the capability lives in content.
+* Neutral — the Willow fork is deferred, not abandoned; this variant's gate is a smaller, concrete spec of what native enforcement must do.
 
 ## Validation
 
-A draft `impl` of the PDN sync layer (the `WillowLayer` trait) over iroh-docs that: writes only to the untrusted store; promotes via the gate into the trusted metadata / data stores; rejects forged / expired / revoked records under adversarial test inputs; and rebuilds trusted state from the untrusted log alone. The existing `iroh-docs-experiment` crate is the staging ground. Compliance criterion: **no record reaches trusted storage without passing Peering (metadata) or UWill (data) validation at the gate.**
+A draft `impl` of the PDN sync layer (the `WillowLayer` trait) over the iroh-docs variant that: rejects forged / expired / revoked / un-peered entries **at the `validate_entry` / `validate_cb` seam** under adversarial test inputs (rejected entries must be *absent* from the store, not merely unpromoted); admits valid entries by auto-merge; delivers capabilities over the metadata channel ahead of data; and evicts previously-admitted entries when a later revocation arrives. The existing `iroh-docs-experiment` crate, now on a local-path dependency on the variant, is the staging ground. Compliance criterion: **no entry is stored that fails Peering (metadata) or UWill (data) validation at ingest.**
 
 ## Pros and Cons of the Options
 
 ### Fork Willow now and enforce UWill at the sync layer
-* Good, native per-claim / revocable enforcement at sync time; the untrusted store ≈ the trusted store.
-* Good, prevention rather than cleanup — no observe-then-evict window.
-* Bad, large, open-ended implementation; blocks replication on the fork.
-* Bad, couples shipping to Willow + UWill integration risk.
+* Good, native per-claim / revocable enforcement; designed for exactly this.
+* Bad, large, open-ended implementation; blocks replication on the fork and on UWill integration risk.
 
-### Fork iroh-docs to inject a pre-persist authorization callback
-* Good, a true pre-write veto; the `validate_entry` / `validate_cb` seam is small and clean.
-* Bad, violates the "don't fork iroh" constraint; we then own a divergent iroh-docs.
-* Bad, still does not fix forever-tickets, and does not give UWill semantics without further work.
+### iroh-docs verbatim as an untrusted store + PDN-side promotion gate
+* Good, zero modification to iroh-docs; fastest possible start.
+* Good, trusted state is a rebuildable projection → revocation falls out as recompute / evict.
+* Bad, no prevention — the untrusted store is spammable and needs quotas / TTL / GC.
+* Bad, data duplicated (untrusted + trusted) and an eventual-consistency lag between "synced" and "trusted".
 
-### iroh-docs unchanged as untrusted store + PDN-side gate (chosen)
-* Good, satisfies both hard constraints; fastest path to replication.
-* Good, transport-independent UWill; rebuildable, revocation-aware trusted state.
-* Neutral, capabilities live as payload data, not as transport ACLs.
-* Bad, no prevention (spam / pollution → GC needed); data duplicated; confidentiality needs payload encryption.
+### Our own minimal iroh-docs variant with a capability-gated ingest (chosen)
+* Good, write-time prevention at the seam iroh-docs already validates on; no untrusted-store tax.
+* Good, minimal, upstream-trackable change over a small codebase; cheaper than Willow by far.
+* Neutral, capabilities live as data (key-chains) we check, not as transport ACLs.
+* Bad, we maintain a variant and must re-apply the seam across releases.
+* Bad, revocation-after-admission and capability-delivery ordering still need their own machinery.
 
 ## More Information
 
-The shape of this ADR: an untrusted store synced unchanged by iroh-docs, and a trusted store gated by our own validation — any peer may append to the untrusted store, but records enter trusted storage only after passing our checks. Names here ("untrusted store", "trusted store") are working titles to be revisited; the lightweight capability is named **Peering**.
+The crux: iroh-docs is small enough (KV store + automerge over iroh's set-reconciliation) that we don't have to treat it as immutable — and the pre-persist accept/reject callback we need **already exists** internally (`ranger::process_message`'s `validate_cb`, currently hardwired to `validate_entry(...).is_ok()`), it just isn't exposed. Owning a thin variant that runs our capability chain there is far cheaper than the Willow fork and avoids the verbatim option's permanent untrusted-store cost. Names ("Peering", "metadata / data store") are working titles.
 
 Open questions to resolve before `accepted`:
 
-1. **Untrusted-store topology** — per-connection / per-recipient inbox / per-namespace replicas.
-2. **Promotion timing** — synchronous on read vs background reconcile.
-3. **Confidentiality** — payload-encryption scheme for the untrusted store.
-4. **GC / quota** policy for un-promotable records.
-5. **Peering spec** — exact format, expiry / revocation mechanism, and its relationship to UWill (a degenerate UWill, or a separate token?).
+1. **Seam shape** — extend `validate_entry()` directly vs. plumb `validate_cb` out as a public, PDN-supplied validator; how to give it access to the capability/metadata index without the blob content.
+2. **Revocation after admission** — revocations-as-entries + eviction / re-validation pass; how it interacts with automerge's last-writer-wins.
+3. **Capability delivery** — the metadata-channel bootstrap: ticketed metadata store, write / Peering rules, and ordering vs. the data it authorizes.
+4. **Upstream tracking** — vendoring / rebase strategy for the variant; pinning vs. following iroh-docs releases.
+5. **Peering spec** — exact format, expiry / revocation, relationship to UWill (a degenerate UWill, or a separate token?).
+6. **Confidentiality** — payload encryption for sensitive entries and how the gate validates over it.
 
 Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-id.md), [ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md), [ADR-0007](0007-uwill.md).
 
-External references: iroh-docs 0.100 — remote entries validated by namespace / author signature + timestamp only (`Replica::insert_entry` → `validate_entry`, `iroh-docs/src/sync.rs`); no injectable pre-persist hook (only after-the-fact `Doc::subscribe`); `DownloadPolicy` gates blob *download*, not record ingestion; share tickets are non-expiring bearer tokens.
+External references: iroh-docs 0.100 — single ingest chokepoint `validate_entry` (`src/sync.rs:622`), called from `insert_entry` (`:452`) and the live-sync `validate_cb` closure (`:548–555`); per-entry pre-persist accept/reject `validate_cb` in `ranger::process_message` (`src/ranger.rs:314,324,394`), not exposed publicly; share tickets are non-expiring bearer tokens.
