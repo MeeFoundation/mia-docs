@@ -241,3 +241,14 @@ The benchmark does not terminate in a reasonable amount of time.
 |[Grafeo](https://grafeo.dev/)|51,481 ms|3,891,744 KB|156 ms|3,588,864 KB |
 |[Oxigraph](https://github.com/oxigraph/oxigraph)|126,152 ms|14,343,484 KB|9 ms|9,232,032 KB |
 |[LadybugDB](https://ladybugdb.com/)|10,750ms|3.2GB|31 ms|276,780 KB |
+
+
+----
+
+## Tests on Android Emulator
+
+The metrics are: (wall time: open + load, peak RAM RSS)
+
+| Database | Dataset 10k | Dataset 100k | Dataset 500k | Dataset 1kk |
+| ---------|-------------|--------------|--------------|-------------|
+|[Grafeo](https://grafeo.dev/)|Ingest (520ms, 236mb); Query (243ms, 226mb)|Ingest (4080ms, 727mb); Query (1858ms, 544mb)|Ingest (24661ms, 2755mb); Query (9115ms, 2234mb)|Ingest (OOM 12GB RAM device); Query ()|
