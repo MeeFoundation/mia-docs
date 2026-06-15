@@ -12,7 +12,7 @@ Can we ship document replication **sooner** by syncing over `iroh-docs` — defe
 
 The obvious answer is to treat iroh-docs as an immutable black box: sync everything unchanged into an *untrusted* store, and authorize after the fact at a PDN-side promotion gate. That works, but it buys shipping speed with a permanent tax: no prevention (the untrusted store can be spammed and must be GC'd), data duplicated across an untrusted and a trusted copy, and an observe-then-evict window between "synced" and "trusted". The sharper question the black-box assumption skips: **iroh-docs is small — a multi-writer KV store plus automerge-style reconciliation — so do we actually have to treat it as immutable?**
 
-Facts verified against iroh-docs 0.100 (local checkout):
+Facts verified against iroh-docs 0.100 (our fork: `github.com/MeeFoundation/pdn-store`):
 
 1. Ingest funnels through **one** validation chokepoint: `validate_entry()` (`src/sync.rs:622`), called by both the direct `insert_remote_entry → insert_entry` path (`src/sync.rs:452`) and the live-sync path. It accepts on **namespace+author Ed25519 signature, namespace-id match, and timestamp ≤ now+10min** (`MAX_TIMESTAMP_FUTURE_SHIFT`, `src/sync.rs:48`) — nothing else.
 2. That chokepoint sits on top of an **already-existing, per-entry, pre-persist accept/reject callback**. The set-reconciliation engine's `process_message()` takes a `validate_cb(&store, &entry, content_status) -> bool` (`src/ranger.rs:324`, doc at `:314`); when it returns `false` the entry is **dropped and never stored** (the `put` at `src/ranger.rs:394` is guarded by it). iroh-docs simply hardwires that callback to `validate_entry(...).is_ok()` (`src/sync.rs:548–555`) and does **not** expose it through its public API.
@@ -39,7 +39,7 @@ So while iroh-docs exposes no injectable pre-persist hook through its public API
 
 Chosen option: **our own minimal variant of iroh-docs with a capability-gated ingest**, because it restores native, write-time capability enforcement at the cost of a *thin, well-located* modification — far cheaper than the Willow fork, and without the untrusted-store tax of the verbatim option.
 
-It is a **fork in the git sense, but deliberately not a divergent one**: we do not re-architect iroh-docs, we vendor it and own a single seam ("свой вариант", not a rewrite). We still do **not** fork iroh itself, and the change is small enough to re-base onto upstream iroh-docs releases. The `iroh-docs-experiment` crate, building against a local checkout of the variant, is the staging ground.
+It is a **fork in the git sense, but deliberately not a divergent one**: we do not re-architect iroh-docs, we vendor it and own a single seam ("свой вариант", not a rewrite). We still do **not** fork iroh itself, and the change is small enough to re-base onto upstream iroh-docs releases. The fork lives at `github.com/MeeFoundation/pdn-store`; the `data-layer` crate, building against it, is the staging ground.
 
 **The seam.** `validate_entry()` (`src/sync.rs:622`) — the single chokepoint both ingest paths already call — gains a capability check. Equivalently/additionally, the ranger's `validate_cb` (`src/ranger.rs:324`) is plumbed out to a PDN-supplied validator instead of being hardwired to `validate_entry(...).is_ok()`. The callback already returns `bool` and already runs before `put`, so the semantics are exactly: **valid capability chain → auto-merge into the persistent store; invalid → turned away, never stored.** No separate untrusted store, no GC of junk, no observe-then-evict window.
 
@@ -66,7 +66,7 @@ It is a **fork in the git sense, but deliberately not a divergent one**: we do n
 
 ## Validation
 
-A draft `impl` of the PDN sync layer (the `WillowLayer` trait) over the iroh-docs variant that: rejects forged / expired / revoked / un-peered entries **at the `validate_entry` / `validate_cb` seam** under adversarial test inputs (rejected entries must be *absent* from the store, not merely unpromoted); admits valid entries by auto-merge; delivers capabilities over the metadata channel ahead of data; and evicts previously-admitted entries when a later revocation arrives. The existing `iroh-docs-experiment` crate, now on a local-path dependency on the variant, is the staging ground. Compliance criterion: **no entry is stored that fails Peering (metadata) or UWill (data) validation at ingest.**
+A draft `impl` of the PDN data layer (the `DataLayer` trait) over the iroh-docs variant that: rejects forged / expired / revoked / un-peered entries **at the `validate_entry` / `validate_cb` seam** under adversarial test inputs (rejected entries must be *absent* from the store, not merely unpromoted); admits valid entries by auto-merge; delivers capabilities over the metadata channel ahead of data; and evicts previously-admitted entries when a later revocation arrives. The `data-layer` crate, depending on the variant via git (`MeeFoundation/pdn-store`), is the staging ground. Compliance criterion: **no entry is stored that fails Peering (metadata) or UWill (data) validation at ingest.**
 
 ## Pros and Cons of the Options
 
