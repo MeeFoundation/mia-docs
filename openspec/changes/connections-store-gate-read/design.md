@@ -4,7 +4,7 @@
 
 ADR-0008 gave us a capability-gated ingest: the forked iroh-docs (`pdn-store`) consults a `CapabilityValidator` (`Fn(&SignedEntry) -> bool`) at the `validate_entry` chokepoint, and `data-layer` bridges it to a domain `IngestPolicy`. The first policy (Tier 1) reads an in-memory `Connections` set, mutated by hand — per-device and lost on restart.
 
-Connections are **identity-level state**: all of Alice's devices must converge on one connection list. The natural home is an iroh-docs replica synced between her devices like any other doc. This change builds exactly that replica and proves it replicates between two devices — nothing more.
+Connections are **identity-level state**: all of Alice's devices must converge on one connection list. The natural home is a pdn-store replica synced between her devices like any other doc. This change builds exactly that replica and proves it replicates between two devices — nothing more.
 
 It deliberately stops short of having the gate *read* the store to admit data (that is the larger follow-up motivated by the gate's working set outgrowing memory once UWill/KERI land — see Deferred). Proving device-sync first is valuable on its own and, crucially, **requires no fork change**: the only enforcement here is a device axiom that needs nothing but the namespace→binding resolution the current seam already affords.
 
@@ -12,7 +12,7 @@ It deliberately stops short of having the gate *read* the store to admit data (t
 
 **Goals:**
 
-- A dedicated, device-replicated connections store: its own iroh-docs replica, separate from data namespaces, with `connect`/`disconnect` as entry writes/tombstones.
+- A dedicated, device-replicated connections store: its own pdn-store replica, separate from data namespaces, with `connect`/`disconnect` as entry writes/tombstones.
 - That store replicates between two devices of one identity, passing the ingest gate via a **device axiom** that needs no store read.
 - No fork change: reuse the current `Fn(&SignedEntry) -> bool` seam.
 
@@ -28,15 +28,15 @@ It deliberately stops short of having the gate *read* the store to admit data (t
 
 ### D1. Connections live in their own replica, not inside `alice/alice` data space
 
-One iroh-docs doc per identity-on-node, holding only connection state. Layout:
+One pdn-store doc per identity-on-node, holding only connection state. Layout:
 
 ```
 path:    connections/<pdnid-hex>     (64 lowercase hex chars, fits EntryPath limits)
 payload: opaque marker (identity is in the key)
-disconnect: tombstone (iroh-docs empty entry via del; len == 0 == not live)
+disconnect: tombstone (pdn-store empty entry via del; len == 0 == not live)
 ```
 
-*Why:* separate ticket (transport access to metadata without data and vice versa), separate gate policy (structural, not key-prefix dispatch), no shared LWW key space with data, independent retention/encryption later. Replication is stock iroh-docs: ticket bootstrap at linking, set reconciliation for catch-up, gossip for live updates, per-key LWW for concurrent device edits.
+*Why:* separate ticket (transport access to metadata without data and vice versa), separate gate policy (structural, not key-prefix dispatch), no shared LWW key space with data, independent retention/encryption later. Replication is stock pdn-store: ticket bootstrap at linking, set reconciliation for catch-up, gossip for live updates, per-key LWW for concurrent device edits.
 
 *Alternative rejected:* `connections/` prefix inside the `alice/alice` data namespace — mixes lifecycles and forces one policy to serve two kinds of content (ADR-0008 explicitly separates metadata and data stores).
 

@@ -2,13 +2,13 @@
 
 ## Why
 
-Connections ("which PdnIds do I accept entries from") are identity-level state: every device of Alice must agree on them. Today they live in a per-device, in-memory set populated by hand (ADR-0008 Tier 1) — lost on restart and never shared between Alice's devices. The first concrete step is to lift them out of memory into a **dedicated replicated store that Alice's devices converge on**, replicated by plain iroh-docs sync.
+Connections ("which PdnIds do I accept entries from") are identity-level state: every device of Alice must agree on them. Today they live in a per-device, in-memory set populated by hand (ADR-0008 Tier 1) — lost on restart and never shared between Alice's devices. The first concrete step is to lift them out of memory into a **dedicated replicated store that Alice's devices converge on**, replicated by plain pdn-store sync.
 
 This change is deliberately scoped to exactly that: the connections store existing and syncing between two devices of one identity. Making the ingest gate *consume* that store to admit/reject data is a separate, larger follow-up (see Out of Scope) — proving device-sync first de-risks it and touches no fork code.
 
 ## What Changes
 
-- **Dedicated connections store**: a per-identity iroh-docs replica, deliberately *separate* from data namespaces (own doc, own ticket, own lifecycle). One entry per connection at path `connections/<pdnid-hex>`; payload is an opaque marker (the key carries the identity); disconnect = tombstone (empty entry). Replication between devices is plain iroh-docs sync — ticket bootstrap, set reconciliation, live gossip.
+- **Dedicated connections store**: a per-identity pdn-store replica, deliberately *separate* from data namespaces (own doc, own ticket, own lifecycle). One entry per connection at path `connections/<pdnid-hex>`; payload is an opaque marker (the key carries the identity); disconnect = tombstone (empty entry). Replication between devices is plain pdn-store sync — ticket bootstrap, set reconciliation, live gossip.
 - **Typed bindings in the registry**: the registry distinguishes `Data(NamespaceId)` (peer-visible `(about, issued_by)` pair) from `Connections { owner: PdnId }` (device-shared store, no domain `NamespaceId`). `IngestCtx` carries the resolved `Binding`. The domain id model in `pdn-types` is untouched.
 - **Device axiom policy (`SelfOwned`)**: a node admits entries of bindings owned by its own PdnId *without any store read*. This is the whole enforcement needed in this scope — it lets the connections store replicate between Alice's devices *through* the existing gate, with no chicken-and-egg against an empty store. It reuses the current fork seam (`Fn(&SignedEntry) -> bool`); **the fork is not modified**.
 - **New scenario test**: two devices of Alice (phone, laptop), same PdnId — `connect`/`disconnect` performed on phone, convergence observed on laptop (the connection appears, a later disconnect propagates). No second identity, no data-namespace gating.
@@ -26,7 +26,7 @@ Also still out: content-dependent UWill chain validation (needs blob payloads, n
 
 ## Capabilities
 
-Capability ids are component-prefixed (the openspec delta layout is flat: `specs/<capability>/spec.md`). Specs are component-owned: on archive they land in the component tree, following the `components/pdn-node/uwill.md` convention — not at the specs root. Nothing in this change specifies `pdn-node`-level behavior or touches the iroh-docs fork; its sole subject is the `data-layer` crate.
+Capability ids are component-prefixed (the openspec delta layout is flat: `specs/<capability>/spec.md`). Specs are component-owned: on archive they land in the component tree, following the `components/pdn-node/uwill.md` convention — not at the specs root. Nothing in this change specifies `pdn-node`-level behavior or touches pdn-store (the fork); its sole subject is the `data-layer` crate.
 
 | Capability (delta)                       | Archive destination                                            |
 | ---------------------------------------- | -------------------------------------------------------------- |
