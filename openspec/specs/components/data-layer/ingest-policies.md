@@ -6,11 +6,11 @@ Domain-level admission policies in `data-layer`: how the fork's validator callba
 
 ## Requirements
 ### Requirement: Ingest context carries the resolved binding
-The bridge SHALL resolve the entry's iroh namespace through the node's registry into a typed binding — `Data(NamespaceId)` for peer-visible `(about, issued_by)` namespaces, `Connections { identity }` for the device-shared connections store — and SHALL hand policies an ingest context carrying that binding (absent for unbound replicas). Resolution SHALL use only namespace→binding registry state, so it runs within the existing fork seam with no fork change.
+The bridge SHALL resolve the entry's iroh namespace through the node's registry into a typed binding — `Data { issuer }` for peer-visible data namespaces (keyed by issuer), `Connections { identity }` for the device-shared connections store — and SHALL hand policies an ingest context carrying that binding (absent for unbound replicas). Resolution SHALL use only namespace→binding registry state, so it runs within the existing fork seam with no fork change.
 
 #### Scenario: Bound data namespace resolves
 - **WHEN** an entry arrives for an iroh namespace bound as a data namespace
-- **THEN** the policy sees `Data(NamespaceId)` with the namespace's `(about, issued_by)` pair
+- **THEN** the policy sees `Data { issuer }` carrying the replica's issuer
 
 #### Scenario: Bound connections store resolves
 - **WHEN** an entry arrives for an iroh namespace bound as the connections store
@@ -21,7 +21,7 @@ The bridge SHALL resolve the entry's iroh namespace through the node's registry 
 - **THEN** the policy sees an absent binding
 
 ### Requirement: Invariant 1 admits own bindings without store reads
-The `SelfOwned` policy SHALL enforce Invariant 1: it admits entries of bindings of the local identity — `Connections { identity == me }`, `PrivateMetadata { identity == me }`, and `Data(ns)` with `ns.issued_by == me` — without consulting any store, so that an identity's own state replicates between its devices and bootstraps against empty local state.
+The `SelfOwned` policy SHALL enforce Invariant 1: it admits entries of bindings of the local identity — `Connections { identity == me }`, `PrivateMetadata { identity == me }`, and `Data { issuer == me }` — without consulting any store, so that an identity's own state replicates between its devices and bootstraps against empty local state.
 
 #### Scenario: Own connections store admitted on empty state
 - **WHEN** entries of the local identity's connections store arrive while the local connections store holds no live connections
