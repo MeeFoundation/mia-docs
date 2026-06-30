@@ -6,7 +6,7 @@ Device-replicated registry of a user's connections: a dedicated pdn-store replic
 
 ## Requirements
 ### Requirement: Connections live in a dedicated replica
-Connection state SHALL be stored in its own pdn-store replica, separate from every data namespace. The replica SHALL be bound in the node's registry as `Connections { identity }` (no domain `NamespaceId`); data namespaces keep the `(about, issued_by)` pair unchanged.
+Connection state SHALL be stored in its own pdn-store replica, separate from every data namespace. The replica SHALL be bound in the node's registry as `Connections { identity }` (no domain `NamespaceId`); data namespaces are keyed by their issuer (`Data { issuer }`).
 
 #### Scenario: Creating the store binds it by kind
 - **WHEN** a node creates its connections store
