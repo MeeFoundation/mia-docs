@@ -1,16 +1,16 @@
 # UWill capability format
 
-Technical specification of the UWill capability token, chain validation rules, revocation mechanism, and identity resolution as implemented inside the PDN node (and the `MeeFoundation/iroh-willow` fork it embeds). The architectural rationale — why UWill rather than Meadowcap or some other alternative — lives in [ADR-0007](../../architecture/adr/0007-uwill.md).
+Technical specification of the UWill capability token, chain validation rules, revocation mechanism, and identity resolution as implemented inside the PDN node. The architectural rationale — why UWill rather than Meadowcap or some other alternative — lives in [ADR-0007](../../architecture/adr/0007-uwill.md).
 
 ## Token format
 
-A UWill delegation is a standard UCAN v1.0.0-rc.1 Delegation (DAG-CBOR envelope) with Willow-specific conventions:
+A UWill delegation is a standard UCAN v1.0.0-rc.1 Delegation (DAG-CBOR envelope):
 
 | Field   | Meaning                                                                                                              |
 | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `iss`   | Delegator's MeeId-backed DID (`did:key` now, `did:keri` later).                                                      |
-| `aud`   | Delegate's MeeId-backed DID.                                                                                         |
-| `sub`   | Namespace owner's MeeId-backed DID.                                                                                  |
+| `iss`   | Delegator's PdnId-backed DID (`did:key` now, `did:keri` later).                                                      |
+| `aud`   | Delegate's PdnId-backed DID.                                                                                         |
+| `sub`   | Namespace owner's PdnId-backed DID.                                                                                  |
 | `cmd`   | List of granted commands. UWill-specific deviation from UCAN's single-command convention. See [Commands](#commands). |
 | `res`   | Granted resource: the `ClaimId` of the specific claim this capability covers. See [Resource](#resource).             |
 | `nbf`   | Wall-clock validity start (unix ms).                                                                                 |
@@ -68,11 +68,11 @@ Eventually-consistent, CID-based:
 
 ## Identity resolution
 
-UWill capabilities reference MeeIds; Willow's wire protocol works in per-device keys. The implementation bridges the two:
+UWill capabilities reference PdnIds; Willow's wire protocol works in per-device keys. The implementation bridges the two:
 
-- A `MeeId` is resolved through the identity layer to the set of currently active willow keys for that identity.
-- Capability chains do not break on key rotation because they reference the MeeId-DID, not raw keys.
-- Adding or removing a device under an existing MeeId does not require re-issuing delegations — the resolution layer widens or narrows the active key set internally.
+- A `PdnId` is resolved through the identity layer to the set of currently active willow keys for that identity.
+- Capability chains do not break on key rotation because they reference the PdnId-DID, not raw keys.
+- Adding or removing a device under an existing PdnId does not require re-issuing delegations — the resolution layer widens or narrows the active key set internally.
 
 The DID form starts as `did:key` (direct ed25519 public-key extraction) and migrates to `did:keri` once KERI is wired in. The DID stays stable across key rotations.
 
@@ -80,7 +80,7 @@ The DID form starts as `did:key` (direct ed25519 public-key extraction) and migr
 
 Willow's Private Interest Overlap (PIO) protocol requires three properties from capabilities. UWill provides them as:
 
-- **receiver** → `aud` DID resolved to the currently active willow keys for that MeeId.
+- **receiver** → `aud` DID resolved to the currently active willow keys for that PdnId.
 - **granted_namespace** → `sub` DID resolved to a `NamespacePublicKey`.
 - **granted_resource** → the `res.claim_id`, resolved by the iroh-willow fork to the underlying willow leaf. Overlap between two UWill receivers is equality on `ClaimId` — no prefix matching, no geometric area intersection.
 

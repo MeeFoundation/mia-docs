@@ -6,7 +6,7 @@ date: 2026-06-03
 
 ## Context and Problem Statement
 
-The planned path ([ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md)) puts a *forked* Willow layer between the PDN node and iroh, so that fine-grained, revocable, MeeId-bound capabilities ([ADR-0004](0004-capabilities-should-refer-to-mee-id.md), [ADR-0007](0007-uwill.md)) are enforced natively at the sync layer. Forking Willow and integrating UWill into its authorization is a large, open-ended effort.
+The planned path ([ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md)) puts a *forked* Willow layer between the PDN node and iroh, so that fine-grained, revocable, PdnId-bound capabilities ([ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md)) are enforced natively at the sync layer. Forking Willow and integrating UWill into its authorization is a large, open-ended effort.
 
 Can we ship document replication **sooner** by syncing over `iroh-docs` — deferring or avoiding the Willow fork — *without* giving up native, write-time capability enforcement? Two constraints frame the answer: we will **not fork iroh** (the endpoint / transport / set-reconciliation engine) and we will **not write our own sync protocol**. iroh-docs must remain the thing that syncs.
 
@@ -25,7 +25,7 @@ So while iroh-docs exposes no injectable pre-persist hook through its public API
 * Ship replication sooner than the Willow fork — but keep **prevention** (reject bad entries before they persist), not just post-hoc cleanup.
 * No fork of **iroh** (transport / endpoint / set-reconciliation); no bespoke sync protocol.
 * Keep the modification to iroh-docs **minimal and upstream-trackable** — a thin seam we re-apply across releases, not a divergent rewrite. iroh-docs is a KV-store + automerge, small enough that this is cheap (unlike Willow).
-* Preserve UWill's guarantees (per-claim, expiring, revocable, MeeId-bound), enforced at the sync layer rather than bolted on afterwards.
+* Preserve UWill's guarantees (per-claim, expiring, revocable, PdnId-bound), enforced at the sync layer rather than bolted on afterwards.
 * Capabilities are **data we control** — a verifiable key/delegation chain ([ADR-0007](0007-uwill.md)) — not iroh ACLs; iroh tickets cannot carry expiry or revocation.
 * The gate needs the issued capabilities on hand when data arrives → a way to deliver them ahead of / alongside the data.
 
@@ -45,8 +45,8 @@ It is a **fork in the git sense, but deliberately not a divergent one**: we do n
 
 **Capabilities are a verifiable key-chain, carried as payload/metadata — not transport ACLs.**
 
-* **UWill** ([ADR-0007](0007-uwill.md)) — the heavyweight, per-claim, expiring, revocable, MeeId-bound capability: a delegation chain of keys plus a `MeeIdentityProof`, verifiable offline. Checked at the gate; governs admission of **data** entries.
-* **Peering** — the lightweight connection capability ("does a connection with this MeeId exist"): a cheap pre-filter, carrying its own expiry/revocation since iroh tickets cannot. Governs admission of **metadata** entries.
+* **UWill** ([ADR-0007](0007-uwill.md)) — the heavyweight, per-claim, expiring, revocable, PdnId-bound capability: a delegation chain of keys plus a `PdnIdentityProof`, verifiable offline. Checked at the gate; governs admission of **data** entries.
+* **Peering** — the lightweight connection capability ("does a connection with this PdnId exist"): a cheap pre-filter, carrying its own expiry/revocation since iroh tickets cannot. Governs admission of **metadata** entries.
 
 **Capability delivery (metadata channel).** For the gate to validate a data entry, the relevant capability must already be local. Issued capabilities are therefore delivered to the peer **as metadata** ahead of the data they authorize: a dedicated metadata store/namespace, reachable by its own ticket, into which capabilities are written (and themselves Peering-gated on ingest). When data entries then arrive, the data-side validator looks the chain up locally. This matters because `validate_cb` sees the entry's record (key, author, content hash, timestamp, `ContentStatus`) but **not necessarily the blob content** — so authorization cannot depend on downloading the payload first.
 
@@ -100,6 +100,6 @@ Open questions to resolve before `accepted`:
 5. **Peering spec** — exact format, expiry / revocation, relationship to UWill (a degenerate UWill, or a separate token?).
 6. **Confidentiality** — payload encryption for sensitive entries and how the gate validates over it.
 
-Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-id.md), [ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md), [ADR-0007](0007-uwill.md).
+Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md), [ADR-0007](0007-uwill.md).
 
 External references: iroh-docs 0.100 — single ingest chokepoint `validate_entry` (`src/sync.rs:622`), called from `insert_entry` (`:452`) and the live-sync `validate_cb` closure (`:548–555`); per-entry pre-persist accept/reject `validate_cb` in `ranger::process_message` (`src/ranger.rs:314,324,394`), not exposed publicly; share tickets are non-expiring bearer tokens.

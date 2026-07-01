@@ -4,7 +4,7 @@ Cross-cutting rules the system upholds. **Referenced by number only** — write 
 
 ## Invariant 1
 
-A PDN identity's connections store and private metadata store are reachable only by that identity's own devices, and a device's copies of them hold that identity's data only.
+A Mee Identity's connections store and private metadata store are reachable only by that identity's own devices, and a device's copies of them hold that identity's data only.
 
 Two mechanisms enforce this — it is not a behavioural agreement between nodes:
 
