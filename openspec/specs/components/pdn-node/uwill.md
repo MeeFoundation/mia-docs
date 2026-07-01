@@ -87,7 +87,7 @@ Willow's Private Interest Overlap (PIO) protocol requires three properties from 
 ## Open questions
 
 - ClaimId ↔ willow leaf mapping. Resolving a `ClaimId` to a concrete willow `(namespace, subspace, path)` is the iroh-willow fork's responsibility. The mapping table, its propagation between peers, and its consistency model are not specified here.
-- Proof-of-authorship placement. Whether claim authorship proof lives alongside the UCAN signature or stays separate as `PdnIdentityProof` in the PDN domain layer.
+- Proof-of-authorship placement. Whether claim authorship proof lives alongside the UCAN signature or stays separate as `MeeIdentityProof` in the PDN domain layer.
 - Semantics of `write` on a claim. What does "write" mean when the resource is a claim — overwriting the attribute, appending a counter-claim, modifying the embedded capability? The current spec leaves this to the PDN layer; UWill only carries the command, not its semantics.
 - Future commands. When `delete` and `delegate` see real use, what additional chain-validation rules beyond command-subset are required.
 - Confidential sync encoding. Capabilities are currently sent in cleartext, exposing `ClaimId` topology to intermediary nodes. Meadowcap encoded capabilities relative to PIO context. A relative encoding that strips PAI-known fields is needed to restore confidentiality but is out of scope for the initial implementation.
