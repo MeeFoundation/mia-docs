@@ -268,7 +268,7 @@ The metrics are: (wall time: open + load, peak RAM RSS)
 
 | Database | Dataset 10k | Dataset 100k | Dataset 500k | Dataset 1kk |
 | ---------|-------------|--------------|--------------|-------------|
-|[Grafeo](https://grafeo.dev/)|||||
+|[Grafeo](https://grafeo.dev/)|Ingest (1244ms, 244mb); Query (584ms, 235mb)|Ingest (15230ms, 614mb); Query (4474ms, 577mb)|Ingest (190,000ms, 2534mb); Query (25000ms, 2416mb)|Ingest (699,247ms, 3376mb); Query (54107ms, 3031mb)|
 |[Oxigraph](https://github.com/oxigraph/oxigraph)|||||
 |[LadybugDB](https://ladybugdb.com/)|Ingest (3768ms, 420mb); Query (375ms, 363mb)|Ingest (10591ms, 732mb); Query (385ms, 356mb)|Ingest (36817ms, 1.74gb); Query (547ms, 344mb)|Ingest (65892ms, ~3.16 GB); Query (802ms, 320mb)|
 |[SurrealDB](https://surrealdb.com/)|Ingest (7417ms, 301mb); Query (970ms, 299mb)|Ingest (78,533ms, 479mb); Query (6125ms, 332mb)|Ingest (428,794ms, 1.7gb); Query (3112ms, 294mb)|Ingest (987s, ~3.26 GB); Query (2478ms, 291mb)|
