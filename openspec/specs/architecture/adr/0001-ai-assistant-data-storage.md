@@ -255,3 +255,20 @@ The metrics are: (wall time: open + load, peak RAM RSS)
 |[Oxigraph](https://github.com/oxigraph/oxigraph)|Ingest (1564ms, 288mb); Query (1569ms, 199mb)|Ingest (16113ms, 1047mb); Query (13060ms, 465mb)|Ingest (OOM); Query ()||
 |[LadybugDB](https://ladybugdb.com/)|(INCOMPATIBLE WITH EMULATOR)||||
 |[SurrealDB](https://surrealdb.com/)|Ingest (2046ms, 269mb); Query (601ms, 271mb)|Ingest (19602ms, 388mb); Query (2472ms, 305mb)|Ingest (102579ms, 1.6gb); Query (1505ms, 264mb)|Ingest (212,166 ms, ~3.7 GB); Query (1153ms, 305mb)|
+
+----
+
+## Tests on Android Device
+
+CPU — 8 cores (octa-core, aarch64), MediaTek MT6768 = Helio G85:
+RAM — 8 GB
+Other: Android 15, kernel 6.6.82, 4 KB page size.
+
+The metrics are: (wall time: open + load, peak RAM RSS)
+
+| Database | Dataset 10k | Dataset 100k | Dataset 500k | Dataset 1kk |
+| ---------|-------------|--------------|--------------|-------------|
+|[Grafeo](https://grafeo.dev/)|||||
+|[Oxigraph](https://github.com/oxigraph/oxigraph)|||||
+|[LadybugDB](https://ladybugdb.com/)|Ingest (3768ms, 420mb); Query (375ms, 363mb)|Ingest (10591ms, 732mb); Query (385ms, 356mb)|Ingest (36817ms, 1.74gb); Query (547ms, 344mb)||
+|[SurrealDB](https://surrealdb.com/)|Ingest (7417ms, 301mb); Query (970ms, 299mb)|Ingest (78,533ms, 479mb); Query (6125ms, 332mb)|Ingest (428,794ms, 1.7gb); Query (3112ms, 294mb)|Ingest (65892ms, ~3.16 GB); Query (802ms, 320mb)|
