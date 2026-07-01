@@ -270,5 +270,5 @@ The metrics are: (wall time: open + load, peak RAM RSS)
 | ---------|-------------|--------------|--------------|-------------|
 |[Grafeo](https://grafeo.dev/)|||||
 |[Oxigraph](https://github.com/oxigraph/oxigraph)|||||
-|[LadybugDB](https://ladybugdb.com/)|Ingest (3768ms, 420mb); Query (375ms, 363mb)|Ingest (10591ms, 732mb); Query (385ms, 356mb)|Ingest (36817ms, 1.74gb); Query (547ms, 344mb)||
-|[SurrealDB](https://surrealdb.com/)|Ingest (7417ms, 301mb); Query (970ms, 299mb)|Ingest (78,533ms, 479mb); Query (6125ms, 332mb)|Ingest (428,794ms, 1.7gb); Query (3112ms, 294mb)|Ingest (65892ms, ~3.16 GB); Query (802ms, 320mb)|
+|[LadybugDB](https://ladybugdb.com/)|Ingest (3768ms, 420mb); Query (375ms, 363mb)|Ingest (10591ms, 732mb); Query (385ms, 356mb)|Ingest (36817ms, 1.74gb); Query (547ms, 344mb)|Ingest (65892ms, ~3.16 GB); Query (802ms, 320mb)|
+|[SurrealDB](https://surrealdb.com/)|Ingest (7417ms, 301mb); Query (970ms, 299mb)|Ingest (78,533ms, 479mb); Query (6125ms, 332mb)|Ingest (428,794ms, 1.7gb); Query (3112ms, 294mb)|Ingest (987s, ~3.26 GB); Query (2478ms, 291mb)|
