@@ -40,7 +40,11 @@ With no validator installed, whatever a replica syncs from a peer holding its ti
 
 ### D5. Linking stays single-seed per identity, repeated per identity
 
-`link_device(node, identity, seed, timeout)` keeps its signature and behavior; a device that should host N identities runs it N times with N seeds obtained out of band (N QR codes). No discovery of one identity through another, no reactive import when a new identity appears elsewhere. This keeps every addition of an identity to a device an observable, user-initiated act — the property the team explicitly wants at this stage.
+`link_device` keeps its behavior and drops its `identity` parameter — the binding registration that consumed it is gone, and the stores' `create`/`import` shed it for the same reason (the handle's holder knows which identity a store serves). A device that should host N identities runs `link_device` N times with N seeds obtained out of band (N QR codes). No discovery of one identity through another, no reactive import when a new identity appears elsewhere. This keeps every addition of an identity to a device an observable, user-initiated act — the property the team explicitly wants at this stage.
+
+### D6. First-device provisioning lives beside linking
+
+The sequence "create the connections store, publish its ticket under the directory's connections key, register this device" is protocol, not test setup: the directory key must match what `link_device` discovers, and the ticket must be in the directory before the seed leaves the device. It had been copied into two tests — the key string with it — so it moves into `linking.rs` as `provision_identity`, the first-device counterpart of `link_device`. Data namespaces stay out of it: their discovery at linking is deferred (ADR-0009), and freezing today's manual data-ticket handover into the provisioning API would turn a workaround into a contract.
 
 ## Risks / Trade-offs
 
