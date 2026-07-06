@@ -5,15 +5,15 @@ The connections store loses its dependence on the ingest gate: registration on t
 ## MODIFIED Requirements
 
 ### Requirement: Connections live in a dedicated replica
-Connection state SHALL be stored in its own pdn-store replica, separate from every data namespace and from every other identity's connections store. The replica is identified on the node by its owning identity's `PdnId` for addressing; no domain `NamespaceId` is allocated for it. Connections stores of several identities SHALL coexist on one node without sharing a replica.
+Connection state SHALL be stored in its own pdn-store replica, separate from every data namespace and from every other identity's connections store. The store handle returned at creation or import is how the replica is addressed — the node keys no registry by identity for it, and no domain `NamespaceId` is allocated. Connections stores of several identities SHALL coexist on one node without sharing a replica.
 
 #### Scenario: Creating the store allocates a dedicated replica
-- **WHEN** a node creates the connections store of an identity
-- **THEN** a fresh pdn-store replica is created for it, addressed by that identity, and no domain `NamespaceId` is allocated
+- **WHEN** a node creates a connections store
+- **THEN** a fresh pdn-store replica is created for it, reached through the returned store handle, and no domain `NamespaceId` is allocated
 
 #### Scenario: Importing the store on a second device
 - **WHEN** a second device imports the connections store from a ticket
-- **THEN** the replica participates in sync with the first device under the same identity's addressing
+- **THEN** the replica participates in sync with the first device, reached through the importing device's own store handle
 
 #### Scenario: Two identities' connections stores on one node
 - **WHEN** connections stores are created on one node for identity A and identity B
