@@ -24,18 +24,18 @@ Authorization SHALL be granted per claim through UWill (`res = ClaimId`), not by
 - **THEN** a UWill capability for that `ClaimId` is issued, and no namespace-level grant is involved
 
 ### Requirement: One pdn-store namespace per issuer
-At the data layer, all of an issuer's claims (about any subject) SHALL live in one `pdn-store` namespace, and the data binding SHALL be keyed by the issuer `PdnId` (`Binding::Data { issuer }`). There SHALL be at most one data replica per issuer, not one per _(subject, issuer)_.
+At the data layer, all of an issuer's claims (about any subject) SHALL live in one `pdn-store` namespace, and the data replica SHALL be keyed by the issuer `PdnId`. There SHALL be at most one data replica per issuer, not one per _(subject, issuer)_.
 
 #### Scenario: two claims about different subjects
 - **WHEN** an issuer writes two claims about two different subjects
 - **THEN** both live in that issuer's single data namespace
 
-#### Scenario: data binding is keyed by issuer
-- **WHEN** `data-layer` opens an issuer's data binding
-- **THEN** it is `Binding::Data { issuer }`, with no `(about, issued_by)` pair
+#### Scenario: the data replica is keyed by issuer
+- **WHEN** `data-layer` opens an issuer's data namespace
+- **THEN** it is keyed by the issuer `PdnId` alone, with no `(about, issued_by)` pair
 
 ### Requirement: The namespace is a data-layer-internal replication bucket
-The `pdn-store` namespace SHALL retain only its iroh-docs roles — the set-reconciliation unit and the gossip topic — and SHALL NOT carry addressing or write-authority. `Binding` and `BindingIndex` SHALL be `data-layer` internals, not surfaced above it.
+The `pdn-store` namespace SHALL retain only its iroh-docs roles — the set-reconciliation unit and the gossip topic — and SHALL NOT carry addressing or write-authority. The namespace-to-replica mapping SHALL be a `data-layer` internal, not surfaced above it.
 
 #### Scenario: namespace carries no authority above data-layer
 - **WHEN** a claim is addressed or authorized
