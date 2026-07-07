@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Device-replicated registry of an identity's connections: a dedicated pdn-store replica, separate from data namespaces, replicated across all of one identity's devices; connections stores of several identities coexist on one node. Access is bounded by possession of the store's ticket (Invariant 1). This spec covers the store and its replication between devices.
+Device-replicated registry of an identity's connections: a dedicated pdn-store replica, separate from data stores, replicated across all of one identity's devices; connections stores of several identities coexist on one node. Access is bounded by possession of the store's ticket (Invariant 1). This spec covers the store and its replication between devices.
 
 ## Requirements
 ### Requirement: Connections live in a dedicated replica
-Connection state SHALL be stored in its own pdn-store replica, separate from every data namespace and from every other identity's connections store. The store handle returned at creation or import is how the replica is addressed — the node keys no registry by identity for it, and no domain `NamespaceId` is allocated. Connections stores of several identities SHALL coexist on one node without sharing a replica.
+Connection state SHALL be stored in its own pdn-store replica, separate from every data store and from every other identity's connections store. The store handle returned at creation or import is how the replica is addressed — the node keys no registry by identity for it, and no domain `NamespaceId` is allocated. Connections stores of several identities SHALL coexist on one node without sharing a replica.
 
 #### Scenario: Creating the store allocates a dedicated replica
 - **WHEN** a node creates a connections store
