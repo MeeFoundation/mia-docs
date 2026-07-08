@@ -2,7 +2,7 @@
 
 ## Context
 
-Invariant 2 says a node receives a record only if it holds a read capability for it. Today reconciliation delivers every record to any peer that syncs — no per-record read control. This change enforces Invariant 2 by filtering what a serving node reveals during reconciliation, driven by the receiving peer's read capabilities. It is the read-side counterpart of the ADR-0008 ingest gate.
+Invariant 2 says a node receives a record only if it holds a read capability for it. Today reconciliation delivers every record to any peer that syncs — no per-record read control: the old ingest gate was removed by multi-identity-node, nodes host several identities, and access is bounded by ticket possession alone. This change enforces Invariant 2 by filtering what a serving node reveals during reconciliation, driven by the receiving peer's read capabilities — the read-side counterpart of the ADR-0008 ingest seam (the fork's `validate_entry` hook, available and uninstalled), and the first enforcement to land on that ungated baseline.
 
 ## Goals / Non-Goals
 
@@ -28,11 +28,17 @@ Because every value the serving node sends is computed over the peer's authorize
 
 ### D3. Minimal read capability — the single-link precursor to UWill
 
-The capability the filter consumes is a single grant `{ issuer, audience, records }`, presented by the peer, evaluated per record. No delegation chain, no revocation crypto, no token encoding — the degenerate form, exactly as `ConnectionsPolicy` is the degenerate form of chain validation. The real format, chains, and revocation migrate to the `uwill` module (ADR-0007). Placement: the minimal type lives in `data-layer` for now (like `Connections`); the domain issuance surface (`pdn-layer` `Capability`, then UWill) supersedes it later.
+The capability the filter consumes is a single grant `{ issuer, audience, records }`, presented by the peer, evaluated per record. No delegation chain, no revocation crypto, no token encoding — the degenerate single-link form that UWill's chain validation later supersedes (ADR-0007). Placement: the minimal type lives in `data-layer` for now; the domain issuance surface (`pdn-layer` `Capability`, then UWill) supersedes it later.
 
-### D4. Own-identity is fully authorized
+### D4. The replica's own devices are fully authorized
 
-An identity's own devices are read-authorized for all of that identity's data (composes with Invariant 1), so the filter admits everything for a same-identity peer with no capability presented. Same-identity reconciliation (connections store, private metadata, own data) stays full.
+A device of the identity a replica belongs to is read-authorized for all of that replica's records (composes with Invariant 1), so the filter admits everything for such a peer with no capability presented, and reconciliation between an identity's devices (connections store, private metadata store, data store) stays full. On a multi-identity node this is judged per replica, not per node: a node hosting several identities is a fully authorized peer only for the replicas of the identities it is linked into, and a capability-scoped peer for anything else it holds. How a peer proves being a device of the identity — today by holding the replica's ticket (bearer), identity-bound proof with UWill — is the same authentication question as for presented capabilities (see Open Questions).
+
+### D5. Scoped peers are outside the swarm; live updates are directed notifications
+
+The reconciliation filter alone does not enforce Invariant 2: live sync broadcasts full records (`Op::Put(SignedEntry)`) and author-heads digests (`SyncReport`) to every swarm member. A broadcast cannot be filtered per recipient. The sender controls only its few active gossip neighbors (HyParView partial view — five by default); every further delivery is a relay performed by a swarm member outside the sender's control. A relaying member must hold what it forwards — Plumtree pushes full messages to eager peers and answers `Graft` requests with full content, and even the lazy path's `IHave` digests leak record existence — so a capability-scoped relay would either obtain records it is not authorized for (the exact transfer Invariant 2 forbids) or refuse to relay and tear the delivery tree, breaking delivery for fully authorized peers behind it. Filtering at every hop instead would require every member to know every neighbor's rights for every record — distributing the access matrix, itself sensitive metadata, to the whole swarm. In short: a broadcast presumes members are interchangeable with respect to the topic's content, per-record authorization breaks that premise, and membership is the only level at which gossip can be "filtered" without breaking the protocol.
+
+Therefore the swarm consists of fully authorized members only — today an identity's own devices (D4), whose full-record gossip is unchanged — and capability-scoped peers never join it. Their live path is a directed notification: when a write lands, the serving node — which already maintains the capability index the filter consumes — notifies exactly the peers whose read capabilities cover the written record, over direct connections. The notification carries no record content and no digests; the notified peer fetches through the filtered reconciliation path, which remains the single enforcement point and the sole carrier of correctness — a missed notification (an offline peer) is healed by the next reconciliation on contact. Consecutive covered writes coalesce into one pending notification per peer until that peer reconciles. Cost scales with the peers covering the written record, not with all scoped peers of the replica, and D2's transcript property extends to liveness: a scoped peer observes activity only on records it can read.
 
 ## Risks / Trade-offs
 
