@@ -10,9 +10,10 @@ Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving no
 
 ## 2. Egress filter (pdn-store)
 
-- [ ] 2.1 Add a reconciliation-time, per-peer filter (distinct from the ingest `validate_entry` hook) in the `ranger` / reconciliation path
-- [ ] 2.2 Apply the filter uniformly to fingerprints, split boundaries, offers, and item transmissions (consistency — partial application leaks)
-- [ ] 2.3 Records not covered by the peer's presented capabilities never enter any message
+- [ ] 2.1 Session-scoped filtering adapter implementing `ranger::Store` over a record source plus the peer's rights frozen at session setup; reconciliation reads records only through it (D6 — verify no read path bypasses the trait; if one exists, fall back to materialized views for scoped sessions)
+- [ ] 2.2 Filter coverage is uniform by construction — fingerprints, split boundaries, offers, and item transmissions all derive from the adapter's iterators; add the existence-hiding test for the transcript property
+- [ ] 2.3 fs sessions read through a redb snapshot (`snapshot_owned`): snapshot opens at session setup and closes at `SyncFinished`; verify the two redb items from D6 (read transactions pin pages — keep lifetimes within session bounds; `snapshot()` commits an open write transaction — check the write-batching interaction)
+- [ ] 2.4 Optional, when a profile demands it: materialized per-audience view keyed by the rights set, invalidated incrementally by the D5 audience-resolution index
 
 ## 3. Wiring (data-layer)
 

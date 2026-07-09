@@ -69,7 +69,7 @@ When a write lands in a replica, the serving node SHALL notify — directly, not
 
 #### Scenario: Only the covered peer is notified
 
-- **WHEN** an issuer holds 10,000,000 records, 1,000 peers each hold a capability on 1 distinct record, and the issuer writes the record covered by peer B's capability
+- **WHEN** an issuer holds 1,000,000 records, 1,000 peers each hold a capability on 1 distinct record, and the issuer writes the record covered by peer B's capability
 - **THEN** peer B receives 1 notification and fetches that record through filtered reconciliation, and the other scoped peers receive nothing
 
 #### Scenario: An unshared write notifies no one
