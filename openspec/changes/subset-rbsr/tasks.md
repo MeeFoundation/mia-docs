@@ -1,6 +1,6 @@
 # Tasks: subset-rbsr
 
-Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving node reveals only records the peer is read-authorized for. Includes a minimal single-link read capability (precursor to UWill) and the directed-notification live path (D5). Modifies pdn-store.
+Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving node reveals only records the peer is read-authorized for. Includes a minimal single-link read capability (precursor to UWill), and keeps capability-scoped peers outside the gossip swarm. Modifies pdn-store. The reconcile-trigger live path is a separate change (`reconcile-trigger`).
 
 ## 1. Read capability (data-layer)
 
@@ -13,26 +13,24 @@ Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving no
 - [ ] 2.1 Session-scoped filtering adapter implementing `ranger::Store` over a record source plus the peer's rights frozen at session setup; reconciliation reads records only through it (D6 — verify no read path bypasses the trait; if one exists, fall back to materialized views for scoped sessions)
 - [ ] 2.2 Filter coverage is uniform by construction — fingerprints, split boundaries, offers, and item transmissions all derive from the adapter's iterators; add the existence-hiding test for the transcript property
 - [ ] 2.3 fs sessions read through a redb snapshot (`snapshot_owned`): snapshot opens at session setup and closes at `SyncFinished`; verify the two redb items from D6 (read transactions pin pages — keep lifetimes within session bounds; `snapshot()` commits an open write transaction — check the write-batching interaction)
-- [ ] 2.4 Optional, when a profile demands it: materialized per-audience view keyed by the rights set, invalidated incrementally by the D5 audience-resolution index
+- [ ] 2.4 Optional, when a profile demands it: materialized per-audience view keyed by the rights set, invalidated incrementally by the audience-resolution index (D6)
 
 ## 3. Wiring (data-layer)
 
 - [ ] 3.1 Peer presents read capabilities at session setup; serving node builds the per-peer filter from them
 - [ ] 3.2 `SyncNode` reconciliation uses the filter; same-identity peers get the unfiltered (full) view
 
-## 4. Live path (D5: directed notifications)
+## 4. Scoped peers outside the swarm (pdn-store)
 
 - [ ] 4.1 Scoped access does not join the replica's gossip swarm: the scoped import/session path skips gossip subscription, while same-identity devices keep full-record gossip
-- [ ] 4.2 Directed notifications: on a write, resolve the scoped peers whose capabilities cover the written record (reusing the capability index) and send each a content-free notification over its direct connection
-- [ ] 4.3 Coalescing: consecutive covered writes collapse into one pending notification per peer until that peer reconciles; a missed notification is left to reconciliation-on-contact
-- [ ] 4.4 A notified peer triggers a capability-filtered reconciliation and receives exactly the covered records
+
+The reconcile-trigger live path (resolve covered peers, send, coalesce, triggered-peer-reconciles) is the `reconcile-trigger` change.
 
 ## 5. Tests
 
 - [ ] 5.1 New read-restriction scenario (the old `sync_two_nodes` was removed by multi-identity-node): issuer grants a peer read on a subset; assert the subset arrives and a withheld record never does (existence hidden). Use real read capabilities, not the naive `Connections` set
 - [ ] 5.2 Same-identity suites (`sync_two_devices`, `device_linking`, `multi_identity`, `three_devices`) still replicate in full under the filter
-- [ ] 5.3 Worked-example scenario (one issuer, many records, scoped peers): an unshared write notifies no scoped peer; a covered write notifies exactly the covering peer, which fetches it through filtered reconciliation; nothing reaches scoped peers over gossip
-- [ ] 5.4 Flake check on the new/changed scenarios; lints + full suite (`just precommit-check`)
+- [ ] 5.3 Flake check on the new/changed scenarios; lints + full suite (`just precommit-check`)
 
 ## 6. Docs & archive
 

@@ -62,17 +62,3 @@ A peer whose access is capability-scoped SHALL NOT be a member of the replica's 
 
 - **WHEN** a record is written into a replica whose swarm is the issuer's devices, while scoped peers hold capabilities on other records
 - **THEN** no scoped peer receives the record or any digest of it over gossip, and the issuer's devices receive the record itself
-
-### Requirement: Live updates for scoped peers are directed notifications
-
-When a write lands in a replica, the serving node SHALL notify — directly, not by broadcast — exactly those scoped peers whose read capabilities cover the written record. The notification SHALL carry no record content; the notified peer fetches through filtered reconciliation. Notifications are best-effort: a missed notification SHALL be compensated by the next reconciliation, which remains the sole carrier of correctness.
-
-#### Scenario: Only the covered peer is notified
-
-- **WHEN** an issuer holds 1,000,000 records, 1,000 peers each hold a capability on 1 distinct record, and the issuer writes the record covered by peer B's capability
-- **THEN** peer B receives 1 notification and fetches that record through filtered reconciliation, and the other scoped peers receive nothing
-
-#### Scenario: An unshared write notifies no one
-
-- **WHEN** the issuer writes a record covered by no scoped peer's capability
-- **THEN** no scoped peer receives a notification, and the record replicates to the issuer's devices over their swarm's gossip as usual
