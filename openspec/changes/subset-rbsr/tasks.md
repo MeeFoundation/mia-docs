@@ -19,6 +19,7 @@ Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving no
 
 - [ ] 3.1 Peer presents read capabilities at session setup; serving node builds the per-peer filter from them
 - [ ] 3.2 `SyncNode` reconciliation uses the filter; same-identity peers get the unfiltered (full) view
+- [ ] 3.3 Reconciliation schedule for scoped peers (D7): trigger a filtered reconciliation **before access** and **on an interval** (hourly to start). The demo's only freshness path — the writer-side push (`reconcile-trigger`) is deferred.
 
 ## 4. Scoped peers outside the swarm (pdn-store)
 

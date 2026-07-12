@@ -52,6 +52,10 @@ Three independent layers.
 
 Two redb properties are verification items for implementation, not settled facts: long-lived read transactions pin old pages (so sessions must hold snapshots strictly within session bounds), and the store's `snapshot()` commits any open write transaction (its interaction with write batching needs checking).
 
+### D7. When scoped peers reconcile — before access and on an interval
+
+Since scoped peers pull, something has to trigger the pull. The baseline trigger — and, until `reconcile-trigger` lands, the only one — is self-initiated: a scoped peer reconciles a replica **before it reads from it**, and **on an interval** (hourly to start). That is what reconciliation-on-contact means concretely, and it suffices for correctness — a peer sees an update at the latest on its next read or interval tick. The cross-node push that prompts an out-of-schedule reconcile the moment a covered write lands is the deferred `reconcile-trigger` change; it lowers latency, never changes what a reconcile delivers. (The timer and the before-read hook live in the node runtime that drives reconciliation; subset-rbsr fixes the policy, not the scheduler.)
+
 ## Risks / Trade-offs
 
 - **[Consistency discipline]** The filter must touch fingerprints + boundaries + offers + sends uniformly; any path over the unfiltered set leaks. Test the existence-hiding property explicitly.
