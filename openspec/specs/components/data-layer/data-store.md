@@ -7,14 +7,14 @@ An issuer's data store: the domain role in an identity's store set — alongside
 ## Requirements
 
 ### Requirement: Operations are addressed by issuer
-Writing, reading, and sharing SHALL address a data store by its issuer's `PdnId`; the node resolves the issuer to the backing replica registered at creation or import. Addressing an issuer with no created or imported data store on the node SHALL be an error distinguishable from transport and storage failures.
+Writing, reading, listing, and sharing SHALL address a data store by its issuer's `PdnId`; the node resolves the issuer to the backing replica registered at creation or import. Addressing an issuer with no created or imported data store on the node SHALL be an error distinguishable from transport and storage failures.
 
 #### Scenario: Write and read under an issuer
 - **WHEN** an entry is written under an issuer and read back under the same issuer
 - **THEN** the written payload is returned
 
 #### Scenario: Unknown issuer is a distinguishable error
-- **WHEN** a read addresses an issuer with no data store on this node
+- **WHEN** a read or a listing addresses an issuer with no data store on this node
 - **THEN** the operation fails with the unknown-issuer error, not a generic failure
 
 ### Requirement: Entries are opaque payloads at validated paths
@@ -38,6 +38,17 @@ Reading an entry SHALL return its payload only once the payload bytes have arriv
 #### Scenario: Record without payload reads as absent
 - **WHEN** an entry's record has synced to a device but its payload bytes have not yet been fetched
 - **THEN** reading it returns absent, and a later read (after the payload arrives) returns the payload
+
+### Requirement: Entries are enumerable as metadata
+An issuer's entries SHALL be enumerable as entry metadata — issuer, path, and payload length, no payload bytes — optionally filtered to paths whose leading components equal a given prefix path's components (prefix queries stand on the component structure of `EntryPath`, not on byte prefixes). Enumeration is record-level, consistent with record-first reads: an entry SHALL appear once its record is stored, whether or not its payload has been fetched yet.
+
+#### Scenario: Listing returns metadata for all entries
+- **WHEN** entries are written at several paths under an issuer
+- **THEN** listing that issuer yields exactly those paths as metadata, with no payload bytes
+
+#### Scenario: Prefix narrows the listing by whole components
+- **WHEN** entries exist at `contacts/a`, `contacts/b`, `contactsx/c`, and `profile/name`, and the listing is filtered by the prefix `contacts`
+- **THEN** exactly `contacts/a` and `contacts/b` are yielded
 
 ### Requirement: Mutations replicate between devices
 Writes performed on one device SHALL become visible on every device holding the replica through standard pdn-store sync (set reconciliation for catch-up, gossip for live updates within the replica's [swarm](../../architecture/language/swarm.md)), with no additional transport or server.
