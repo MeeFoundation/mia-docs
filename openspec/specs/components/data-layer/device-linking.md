@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The single-seed bootstrap procedure and its first-device counterpart. The private metadata store this procedure reads — the directory — is specified as a store in [private-metadata-store.md](private-metadata-store.md); this spec covers the procedure. `provision_identity` brings an identity up from nothing on its first device: it creates the connections store, publishes its ticket into a fresh private-metadata directory, and registers the device. `link_device` brings a new device of an identity up from one ticket — the private-metadata-store seed (as carried in a QR): it imports that store (the directory), registers the new device in the device set, then discovers and imports the identity's other stores (the connections store, later data) through tickets found in the directory. The device set is bidirectional — the existing device sees the newcomer. Linking is per identity and repeatable: a node hosting several identities runs it once per identity. The seed is a bearer ticket; identity-bound, revocable linking arrives with UWill.
+The single-seed bootstrap procedure and its first-device counterpart. The private metadata store this procedure reads — the directory — is specified as a store in [private-metadata-store.md](private-metadata-store.md); this spec covers the procedure. `provision_identity` brings an identity up from nothing on its first device: it creates the connections store, publishes its ticket into a fresh private-metadata directory, and registers the device. `link_device` brings a new device of an identity up from one ticket — the private-metadata-store seed (as carried in a QR): it imports that store (the directory), discovers and imports the identity's other stores (the connections store, later data) through tickets found in the directory, then registers the new device in the device set and stays in contact until the registration has demonstrably reached one of the identity's existing devices. The device set is bidirectional — the existing device sees the newcomer. Linking is per identity and repeatable: a node hosting several identities runs it once per identity. The seed is a bearer ticket; identity-bound, revocable linking arrives with UWill.
 
 ## Requirements
 ### Requirement: An identity is provisioned on its first device
@@ -35,11 +35,15 @@ A node SHALL link into any number of identities by running the linking procedure
 - **THEN** the node imports the connections store and replicates its contents, without that ticket being supplied out of band
 
 ### Requirement: A linked device registers itself
-On linking, a device SHALL add its own node id to the private metadata store's device set.
+On linking, a device SHALL add its own node id to the private metadata store's device set, after the directory catch-up (so the local write does not race the import's first sync). `link_device` SHALL NOT report success until the registration has reached at least one of the identity's existing devices: delivery counts as confirmed when a sync exchange of the directory that started after the registration write completes successfully — reconciliation exchanges both directions, so such an exchange necessarily carried the registration out. A registration that cannot be delivered within the linking timeout SHALL surface as an error, not a hang. Without this confirmation the registration rides on its one-shot gossip broadcast, which is lost when the gossip neighborhood is not yet up, and nothing else retriggers the exchange.
 
 #### Scenario: New device joins the set
 - **WHEN** a device links to an identity
 - **THEN** its node id appears in the identity's device set
+
+#### Scenario: Success implies the registration reached an existing device
+- **WHEN** `link_device` returns success
+- **THEN** a directory sync exchange that started after the registration write has completed successfully, and the identity's existing device observes the newcomer in its device set
 
 ### Requirement: The device set is bidirectional
 A device added on one device of an identity SHALL become visible on the identity's other devices, since the private metadata store replicates between them.
