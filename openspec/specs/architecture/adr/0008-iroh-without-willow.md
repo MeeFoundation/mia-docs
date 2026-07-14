@@ -6,7 +6,7 @@ date: 2026-06-03
 
 ## Context and Problem Statement
 
-The planned path ([ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md)) puts a *forked* Willow layer between the PDN node and iroh, so that fine-grained, revocable, PdnId-bound capabilities ([ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md)) are enforced natively at the sync layer. Forking Willow and integrating UWill into its authorization is a large, open-ended effort.
+The planned path (ADR-0005, ADR-0006) puts a *forked* Willow layer between the PDN node and iroh, so that fine-grained, revocable, PdnId-bound capabilities ([ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md)) are enforced natively at the sync layer. Forking Willow and integrating UWill into its authorization is a large, open-ended effort.
 
 Can we ship document replication **sooner** by syncing over `iroh-docs` — deferring or avoiding the Willow fork — *without* giving up native, write-time capability enforcement? Two constraints frame the answer: we will **not fork iroh** (the endpoint / transport / set-reconciliation engine) and we will **not write our own sync protocol**. iroh-docs must remain the thing that syncs.
 
@@ -31,7 +31,7 @@ So while iroh-docs exposes no injectable pre-persist hook through its public API
 
 ## Considered Options
 
-* **Fork Willow now and enforce UWill at the sync layer** — the [ADR-0006](0006-why-fork-of-willow.md) path.
+* **Fork Willow now and enforce UWill at the sync layer** — the ADR-0006 path.
 * **iroh-docs verbatim as an untrusted store + a PDN-side promotion gate** (observe-then-reconcile).
 * **Our own minimal iroh-docs variant with a capability-gated ingest** — inject the UWill/Peering check at the existing `validate_entry` / `validate_cb` seam, so each entry is accepted (auto-merged) or rejected at write time. ← chosen
 
@@ -100,6 +100,6 @@ Open questions to resolve before `accepted`:
 5. **Peering spec** — exact format, expiry / revocation, relationship to UWill (a degenerate UWill, or a separate token?).
 6. **Confidentiality** — payload encryption for sensitive entries and how the gate validates over it.
 
-Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0005](0005-why-willow.md), [ADR-0006](0006-why-fork-of-willow.md), [ADR-0007](0007-uwill.md).
+Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md). ADR-0005 (why Willow) and ADR-0006 (why a fork of Willow) were removed when the Willow-assuming material was cleaned up (commit e8a352a) and survive only in git history; the numbers 0005 and 0006 are not reused.
 
 External references: iroh-docs 0.100 — single ingest chokepoint `validate_entry` (`src/sync.rs:622`), called from `insert_entry` (`:452`) and the live-sync `validate_cb` closure (`:548–555`); per-entry pre-persist accept/reject `validate_cb` in `ranger::process_message` (`src/ranger.rs:314,324,394`), not exposed publicly; share tickets are non-expiring bearer tokens.

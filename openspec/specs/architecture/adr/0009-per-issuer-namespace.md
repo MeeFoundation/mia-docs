@@ -14,7 +14,7 @@ Can we collapse to a single addressing axis — and, once collapsed, does a "nam
 ## Decision
 
 - **Drop the domain `NamespaceId = (about, issued_by)`.** `about` becomes a field _inside_ the claim (it already is: `Claim.about`), not a namespace coordinate.
-- **One `pdn-store` namespace per issuer.** All of an issuer's claims (about anyone) live in that one namespace. The data binding is keyed by the issuer `PdnId`: `Binding::Data { issuer }`.
+- **One `pdn-store` namespace per issuer.** All of an issuer's claims (about anyone) live in that one namespace — a separate set-reconciliation unit and gossip topic per issuer, not the issuer as a key-prefix inside a single shared namespace. The data binding is keyed by the issuer `PdnId`: `Binding::Data { issuer }`.
 - **Granularity lives entirely in UWill** (per-claim), not in the namespace boundary.
 - **pdn-node is namespace-free.** Nothing above `data-layer` names a namespace: claims are addressed by `ClaimId` and authorized by UWill. `Binding` and `BindingIndex` are `data-layer` internals.
 - **The namespace is demoted to a `data-layer`-internal replication bucket** — the iroh-docs set-reconciliation unit and gossip topic, nothing more. Addressing moves to `ClaimId`, write-authority to UWill.
@@ -29,6 +29,16 @@ This is orthogonal to the device-internal stores (`ConnectionsStore`, `PrivateMe
 - Good — simpler addressing: one replica per issuer, not one per subject.
 - Good — pdn-node is namespace-free: a smaller, capability-only surface (`ClaimId` + UWill), with `Binding`/`BindingIndex` demoted to `data-layer` internals.
 - Bad — the capability gate (ADR-0008) becomes the sole writer authority: namespace-key possession no longer authorizes writes, so correctness leans entirely on the fork's ingest checks.
+
+## Rejected alternative: one namespace for all issuers
+
+Both layouts put every issuer's claims in the node's single physical store — iroh-docs keeps all namespaces in shared redb tables keyed by namespace. They differ in namespace count: per-issuer carves one namespace per issuer; the alternative uses one namespace holding everyone, with the issuer as a key-prefix inside it, filtering each reconciliation session down to what the peer may read. Considered and rejected.
+
+- The namespace, not the physical store, is iroh-docs' reconciliation unit, gossip topic, and capability boundary. Reconciliation cost is set by the size of the namespace being reconciled, before any read-filter — the filter runs after and does not reduce it. A per-issuer namespace holds one issuer's claims; one shared namespace holds everyone's, so every session pays for the whole set to deliver the few records a peer actually reads.
+- The property that an already-synced namespace re-confirms in one round survives only per-issuer. A single issuer's namespace is usually quiescent, so its re-sync is near-instant; a shared namespace aggregates every writer and is never quiescent, so each peer re-descends the whole set on every write anywhere in it — including writes it may not read, which the filter then discards.
+- Today that re-descent is proportional to the namespace's record count (the fork computes a range fingerprint by scanning the range — its `// TODO: optimize`). Even once that is optimized to a cached fingerprint tree, one shared namespace still couples all writers into a single tree and routes every peer through it; per-issuer keeps each writer's changes in a separate tree a peer touches only when it reads that issuer.
+- No storage is saved by sharing one namespace: the node already has a single physical store (one redb database) holding every namespace in shared tables, so per-issuer namespaces are key-ranges in those shared tables, not separate databases. The axis is namespace count, not store count.
+- Independently of reconciliation cost, the per-issuer namespace is the authorization unit (a device fully owns its issuer's namespace — Invariant 1), revocation drops a whole namespace rather than excising records scattered through a shared one, and gossip membership is per-namespace (an issuer's own devices swarm its namespace while scoped readers reconcile point-to-point outside it) — none of which one shared namespace can express.
 
 ## More Information
 

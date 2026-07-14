@@ -13,17 +13,19 @@ Invariant 2 requires that a node receive a data record only if it holds a read c
 - **Own-identity sync is unaffected.** An identity's own devices are authorized for all of that identity's data (composes with Invariant 1), so reconciliation between them stays full — the filter admits everything for a same-identity peer.
 - **Tests use the mechanism.** A new read-restriction scenario, written fresh (the cross-identity `sync_two_nodes` test was removed together with the ingest gate by multi-identity-node): an issuer grants a peer read on a subset of records, and the test asserts the peer receives exactly that subset while the withheld records never arrive (existence hidden). The same-identity suites (`sync_two_devices`, `device_linking`, `multi_identity`, `three_devices`) must keep replicating in full under the filter.
 
-## Worked examples
+## Load profiles
 
-Two load profiles make the live-path design concrete.
+Two load profiles make the design concrete: how the capability filter behaves under realistic, bidirectional sharing, and what the per-issuer model (ADR-0009) costs a well-connected node at scale. The live path — a covered write prompting its covered peers — is the separate `reconcile-trigger` change; it appears here only to size the load.
 
 ### Example 1: personal store, sparse sharing
 
-Alice's data store holds 1,000,000 records. 1,000 scoped peers — Bob among them — each hold a read capability on **1 distinct record**. Alice's own devices form the replica's swarm; the 1,000 scoped peers are not in it.
+Alice's data store holds 1,000,000 records. 1,000 scoped peers — Bob among them — each hold a read capability on **1 distinct record** of hers. Alice's own devices form the replica's swarm; the 1,000 scoped peers are not in it. It runs the other way too: each of those 1,000 contacts has shared about **1,000 of their own records** with Alice, so Alice is herself a scoped peer of 1,000 other replicas, holding a filtered slice of each.
 
 - **Alice edits a record shared with nobody.** Her devices receive the record itself over the swarm's full gossip, exactly as without this change. No scoped peer receives anything — not the record, not a digest, not a tick. 0 triggers sent.
 - **Alice edits the record shared with Bob.** Her devices receive it over gossip; Bob receives 1 trigger and runs 1 filtered reconciliation, which delivers exactly that record. The other 999 receive nothing and learn nothing. Cost: O(peers whose capability covers the record) — here, 1.
 - **What the rejected alternative — a broadcast tick in a swarm holding all 1,000 scoped peers alongside Alice's devices — would do**: every write, shared or not, would wake all 1,000 peers into reconciliation against Alice's node (a thundering herd, almost all of it empty), and every scoped peer would observe the full rate of Alice's writes across the 1,000,000 records — a side channel far wider than the 1 record each was granted.
+
+**Delegation widens the author set.** Each of those 1,000 inbound replicas triggers Alice on a covered write, symmetric to her own outbound side. And once capabilities can be delegated (a contact re-shares a third party's record with her), the issuers Alice holds records from outgrow her contact count: 1,000 contacts, but an estimated 2,000–5,000 distinct issuers over a few years of use. By ADR-0009 that is 2,000–5,000 `pdn-store` replicas — each its own set-reconciliation unit and gossip topic — on Alice's one node: her own (1,000,000 records, full) plus thousands of others', about **1,000 records each**. So Alice sits on both sides of the filter at once — serving her own replica filtered to her consumers, and a filtered consumer of thousands of others' replicas — and the per-node replica-and-topic count tracks the transitive reach of delegation, not the contact count. That count is a scale question for the per-issuer model (ADR-0009), surfaced here, not for the filter itself.
 
 ### Example 2: SMB Coordination
 
@@ -44,7 +46,7 @@ A gossip sender controls only its few direct neighbors (HyParView active view), 
 
 - **Full UWill** (ADR-0007): delegation chains, chain validation, revocation, token encoding. This change carries only the degenerate single-link read capability the filter consumes; the real format and issuance migrate to the `uwill` module later.
 - **The metadata a filtered session still reveals to an authorized peer** (count / opaque keys / timestamps of the records it _is_ authorized for) — accepted; addressed on the linkability axis by non-correlatable ids (KERI), not here.
-- **The reconcile-trigger live path** (transport, coalescing, retry) — the separate `reconcile-trigger` change; subset-rbsr describes it (design D5, worked examples) but does not build it, and correctness does not depend on it (reconciliation-on-contact suffices).
+- **The reconcile-trigger live path** (transport, coalescing, retry) — the separate `reconcile-trigger` change; subset-rbsr describes it (design D5, load profiles) but does not build it, and correctness does not depend on it (reconciliation-on-contact suffices).
 
 ## Capabilities
 
