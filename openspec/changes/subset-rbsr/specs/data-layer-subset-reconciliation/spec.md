@@ -1,6 +1,6 @@
 # data-layer: subset reconciliation
 
-Capability-filtered reconciliation — "subset-RBSR" — the read-side counterpart of the ADR-0008 ingest seam, enforcing Invariant 2: a serving node reveals only the records the receiving peer is read-authorized for.
+Capability-filtered reconciliation — "subset-RBSR" — the read-side counterpart of the ADR-0008 ingest hook, enforcing Invariant 2: a serving node reveals only the records the receiving peer is read-authorized for.
 
 ## ADDED Requirements
 
@@ -26,9 +26,9 @@ The reconciliation transcript a peer observes SHALL depend only on the records i
 
 Filtering SHALL run at reconciliation time inside `pdn-store`, per peer, distinct from the ingest-only `validate_entry` hook, and SHALL consume the peer's presented read capabilities.
 
-#### Scenario: Read filter is independent of the ingest seam
+#### Scenario: Read filter is independent of the ingest hook
 
-- **WHEN** the egress filter runs while the fork's `validate_entry` seam has no validator installed
+- **WHEN** the egress filter runs while the fork's `validate_entry` hook has no validator installed
 - **THEN** filtering applies unchanged, and it composes with any future ingest validator (ADR-0008) — read on egress, write on ingest, independently
 
 ### Requirement: Same-identity reconciliation is unfiltered
