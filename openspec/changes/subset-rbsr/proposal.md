@@ -2,7 +2,7 @@
 
 ## Why
 
-Invariant 2 requires that a node receive a data record only if it holds a read capability for it — but today reconciliation delivers every record to any peer that syncs, with no per-record read control. This change adds capability-filtered reconciliation ("subset-RBSR"): a serving node reveals only the records the receiving peer is authorized to read, enforcing Invariant 2 during reconciliation (the read-side counterpart of the ADR-0008 ingest seam — the fork's `validate_entry` hook).
+Invariant 2 requires that a node receive a data record only if it holds a read capability for it — but today reconciliation delivers every record to any peer that syncs, with no per-record read control. This change adds capability-filtered reconciliation ("subset-RBSR"): a serving node reveals only the records the receiving peer is authorized to read, enforcing Invariant 2 during reconciliation (the read-side counterpart of the ADR-0008 ingest hook — the fork's `validate_entry`).
 
 ## What Changes
 
@@ -60,11 +60,11 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 ### New Capabilities
 
 - `data-layer-read-capabilities`: the minimal read-capability — issuance, presentation, and per-record evaluation; the single-link precursor to UWill.
-- `data-layer-subset-reconciliation`: capability-filtered reconciliation enforcing Invariant 2 — the serving node reveals only authorized records, hiding the rest (content and existence); the read-side counterpart of the ingest seam.
+- `data-layer-subset-reconciliation`: capability-filtered reconciliation enforcing Invariant 2 — the serving node reveals only authorized records, hiding the rest (content and existence); the read-side counterpart of the ingest hook.
 
 ## Impact
 
 - **`pdn-store`**: a new reconciliation-time egress filter (a per-session predicate over which records participate in fingerprints and item transmissions). Deeper than the ingest hook; touches the reconciliation engine (`ranger`).
 - **`crates/data-layer`**: the read-capability type + issuance/evaluation; presentation of capabilities at session setup; wiring the per-peer filter into `SyncNode` reconciliation.
 - **`crates/data-layer/tests`**: a new read-restriction scenario test; the same-identity suites (`sync_two_devices`, `device_linking`, `multi_identity`, `three_devices`) verified to still replicate in full.
-- **Unaffected**: `pdn-types` addressing (issuer / `ClaimId`), `pdn-layer` domain model, and the fork's ingest seam (`validate_entry`, ADR-0008), which stays available and uninstalled. The old ingest gate was removed by multi-identity-node, so this filter is the first enforcement to land on the ungated, ticket-possession baseline — it composes with nothing and replaces nothing.
+- **Unaffected**: `pdn-types` addressing (issuer / `ClaimId`), `pdn-layer` domain model, and the fork's ingest hook (`validate_entry`, ADR-0008), which stays available and uninstalled. The old ingest gate was removed by multi-identity-node, so this filter is the first enforcement to land on the ungated, ticket-possession baseline — it composes with nothing and replaces nothing.

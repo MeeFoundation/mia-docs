@@ -2,7 +2,7 @@
 
 ## Context
 
-Invariant 2 says a node receives a record only if it holds a read capability for it. Today reconciliation delivers every record to any peer that syncs — no per-record read control: the old ingest gate was removed by multi-identity-node, nodes host several identities, and access is bounded by ticket possession alone. This change enforces Invariant 2 by filtering what a serving node reveals during reconciliation, driven by the receiving peer's read capabilities — the read-side counterpart of the ADR-0008 ingest seam (the fork's `validate_entry` hook, available and uninstalled), and the first enforcement to land on that ungated baseline.
+Invariant 2 says a node receives a record only if it holds a read capability for it. Today reconciliation delivers every record to any peer that syncs — no per-record read control: the old ingest gate was removed by multi-identity-node, nodes host several identities, and access is bounded by ticket possession alone. This change enforces Invariant 2 by filtering what a serving node reveals during reconciliation, driven by the receiving peer's read capabilities — the read-side counterpart of the ADR-0008 ingest hook (the fork's `validate_entry`, available and uninstalled), and the first enforcement to land on that ungated baseline.
 
 ## Goals / Non-Goals
 
