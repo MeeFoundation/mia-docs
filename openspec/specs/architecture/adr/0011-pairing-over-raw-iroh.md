@@ -1,12 +1,12 @@
 ---
-status: proposed
-date: 2026-07-14
+status: accepted
+date: 2026-07-15
 ---
 # Establish connections over a raw iroh dialogue: pairing is its own protocol, not pdn-store sync
 
 ## Context and Problem Statement
 
-Two identities that have never met need to become connected: exchange who they are (PdnId), how to reach each other (node addresses), and the initial access everything afterwards rides on — tickets to the metadata replicas through which capability grants and data-store tickets will later travel. Every ongoing channel in the stack — reconciliation, gossip, blob fetch — presupposes a shared replica and a ticket for it. Connection establishment is the step that *creates* that shared state, so it cannot presuppose it.
+Two identities that have never met need to become [connected](../language/connection.md): exchange who they are (PdnId), how to reach each other (node addresses), and the initial access everything afterwards rides on — tickets to the metadata replicas through which capability grants and data-store tickets will later travel. Every ongoing channel in the stack — reconciliation, gossip, blob fetch — presupposes a shared replica and a ticket for it. Connection establishment is the step that *creates* that shared state, so it cannot presuppose it.
 
 The concrete flow being designed is in-person pairing: the inviter's device displays a QR code, the scanner's device completes the procedure, and afterwards both identities see the connection from all of their devices. Two properties constrain the design. First, the QR is semi-public — shown on a screen, photographable — so nothing bearer-grade can ride in it; and at display time the counterparty is unknown, so nothing can be scoped to them either. Second, the invitation must be single-use: a one-time pairing secret verified and burned atomically, closing replay and the double-scan race. The question: over what channel does the pairing dialogue run?
 
@@ -35,7 +35,7 @@ Facts about the stack:
 
 Chosen option: **a dedicated pairing protocol on its own ALPN**, because it is the only option that requires no pre-shared state, keeps bearer material out of the QR, and gives the secret's verify-and-burn one atomic home — while leaving pdn-store untouched.
 
-The shape (names are working titles; the store-level realization is specified separately, in the connection metadata store proposal):
+The shape (names are working titles; the store-level realization is specified in the [connection metadata store spec](../../components/data-layer/connection-metadata-store.md)):
 
 * **The QR carries**: the inviter device's node address (endpoint public key plus direct socket addresses — the current stack is relay-free), a one-time short-lived pairing secret (random, not a counter), the inviter's PdnId, and a format version. It carries **no** tickets and **no** identity proof.
 * **The dialogue**: the scanner's endpoint dials the address over the pairing ALPN — a raw bidirectional QUIC stream, not a document-sync session. The scanner presents the pairing secret, its PdnId, its own node address, and a read ticket to the metadata replica it issues for the counterparty; the inviter **atomically verifies and burns** the secret — present and unburned → burn and continue, anything else → refuse — *before* creating or writing any state, then answers with the read ticket to its own metadata replica. The secret also burns on timeout, whichever comes first.
@@ -57,6 +57,8 @@ The shape (names are working titles; the store-level realization is specified se
 ## Validation
 
 An in-process integration test drives the full establishment: invite → dial by the scanned address → secret verified and burned → tickets exchanged → both identities see the connection from all their devices (the device-replicated stores converge). Adversarial cases per the [access-control-tests practice](../../code-practices/access-control-tests.md), each paired with its allowed counterpart: a replayed or second presentation of the same secret is refused; presentation after expiry is refused; a caller without the secret obtains nothing — and refused attempts leave **no** observable state on the inviter (no replica created, no ticket issued, no connections-store write), which is the atomicity property itself.
+
+Re-establishment, the recovery path the Consequences claim: a fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that died after the burn — converges rather than duplicates. One connections entry per side, each side's own metadata replica reused through its directory (tickets from different attempts address the same namespace), whichever side mints the fresh invite — including the direction-swapped retry.
 
 ## Pros and Cons of the Options
 
@@ -87,7 +89,9 @@ An in-process integration test drives the full establishment: invite → dial by
 
 ## More Information
 
-Open questions to resolve before `accepted`: exact QR encoding and size budget; secret entropy and lifetime; mid-dialogue failure handling (which side retries what); where the protocol handler lives in the runtime and the `data-layer` API for registering it; the later shape of pending/offline invitations; the exact contents of the KERI proof step; the QR linkability leak: whether the inviter's PdnId needs to be in the QR at all (it could travel inside the encrypted dialogue instead), and whether pairing should later present a per-relationship identifier rather than the long-lived PdnId — KERI makes minting per-context autonomic identifiers cheap, which is the hoped-for path, not yet a design.
+Open questions, none blocking this decision: exact QR encoding and size budget; the later shape of pending/offline invitations; the exact contents of the KERI proof step; the QR linkability leak: whether the inviter's PdnId needs to be in the QR at all (it could travel inside the encrypted dialogue instead), and whether pairing should later present a per-relationship identifier rather than the long-lived PdnId — KERI makes minting per-context autonomic identifiers cheap, which is the hoped-for path, not yet a design.
+
+Resolved by the connection-establishment change: secret entropy and lifetime (32 random bytes from the operating-system generator; 120-second default lifetime with an invite-time override; expiry checked lazily at presentation); mid-dialogue failure handling (a handshake that dies after the burn is retried with a fresh invite and converges — see Validation's re-establishment case); where the protocol handler lives and the `data-layer` API (the handler is pdn-node runtime code, registered at `Runtime::spawn` through `data-layer`'s spawn-time protocol slot, with a narrow dial handle for the dial side).
 
 Related ADRs: [ADR-0007](0007-uwill.md) (the capability model the exchanged grants grow into), [ADR-0008](0008-iroh-without-willow.md) (fork minimalism; the metadata channel the exchanged tickets open), [ADR-0009](0009-per-issuer-namespace.md) (the per-issuer replicas the grants point into), [ADR-0010](0010-subset-rbsr.md) (the reconciliation-time egress filter that enforces the read grants the metadata replicas carry).
 

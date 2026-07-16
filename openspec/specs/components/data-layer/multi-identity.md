@@ -11,7 +11,7 @@ A `SyncNode` SHALL host the store sets of any number of identities concurrently:
 
 #### Scenario: Two identities' private stores on one node
 - **WHEN** private metadata stores and connections stores are created on one node for identity A and identity B
-- **THEN** the node carries four distinct replicas, and each store is reached through its own handle and holds only its identity's records
+- **THEN** the node carries four distinct replicas, and each store is reached through its own handle and holds only its identity's entries
 
 #### Scenario: Two issuers' data stores on one node
 - **WHEN** data stores are created on one node for issuer A and issuer B and one entry is written into each

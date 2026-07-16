@@ -24,16 +24,20 @@ The identity service SHALL create an identity on its first device — minting a 
 - **WHEN** runtime B is linked into identity X while identity Y exists elsewhere
 - **THEN** B hosts X only, and operations addressed to Y on B are refused as unknown
 
-### Requirement: Connections service records and lists an identity's connections
-The connections service SHALL record a connection between a hosted identity and a peer identity and SHALL list the identity's current connections, delegating to that identity's [connections store](../data-layer/connections-store.md). Recording is the current producer of connections; the establishment dialogue (pairing) becomes a producer in a later change.
-
-#### Scenario: Recorded on one device, listed on a linked device
-- **WHEN** device A of an identity records a connection to peer P and device B is linked into the same identity
-- **THEN** B lists P once the connections store syncs
+### Requirement: Connections service establishes, lists, and carries grants
+The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](connection-establishment.md)) — and SHALL list a hosted identity's current connections, delegating to that identity's [connections store](../data-layer/connections-store.md). It SHALL carry data grants over the connection's [metadata pair](../data-layer/connection-metadata-store.md): publishing a grant of a hosted issuer's namespace toward a connected peer, and reading the grants a connected peer has published — opening the pair from the directory's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a grant yields the ticket it carries; importing that namespace remains an explicit data-service act. (The grant payload is the interim whole-store ticket; capability-scoped grants land with the read-capability mechanism, and this requirement changes with it.)
 
 #### Scenario: Hosted identities' connection lists are disjoint
-- **WHEN** identity X records a connection to peer P and identity Y on the same runtime records none
+- **WHEN** identity X on a runtime establishes a connection with peer P and identity Y on the same runtime establishes none
 - **THEN** listing Y's connections yields nothing
+
+#### Scenario: A grant crosses to the peer with no new pairing
+- **WHEN** X publishes a grant of its namespace toward its established peer P, after establishment completed
+- **THEN** P's runtime reads the grant from the metadata pair, and importing the carried ticket through the data service lets P read X's entries once synced
+
+#### Scenario: Connections operations on an unhosted identity are refused
+- **WHEN** an invite, establishment, listing, or grant operation addresses an identity the runtime neither created nor linked
+- **THEN** the operation fails with an unknown-identity error and nothing is minted, established, listed, or published
 
 ### Requirement: Data service writes, reads, lists, and hands over namespace tickets
 The data service SHALL write and read entries in a hosted issuer's [data namespace](../data-layer/data-store.md), SHALL list its entries as metadata (no payload bytes; optionally filtered by a path prefix), SHALL share a hosted namespace as a ticket, and SHALL import a peer's namespace from a ticket, after which its entries sync whole. Whole-store ticket handover is the interim access model (ticket possession); capability-scoped sharing replaces it in later changes, and this requirement changes with the mechanism.

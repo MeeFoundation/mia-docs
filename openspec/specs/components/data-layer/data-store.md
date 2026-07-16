@@ -2,7 +2,7 @@
 
 ## Purpose
 
-An issuer's data store: the domain role in an identity's store set — alongside the connections store and the private metadata store — holding all entries the issuer emits. The role is implemented as the issuer's single pdn-store namespace ([namespace-addressing.md](../pdn-node/namespace-addressing.md)): "data store" names the role, and below `data-layer` the word namespace keeps its mechanical meaning — the replication unit and gossip topic. A person's *personal datastore* ([north-star.md](../../north-star.md)) is, in these terms, the union of the data stores and private stores of that person's identities across their devices. Access is bounded by possession of the replica's ticket until subset-rbsr and UWill land ([multi-identity.md](multi-identity.md)), and author keys are node-local, not identity-bound, until UWill. Two operations are deliberately absent at this stage: deleting an entry, and discovering data stores during device linking (deferred — ADR-0009; tickets are handed over explicitly).
+An issuer's data store: the domain role in an identity's store set — alongside the connections store and the private metadata store — holding all entries the issuer emits — each entry the stored form of one [claim](../../architecture/language/claim.md) the issuer makes; this layer sees a path and an opaque payload, and the claim semantics live above. The role is implemented as the issuer's single pdn-store namespace ([namespace-addressing.md](../pdn-node/namespace-addressing.md)): "data store" names the role, and below `data-layer` the word namespace keeps its mechanical meaning — the replication unit and gossip topic. A person's *personal datastore* ([north-star.md](../../north-star.md)) is, in these terms, the union of the data stores and private stores of that person's identities across their devices. Access is bounded by possession of the replica's ticket until subset-rbsr and UWill land ([multi-identity.md](multi-identity.md)), and author keys are node-local, not identity-bound, until UWill. Two operations are deliberately absent at this stage: deleting an entry, and discovering data stores during device linking (deferred — ADR-0009; tickets are handed over explicitly).
 
 ## Requirements
 
@@ -47,8 +47,8 @@ An issuer's entries SHALL be enumerable as entry metadata — issuer, path, and 
 - **THEN** listing that issuer yields exactly those paths as metadata, with no payload bytes
 
 #### Scenario: Prefix narrows the listing by whole components
-- **WHEN** entries exist at `contacts/a`, `contacts/b`, `contactsx/c`, and `profile/name`, and the listing is filtered by the prefix `contacts`
-- **THEN** exactly `contacts/a` and `contacts/b` are yielded
+- **WHEN** entries exist at `contact/email`, `contact/phone`, `contacts/emergency`, and `banking/iban`, and the listing is filtered by the prefix `contact`
+- **THEN** exactly `contact/email` and `contact/phone` are yielded
 
 ### Requirement: Mutations replicate between devices
 Writes performed on one device SHALL become visible on every device holding the replica through standard pdn-store sync (set reconciliation for catch-up, gossip for live updates within the replica's [swarm](../../architecture/language/swarm.md)), with no additional transport or server.
