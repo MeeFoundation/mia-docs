@@ -16,7 +16,8 @@ A test that fails rarely is not "unstable" — it has caught a rare defect. Scen
 
 ## How
 
-- Loop harness: `just stress <iterations>` — a counted loop over the integration-test binaries, one verdict line per run, full output kept only for failures. When hunting, restrict the roster to the affected binaries: failure cost is dominated by the liveness timeout burning on the starved wait.
+- Loop harness: `just stress <iterations> <only> <skip>` — a counted loop over the integration-test binaries, one verdict line per run, full output kept only for failures; `only`/`skip` narrow the roster by substrings of `crate--name`. When hunting, restrict the roster to the affected binaries: failure cost is dominated by the liveness timeout burning on the starved wait.
+- Broad and fast before deep and narrow. When a pass has both a wide sweep (every binary, fewer iterations) and a long counted loop on the suspects, run the wide sweep first: a failure in the deep loop stops everything and sends the work off to a fix, and a stop must never be what cancels the cheap full-tree picture. The deep loop loses nothing by going second — its verdict is the last thing needed anyway.
 - Count acts, not only runs: one run may exercise the racy path many times; rates per act compare configurations that exercise it differently.
 - Load is not a multiplier by default: parallel copies once bought no extra reproduction speed here — measure before assuming.
 - Keep the harness output: the verdict log and failure files are the evidence appendix of the fix and the tool for the next hunt.
