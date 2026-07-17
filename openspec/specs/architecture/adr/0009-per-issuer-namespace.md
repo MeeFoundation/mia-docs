@@ -21,7 +21,7 @@ Can we collapse to a single addressing axis — and, once collapsed, does a "nam
 
 A namespace survives because **UWill authorizes, it does not replicate**: a per-issuer set that replicates by reconciliation is irreducible on iroh-docs, so we coarsen it to one-per-issuer rather than try to remove it.
 
-This is orthogonal to the device-internal stores (`ConnectionsStore`, `PrivateMetadataStore`), which are bound by `identity` and admitted by Invariant 1 (see `../../components/pdn-node/invariants.md`): unaffected by how data namespaces are addressed.
+This is orthogonal to the device-internal store (`PrivateMetadataStore`, the directory), which is bound by `identity` and admitted by Invariant 1 (see `../../components/pdn-node/invariants.md`): unaffected by how data namespaces are addressed.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-An issuer's data store: the domain role in an identity's store set — alongside the connections store and the private metadata store — holding all entries the issuer emits — each entry the stored form of one [claim](../../architecture/language/claim.md) the issuer makes; this layer sees a path and an opaque payload, and the claim semantics live above. The role is implemented as the issuer's single pdn-store namespace ([namespace-addressing.md](../pdn-node/namespace-addressing.md)): "data store" names the role, and below `data-layer` the word namespace keeps its mechanical meaning — the replication unit and gossip topic. A person's *personal datastore* ([north-star.md](../../north-star.md)) is, in these terms, the union of the data stores and private stores of that person's identities across their devices. Access is bounded by possession of the replica's ticket until subset-rbsr and UWill land ([multi-identity.md](multi-identity.md)), and author keys are node-local, not identity-bound, until UWill. Two operations are deliberately absent at this stage: deleting an entry, and discovering data stores during device linking (deferred — ADR-0009; tickets are handed over explicitly).
+An issuer's data store: the domain role in an identity's store set — alongside the private-metadata directory — holding all entries the issuer emits — each entry the stored form of one [claim](../../architecture/language/claim.md) the issuer makes; this layer sees a path and an opaque payload, and the claim semantics live above. The role is implemented as the issuer's single pdn-store namespace ([namespace-addressing.md](../pdn-node/namespace-addressing.md)): "data store" names the role, and below `data-layer` the word namespace keeps its mechanical meaning — the replication unit and gossip topic. A person's *personal datastore* ([north-star.md](../../north-star.md)) is, in these terms, the union of the data stores and private stores of that person's identities across their devices. Access is bounded by possession of the replica's ticket until subset-rbsr and UWill land ([multi-identity.md](multi-identity.md)), and author keys are node-local, not identity-bound, until UWill. Deleting an entry is deliberately absent at this stage. A device of the identity obtains the data store through the linking reply, which carries a fresh write ticket next to the directory's ([device-linking.md](../pdn-node/device-linking.md)); handover to anyone else stays an explicit ticket act.
 
 ## Requirements
 
@@ -74,3 +74,14 @@ A data store SHALL be shareable as a ticket, and importing that ticket SHALL reg
 #### Scenario: Import joins the replica
 - **WHEN** a node imports a data store from its ticket under the issuer
 - **THEN** subsequent reads under that issuer on that node observe the replica's entries as they sync
+
+### Requirement: A registered data namespace can be forgotten
+Registering a data store under an issuer SHALL have a counterpart: forgetting an issuer's data namespace stops reconciling its replica, drops it, and removes the issuer's registration together — so operations addressed to that issuer afterwards fail with the unknown-issuer error, exactly as before the import, rather than resolving to a dropped replica. Dropping the replica without removing the registration is not sufficient and SHALL NOT be the surface offered: the issuer would still resolve, and its operations would fail as storage errors instead of the distinguishable refusal this store's addressing requirement mandates. This is the rollback path for an import that must not survive the operation that made it ([device-linking](../pdn-node/device-linking.md)).
+
+#### Scenario: Forgetting a namespace unregisters its issuer
+- **WHEN** a node imports the data namespace of an issuer, then forgets it
+- **THEN** the replica is no longer reconciled, and reading, writing, or listing under that issuer fails with the unknown-issuer error
+
+#### Scenario: Forgetting one issuer leaves the others addressable
+- **WHEN** a node hosts the data namespaces of two issuers and forgets one
+- **THEN** the other issuer's entries remain readable under its own `PdnId`
