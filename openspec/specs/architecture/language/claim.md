@@ -9,8 +9,8 @@ Claim is an assertion about a [Subject](subject.md) made by [Issuer](issuer.md).
 Claim consists of:
 
 * An [Attribute](attribute.md) that holds the claim's data
-* [Mee Identity](pdn-identity.md) of the claim's issuer
-* [Mee Identity](pdn-identity.md) of the claim's subject
+* [Mee Identity](mee-identity.md) of the claim's issuer
+* [Mee Identity](mee-identity.md) of the claim's subject
 * Proof of the issuance of the claim (e.g. a digital signature)
 
 ## Examples of Claims

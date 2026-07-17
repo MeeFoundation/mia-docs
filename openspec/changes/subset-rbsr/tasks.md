@@ -30,7 +30,7 @@ The reconcile-trigger live path (resolve covered peers, send, coalesce, triggere
 ## 5. Tests
 
 - [ ] 5.1 New read-restriction scenario (the old `sync_two_nodes` was removed by multi-identity-node): issuer grants a peer read on a subset; assert the subset arrives and a withheld claim never does (existence hidden). Use real read capabilities, not the naive `Connections` set
-- [ ] 5.2 Same-identity suites (`sync_two_devices`, `device_linking`, `multi_identity`, `three_devices`) still replicate in full under the filter
+- [ ] 5.2 Same-identity suites (data-layer `sync_two_devices`, `multi_identity`, `three_devices`, and pdn-node `linking`) still replicate in full under the filter
 - [ ] 5.3 Flake check on the new/changed scenarios; lints + full suite (`just precommit-check`)
 
 ## 6. Docs & archive

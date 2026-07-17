@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How two identities become [connected](../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual entries in the two [connections stores](../data-layer/connections-store.md) and the exchanged [connection metadata pair](../data-layer/connection-metadata-store.md). The exchange is bearer-level for now: the KERI proof of control over a presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both peers must be online — pending invitations are future work.
+How two identities become [connected](../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../data-layer/private-metadata-store.md) and the exchanged [connection metadata pair](../data-layer/connection-metadata-store.md). The exchange is bearer-level for now: the KERI proof of control over a presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both peers must be online — pending invitations are future work.
 
 ## Requirements
 
@@ -54,7 +54,7 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: Establishment records the connection for both identities, on all their devices
-On a completed dialogue each side SHALL record the counterparty in its connections store, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in its private-metadata directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory and the connections store replicate, and a linked device opens the pair from the directory's tickets on demand.
+On a completed dialogue each side SHALL record the counterparty among the connections records of its private-metadata directory, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory replicates, and a linked device opens the pair from the directory's tickets on demand.
 
 #### Scenario: Both sides list each other
 - **WHEN** runtime B establishes with an invite from runtime A
@@ -65,7 +65,7 @@ On a completed dialogue each side SHALL record the counterparty in its connectio
 - **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its directory
 
 ### Requirement: Re-establishment converges, whichever side invites
-A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each connections store holds one entry per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
+A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's directory holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
 
 #### Scenario: Establishing twice yields one connection
 - **WHEN** A and B establish, and later establish again from a fresh invite
