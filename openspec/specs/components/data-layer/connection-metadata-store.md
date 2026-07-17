@@ -48,7 +48,7 @@ Write access SHALL be bounded by the store's write ticket, which circulates only
 - **THEN** C's node holds no replica of A's store toward B and no ticket to it, and nothing readable by C reveals that the store exists
 
 ### Requirement: Grants are keyed by data-store issuer
-A grant SHALL live under the key prefix `grants/<issuer-hex>` (64 lowercase hex chars of the granted data store's issuer `PdnId`): the ticket to that issuer's data store at `grants/<issuer-hex>/ticket`, and the read capability at `grants/<issuer-hex>/cap` — a reserved slot, unwritten until the read-capability mechanism lands. The interim grant is the whole-store ticket alone. Capability payloads SHALL be treated as opaque bytes at this layer.
+A grant SHALL live under the key prefix `grants/<issuer-hex>` (64 lowercase hex chars of the granted data store's issuer `PdnId`): the ticket to that issuer's data store at `grants/<issuer-hex>/ticket`, and the capability at `grants/<issuer-hex>/cap` — a reserved slot, unwritten until the capability mechanism lands. The interim grant is the whole-store ticket alone, and that ticket is a write ticket: the store's capability bounds swarm membership, not access, so read and write alike are the capability's to state once it lands. Capability payloads SHALL be treated as opaque bytes at this layer.
 
 #### Scenario: A grant round-trips
 - **WHEN** the issuer publishes a grant carrying a data-store ticket and the counterparty reads it after sync
