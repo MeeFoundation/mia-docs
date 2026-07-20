@@ -2,7 +2,7 @@
 
 ## Purpose
 
-One node hosts several identities — for example Alice-at-work and Alice-at-leisure, later groups and organizations — each with its own store set (the private-metadata directory and the data store), added to a device explicitly and addressed independently. Interim admission is ticket possession, until subset-rbsr (Invariant 2) and UWill restore enforcement.
+One node hosts several identities — for example Alice-at-work and Alice-at-leisure, later groups and organizations — each with its own store set (the private-metadata directory and the data store), added to a device explicitly and addressed independently. Read admission to a data store is classified per session — an identity's own devices see it whole, granted counterparties see what their grants cover, other callers are refused ([subset reconciliation](subset-reconciliation.md), Invariant 2); identity-bound authorization lands with UWill.
 
 ## Requirements
 
