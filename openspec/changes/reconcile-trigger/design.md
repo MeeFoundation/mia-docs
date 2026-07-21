@@ -2,7 +2,7 @@
 
 ## Context
 
-subset-rbsr puts capability-scoped peers outside the gossip swarm and makes filtered reconciliation their only data path and the sole carrier of correctness. Without a live path a scoped peer sees new claims only when it next reconciles. This change adds a reconcile trigger — a directed, content-free message that prompts a covered peer to reconcile promptly — without the side channel a broadcast tick would open. subset-rbsr's worked examples (Example 1 sparse, Example 2 SMB) make the cost and the side channel concrete; this design does not repeat them.
+subset-rbsr puts capability-scoped peers outside the gossip swarm and makes filtered reconciliation their only data path and the sole carrier of correctness. Without a live path a scoped peer sees new claims only when it next reconciles. This change adds a reconcile trigger — a directed, content-free message that prompts a covered peer to reconcile promptly — without the side channel a broadcast tick would open. subset-rbsr's worked examples (Example 1, a personal store with sparse sharing; Example 2, coordination inside a small-or-medium business) make the cost and the side channel concrete; this design does not repeat them.
 
 ## Goals / Non-Goals
 
@@ -24,7 +24,7 @@ On a write, the serving node resolves the scoped peers whose capabilities cover 
 
 ### D2. Coalescing
 
-A peer holds at most one pending trigger until it reconciles; consecutive covered writes collapse into that one pending tick. So what a peer receives is bounded by its own reconciliation cadence, not the write rate (subset-rbsr, Example 2: about a hundred covered writes a day become a few ticks, never a flood).
+A peer holds at most one pending trigger until it reconciles; consecutive covered writes collapse into that one pending tick. So what a peer receives is bounded by its own reconciliation cadence, not the write rate (subset-rbsr, Example 2: about 100 covered writes a day become a few ticks, never a flood).
 
 ### D3. Best-effort; reconciliation heals
 

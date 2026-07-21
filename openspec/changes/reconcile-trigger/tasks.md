@@ -1,9 +1,6 @@
 # Tasks: reconcile-trigger
 
-Scope: the live path for capability-scoped peers — a directed, content-free
-trigger on a covered write, coalesced per peer, best-effort, prompting a
-filtered reconciliation. Depends on subset-rbsr (filter, read capability,
-scoped-peers-outside-swarm). Correctness and confidentiality are subset-rbsr's.
+Scope: the live path for capability-scoped peers — a directed, content-free trigger on a covered write, coalesced per peer, best-effort, prompting a filtered reconciliation. Depends on subset-rbsr (filter, read capability, scoped-peers-outside-swarm). Correctness and confidentiality are subset-rbsr's.
 
 ## 1. Trigger
 

@@ -1,1 +1,1 @@
-This is a documentation for the Mee Identity Agent project. It follows the conventions of the OpenSpec specification format. See the [OpenSpec documentation](https://github.com/Fission-AI/OpenSpec) for more information about the format.
+This is the documentation for the Mee Identity Agent project. It follows the conventions of the OpenSpec specification format. See the [OpenSpec documentation](https://github.com/Fission-AI/OpenSpec) for more information about the format.

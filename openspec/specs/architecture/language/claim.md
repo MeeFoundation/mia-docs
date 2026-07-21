@@ -2,11 +2,11 @@
 
 ## Overview
 
-Claim is an assertion about a [Subject](subject.md) made by [Issuer](issuer.md). 
+A claim is an assertion about a [Subject](subject.md) made by an [Issuer](issuer.md).
 
 ## Composition
 
-Claim consists of:
+A claim consists of:
 
 * An [Attribute](attribute.md) that holds the claim's data
 * [Mee Identity](mee-identity.md) of the claim's issuer
