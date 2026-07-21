@@ -2,7 +2,7 @@
 
 ## Overview
 
-A named and typed property that holds a single piece of data
+A named and typed property that holds a single piece of data.
 
 ## Composition
 

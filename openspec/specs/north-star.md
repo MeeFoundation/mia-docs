@@ -8,7 +8,7 @@ We envision a digital world where people are free to live as they wish, free to 
 
 ### Independence, freedom, autonomy
 
-People have digital identities that are independent of government and big tech. This life-long digital identity is controlled by the individual and is not created by governments or corporations. These identity agents follow a local-first design philosophy that reduces a far as possible, dependence on web services managed by entities other than the individual.
+People have digital identities that are independent of government and big tech. This life-long digital identity is controlled by the individual and is not created by governments or corporations. These identity agents follow a local-first design philosophy that reduces, as far as possible, dependence on web services managed by entities other than the individual.
 
 ### Control
 
@@ -22,7 +22,7 @@ People tell their agents what to share with whom (other identity agent users or 
 
 Meet people where they are and lead them to a better future. 
 
-* For example "where they are" means the agent imports the person's contacts (e.g. from Apple Contacts). "A better future" means now he person has the ability to make selected contacts auto-updating by inviting the other person to use Mee. 
+* For example "where they are" means the agent imports the person's contacts (e.g. from Apple Contacts). "A better future" means the person now has the ability to make selected contacts auto-updating by inviting the other person to use Mee. 
 
 ## What's a Mee identity agent? (MIA)
 
@@ -30,13 +30,13 @@ MIA is a software application that runs on your devices, with minimal use of clo
 
 * A UI that allows the user to (i) view, update, organize their personal information held in a local datastore and/or in other PDN nodes, (ii) create *connections* and (iii) manage *integrations*.
 * The user's data is stored in a personal datastore within the application. It adheres to the Persona ontology.
-* A *connection* is a internet communications channel between nodes on the Personal Data Network (PDN). Each Mia is a PDN node. Service providers can integrate as nodes on the PDN.
+* A *connection* is an internet communications channel between nodes on the Personal Data Network (PDN). Each Mia is a PDN node. Service providers can integrate as nodes on the PDN.
 * An *integration* is implemented as a connector between the personal datastore and some external OS service or local application.
-* A bundled browser extension to implement GPC and MySignals
+* A bundled browser extension to implement Global Privacy Control (GPC) and MySignals
 
 ## Features
 
-## Over time we will add features to the agent. We need to sort them into [roadmap](https://plane.mee.foundation/mee/projects/c7ef98b7-8daf-4db3-9849-cf6a9c8a765d/issues/).
+Over time we will add features to the agent. We need to sort them into the [roadmap](https://plane.mee.foundation/mee/projects/c7ef98b7-8daf-4db3-9849-cf6a9c8a765d/issues/).
 
 | **Feature** | **Description** |
 |---------|-------------|
