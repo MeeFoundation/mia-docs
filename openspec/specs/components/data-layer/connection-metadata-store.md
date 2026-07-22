@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The cross-identity channel of a [connection](../../architecture/language/connection.md): for each connection there are two of these stores, one per direction. The store issued by identity A toward its counterparty B carries A's grants to B — whole-store tickets and capability-scoped read grants — and A's published device set, written only by A's devices and read, whole, by B's devices (Invariant 3). The mechanism is the one the private-metadata directory already uses: a dedicated pdn-store replica gated by ticket possession — no new sync machinery, and no domain `NamespaceId`. In code the pair at one side is `ConnectionMetadata { own, peer }`: `own` the replica this side issues, `peer` the counterpart's. The counterparty is the audience of the whole replica, so no per-entry filtering applies inside it — filtered reconciliation ([subset reconciliation](subset-reconciliation.md)) matters for the data stores grants point at, not here. Establishment ([connection-establishment](../pdn-node/connection-establishment.md)) creates and exchanges these stores; the [private-metadata directory](private-metadata-store.md) carries their tickets to each identity's other devices.
+The cross-identity channel of a [connection](../../architecture/language/connection.md): for each connection there are two of these stores, one per direction. The store issued by identity A toward its counterparty B carries A's grants to B — capability-scoped read grants, each naming an exact claim set — and A's published device set, written only by A's devices and read, whole, by B's devices (Invariant 3). The mechanism is the one the private-metadata directory already uses: a dedicated pdn-store replica gated by ticket possession — no new sync machinery, and no domain `NamespaceId`. In code the pair at one side is `ConnectionMetadata { own, peer }`: `own` the replica this side issues, `peer` the counterpart's. The counterparty is the audience of the whole replica, so no per-entry filtering applies inside it — filtered reconciliation ([subset reconciliation](subset-reconciliation.md)) matters for the data stores grants point at, not here. Establishment ([connection-establishment](../pdn-node/connection-establishment.md)) creates and exchanges these stores; the [private-metadata directory](private-metadata-store.md) carries their tickets to each identity's other devices.
 
 ## Requirements
 
@@ -48,23 +48,27 @@ Write access SHALL be bounded by the store's write ticket, which circulates only
 - **THEN** C's node holds no replica of A's store toward B and no ticket to it, and nothing readable by C reveals that the store exists
 
 ### Requirement: Grants are keyed by data-store issuer
-A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex chars of the granted data store's issuer `PdnId`), whose payload names its own width explicitly: the interim whole-store grant — the data store's ticket alone — or a capability-scoped grant carrying the capability and its ticket together. In one directional store at most one grant of one width SHALL exist per issuer at any moment: publishing either width replaces the record wholesale, and withdrawal SHALL be one tombstone over that one record — so no ordering of separate entries, locally or across replicating devices, can ever expose a wider grant than the last one published. A grant record that is absent, whose payload has not yet replicated, or whose payload a build cannot decode SHALL be treated as no grant — width is never inferred from absence or from partial state. The whole-store grant's ticket is a write ticket (the store's capability bounds swarm membership, not access — read and write are the capability mechanism's to state); a scoped grant's ticket mode follows its commands. Capability payloads inside the record SHALL be treated as opaque bytes at this layer.
+A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex chars of the granted data store's issuer `PdnId`), carrying a capability scoped to an exact claim set together with the data store's ticket. Every grant is capability-scoped: there is no grant that conveys a whole store without naming its claims. In one directional store at most one grant SHALL exist per issuer at any moment: publishing replaces the record wholesale, and withdrawal SHALL be one tombstone over that one record — so no ordering of separate entries, locally or across replicating devices, can ever expose a grant other than the last one published. A grant record that is absent, whose payload has not yet replicated, or whose payload a build cannot decode SHALL be treated as no grant — never inferred from absence or from partial state. The ticket's mode follows the grant's commands: a read-only grant ships a read ticket (no namespace secret, so the grantee cannot write at all), a grant carrying write ships a write ticket. The capability's own `issuer` and `audience` bind the grant to its subject: the serving side SHALL honor a record only for the identity its capability names as audience, never on the record's position alone. Capability payloads inside the record SHALL otherwise be treated as opaque bytes at this layer.
 
 #### Scenario: A grant round-trips
 - **WHEN** the issuer publishes a grant carrying a data-store ticket and the counterparty reads it after sync
-- **THEN** the ticket read equals the ticket published, keyed by the data store's issuer
+- **THEN** the ticket and capability read equal those published, keyed by the data store's issuer
 
 #### Scenario: A grant published later needs no new pairing
 - **WHEN** establishment completed earlier and the issuer publishes a new grant into `own`
 - **THEN** the counterparty reads it from `peer` without any further pairing dialogue
 
-#### Scenario: Publishing the other width replaces the record wholesale
-- **WHEN** a scoped grant for an issuer is followed by a whole-store grant for the same issuer, or the reverse
-- **THEN** the counterparty eventually reads exactly the later grant's width, and the earlier record is gone — no stale capability or ticket survives beside the new record to mask it
+#### Scenario: Republishing replaces the record wholesale
+- **WHEN** a grant for an issuer is followed by another grant for the same issuer, on a different claim set or ticket
+- **THEN** the counterparty eventually reads exactly the later grant, and the earlier record is gone — no stale capability or ticket survives beside the new record to mask it
 
-#### Scenario: Withdrawal is one act whatever the width
+#### Scenario: Withdrawal is one act
 - **WHEN** the issuer withdraws the grant for an issuer
-- **THEN** one tombstone removes it; the issuer's own book reads it as absent at once, the counterparty eventually reads no grant of either width, and at no intermediate state does either side read a grant wider than the last published record
+- **THEN** one tombstone removes it; the issuer's own book reads it as absent at once, the counterparty eventually reads no grant, and at no intermediate state does either side read a grant other than the last published record
+
+#### Scenario: A record addressed to another identity authorizes no one
+- **WHEN** a grant record sits in the directional store toward one counterparty but its capability names a different identity as audience
+- **THEN** the serving side treats it as no grant for the counterparty the store is toward — position never substitutes for the capability's named audience
 
 ### Requirement: Each side publishes its device set into its directional store
 
