@@ -72,7 +72,7 @@ A replica's gossip topic SHALL carry only content-free announcements, never entr
 
 ### Requirement: Grantees stay outside the gossip swarm
 
-A peer whose access arrived through a grant — capability-scoped or whole-store — SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the issuer's own devices; a grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
+A peer whose access arrived through a grant SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the issuer's own devices; a grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
 
 Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
@@ -81,10 +81,10 @@ Membership SHALL follow the recorded sync strategy in both directions: a grantee
 - **WHEN** a claim is written into a replica whose swarm is the issuer's devices, while scoped peers hold capabilities on other claims
 - **THEN** no scoped peer receives the claim or any digest of it over gossip, and the issuer's devices receive the claim itself
 
-#### Scenario: A whole-store grantee receives entries by reconciliation only
+#### Scenario: A grantee receives entries by reconciliation only
 
-- **WHEN** the issuer writes after a peer imported the replica's whole-store ticket, past the window in which a swarm would have formed
-- **THEN** a granted peer receives the write over its next classified reconciliation, and a bare-ticket holder with no recorded grant receives nothing — the write never arrives over gossip
+- **WHEN** the issuer writes after a peer imported the replica's ticket, past the window in which a swarm would have formed
+- **THEN** a granted peer receives the write, filtered to its granted claims, over its next classified reconciliation, and a bare-ticket holder with no recorded grant receives nothing — the write never arrives over gossip
 
 #### Scenario: A swarm member is served only while authorized
 
@@ -96,16 +96,49 @@ Membership SHALL follow the recorded sync strategy in both directions: a grantee
 - **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a directory or connection metadata store
 - **THEN** the import is refused, and the device-shared replica's tracking, swarm membership, and live path are untouched
 
+### Requirement: A granted replica serves the audience identity's devices
+
+A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. On a node hosting several identities, only the directory of the identity the grant is addressed to is consulted.
+
+#### Scenario: A sibling catches up while the issuer is offline
+
+- **WHEN** a device of the audience identity opens a granted replica and requests a sync from a sibling device that holds the replica and a live local grant record, with every device of the issuer offline
+- **THEN** the sibling serves the session per the local record and the granted claim arrives at the requesting device, payload included
+
+#### Scenario: A scoped sibling session is filtered by the same claim set
+
+- **WHEN** the local grant record is scoped and a sibling device syncs the replica
+- **THEN** the sibling receives exactly the entries the claim set covers — the transcript is the one the issuer would have served, and withheld entries stay hidden
+
+#### Scenario: A withdrawn local record refuses the next sibling session
+
+- **WHEN** the withdrawal tombstone has reached the serving device's copy of the pair and a sibling then requests a sync
+- **THEN** the request is refused indistinguishably from the replica not being hosted, and what the sibling obtained while granted is retained
+
+#### Scenario: A co-located identity's device is not an audience device
+
+- **WHEN** the serving node hosts a second identity and a caller resolves only in that other identity's directory
+- **THEN** the session is refused indistinguishably from the replica not being hosted
+
+### Requirement: A granted replica reconciles with siblings as well as the issuer
+
+A granted replica's tracked contacts SHALL admit devices of the audience identity in addition to the issuer's devices — supplied at import or added later — and the periodic reconcile pass and the before-access nudge SHALL dial them exactly as they dial the issuer's.
+
+#### Scenario: The reconcile pass dials a sibling contact
+
+- **WHEN** a granted replica is tracked with a sibling device among its contacts and the issuer is unreachable
+- **THEN** the next reconcile pass reaches the sibling and the replica converges without the issuer
+
 ### Requirement: Unauthorized callers are refused uniformly
 
-A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge — for a foreign replica whose grant book it does not hold, it SHALL refuse.
+A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's directory and the local grant record; every other caller SHALL be refused.
 
 #### Scenario: A ticket holder without a grant learns nothing
 
 - **WHEN** a caller holding the replica's ticket but no grant requests a sync
 - **THEN** the request is refused with the same answer an unhosted replica would produce, and no fingerprint, count, or existence signal is revealed
 
-#### Scenario: A scoped peer does not re-serve its slice
+#### Scenario: A scoped holder does not re-serve to a third party
 
-- **WHEN** a third party asks a scoped holder to sync the issuer's replica
-- **THEN** the scoped holder refuses as for an unhosted replica, since it cannot compute the third party's rights
+- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a sibling-minted ticket — asks a scoped holder to sync the issuer's replica
+- **THEN** the scoped holder refuses as for an unhosted replica, since it cannot compute a third party's rights
