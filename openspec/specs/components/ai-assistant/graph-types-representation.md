@@ -1,5 +1,3 @@
-Here is the minimized core model.
-
 ## 1. `TypeDef`
 
 `TypeDef` represents an ontological type.
