@@ -1,100 +1,97 @@
-## 1. `TypeDef`
+```cypher
+// ============================================================
+// GRAPH
+// ============================================================
 
-`TypeDef` represents an ontological type.
-
-It is used for named concepts that can type a whole claim value or a semantic leaf value.
-
-Examples:
-
-```text
-Person
-DriverLicense
-DateOfBirth
-Day
-Month
-Year
-DocumentNumber
+CREATE GRAPH mee;
+USE mee;
 ```
 
-It is **not** used for anonymous intermediate nesting levels unless those levels are explicitly named by the ontology.
+## 1. `TypeDef`
+
+`TypeDef` is a named ontological type. It represents domain concepts such as `Person`, `DriverLicense`, `DateOfBirth`, `Day`, `Month`, `Year`, `LicenseNumber`.
+
+Anonymous intermediate nesting levels are **not** materialized as `TypeDef`.
 
 ```cypher
 CREATE NODE TABLE TypeDef(
+  // Stable ontology type identifier.
+  // Example: mee:DriverLicense, mee:DateOfBirth, mee:Person
   type_id STRING PRIMARY KEY,
-  namespace STRING,
+
+  // Human-readable ontology name.
+  // Example: DriverLicense, DateOfBirth, Person
   name STRING,
 
-  -- entity | scalar | compound | list | ref | secret | credential
+  // Normalized ontology name.
+  // Example: driver_license, date_of_birth, person
+  canonical_name STRING,
+
+  // Ontological kind.
+  // Expected values:
+  //   entity      = subject/entity type, e.g. Person
+  //   scalar      = atomic semantic value, e.g. DateOfBirth, Month
+  //   compound    = structured semantic value, e.g. DriverLicense
+  //   list        = named list-like semantic value, if explicitly modeled
+  //   ref         = reference to another Subject
+  //   secret      = secret-bearing value
+  //   credential  = credential-like compound value
   kind STRING,
 
-  -- physical representation for scalar TypeDefs only:
-  -- bool | int | float | decimal | string | date | timestamp | json | blob
-  primitive_representation STRING,
-
+  // Physical primitive carrier for scalar TypeDefs.
+  // Expected values when kind = scalar:
+  //   bool
+  //   int
+  //   float
+  //   decimal
+  //   string
+  //   date
+  //   timestamp
+  //   blob
+  //
+  // Null for non-scalar TypeDefs.
+  primitive_representation STRING
 );
 ```
-
-Role:
-
-```text
-TypeDef says what a value means ontologically.
-```
-
----
 
 ## 2. `FieldSpec`
 
-`FieldSpec` represents a field slot inside a compound type or anonymous structural field.
-
-It is ontology structure, not runtime data.
-
-Examples:
-
-```text
-DriverLicense.document_number
-DriverLicense.holder
-DriverLicense.holder.biographic
-DriverLicense.holder.biographic.birth.date_of_birth
-DateOfBirth.day
-DateOfBirth.month
-DateOfBirth.year
-```
-
-A `FieldSpec` can either:
-
-```text
-point to a TypeDef if the field value has an ontological type,
-or contain child FieldSpecs if it is an anonymous structural field.
-```
+`FieldSpec` is a slot inside a compound structure. It is not runtime data. It says that a parent type or anonymous structural field may contain a member with a given structural key.
 
 ```cypher
 CREATE NODE TABLE FieldSpec(
+  // Stable field identifier.
+  // Example: mee:DriverLicense.license_number
+  // Example: mee:DriverLicense.holder.birth.date_of_birth
   field_id STRING PRIMARY KEY,
-  field_name STRING,
-  canonical_name STRING,
 
-  -- one | optional | many
+  // Structural member key used in serialized object form.
+  // Example: license_number, holder, date_of_birth
+  member_key STRING,
+
+  // Human-friendly label.
+  // Example: License number, Holder, Date of birth
+  display_name STRING,
+
+  // Whether the field must be present.
+  required BOOL,
+
+  // Field cardinality.
+  // Expected values:
+  //   one       = exactly one value
+  //   optional  = zero or one value
+  //   many      = multiple values, usually represented through a list value
   cardinality STRING,
 
-  required BOOL,
-  ordinal INT64,
-
-  -- debug/import path, not the source of truth
-  scope_path STRING,
+  // Optional display/source order inside the parent shape.
+  // This is not the identity of the field.
+  ordinal INT64
 );
 ```
 
-Role:
+## 3. Ontology shape relationships
 
-```text
-FieldSpec says where a value sits inside a compound structure.
-```
-
----
-
-## 3. Type-shape relationships
-
-A named compound `TypeDef` owns top-level fields:
+A named compound `TypeDef` owns top-level fields.
 
 ```cypher
 CREATE REL TABLE TYPE_HAS_FIELD(
@@ -102,7 +99,7 @@ CREATE REL TABLE TYPE_HAS_FIELD(
 );
 ```
 
-An anonymous structural `FieldSpec` owns nested fields:
+An anonymous structural `FieldSpec` owns nested fields.
 
 ```cypher
 CREATE REL TABLE FIELD_HAS_FIELD(
@@ -110,7 +107,7 @@ CREATE REL TABLE FIELD_HAS_FIELD(
 );
 ```
 
-A typed field points to the ontological type of the value occupying that field:
+A typed field points to the ontological type of the value occupying that field.
 
 ```cypher
 CREATE REL TABLE FIELD_VALUE_TYPE(
@@ -118,65 +115,49 @@ CREATE REL TABLE FIELD_VALUE_TYPE(
 );
 ```
 
-Essence:
+Interpretation:
 
 ```text
-TypeDef --TYPE_HAS_FIELD--> FieldSpec
-FieldSpec --FIELD_HAS_FIELD--> FieldSpec
-FieldSpec --FIELD_VALUE_TYPE--> TypeDef
-```
+TypeDef(DriverLicense)
+  -- TYPE_HAS_FIELD -->
+FieldSpec(holder)
 
-Example:
+FieldSpec(holder)
+  -- FIELD_HAS_FIELD -->
+FieldSpec(date_of_birth)
 
-```text
-TypeDef(Person)
-  --TYPE_HAS_FIELD--> FieldSpec(date_of_birth)
-  --FIELD_VALUE_TYPE--> TypeDef(DateOfBirth)
-
+FieldSpec(date_of_birth)
+  -- FIELD_VALUE_TYPE -->
 TypeDef(DateOfBirth)
-  --TYPE_HAS_FIELD--> FieldSpec(day)
-  --FIELD_VALUE_TYPE--> TypeDef(Day)
 ```
 
-For anonymous nesting:
+A `FieldSpec` has one of two roles:
 
 ```text
-TypeDef(SomeRootType)
-  --TYPE_HAS_FIELD--> FieldSpec(a)
+Typed field:
+  FieldSpec -- FIELD_VALUE_TYPE --> TypeDef
 
-FieldSpec(a)
-  --FIELD_HAS_FIELD--> FieldSpec(aa)
-
-FieldSpec(aa)
-  --FIELD_HAS_FIELD--> FieldSpec(aaa)
-
-FieldSpec(aaa)
-  --FIELD_VALUE_TYPE--> TypeDef(AaaValue)
+Anonymous structural field:
+  FieldSpec -- FIELD_HAS_FIELD --> child FieldSpec(s)
 ```
 
----
+Leaf fields must eventually resolve to `FIELD_VALUE_TYPE`.
 
 ## 4. `Subject`
 
-`Subject` is the thing the claim is about.
-
-Examples:
-
-```text
-Alice
-A company
-A device
-A credential holder
-```
+`Subject` is the thing a claim is about.
 
 ```cypher
 CREATE NODE TABLE Subject(
+  // Stable subject identifier.
   subject_id STRING PRIMARY KEY,
-  display_name STRING,
+
+  // Human-readable display name.
+  display_name STRING
 );
 ```
 
-Optional type classification:
+Optional subject classification:
 
 ```cypher
 CREATE REL TABLE SUBJECT_HAS_TYPE(
@@ -184,50 +165,29 @@ CREATE REL TABLE SUBJECT_HAS_TYPE(
 );
 ```
 
-Since Subject is most likely to always be a MeeIdentity, the type specification can be redundant.
-
-Role:
-
-```text
-Subject is the target of a claim.
-```
-
----
-
 ## 5. `Claim`
 
-`Claim` is the assertion envelope.
+`Claim` is the assertion envelope. In this minimized model, it only connects a `Subject` to one root `ValueNode`.
 
-It says:
-
-```text
-This subject has this root value.
-```
-
-The claim itself is not typed. The root `ValueNode` is typed.
+The claim itself is not typed.
 
 ```cypher
 CREATE NODE TABLE Claim(
+  // Stable claim identifier.
   claim_id STRING PRIMARY KEY,
 
-  status STRING,       -- active | revoked | superseded | expired | imported
-  claim_role STRING,   -- asserted | self_attested | imported | derived
-
-  issued_at TIMESTAMP,
-  valid_from TIMESTAMP,
-  valid_until TIMESTAMP,
-
-  proof_type STRING,
-  proof_json JSON,
-  proof_hash STRING,
-
-  source_doc_id STRING,
-  source_json_path STRING,
-  source_hash STRING
+  // Claim lifecycle state.
+  // Expected values:
+  //   active
+  //   revoked
+  //   superseded
+  //   expired
+  //   imported
+  status STRING
 );
 ```
 
-Claim-to-subject:
+Claim target:
 
 ```cypher
 CREATE REL TABLE CLAIM_ABOUT(
@@ -235,7 +195,7 @@ CREATE REL TABLE CLAIM_ABOUT(
 );
 ```
 
-Claim-to-root-value:
+Claim payload:
 
 ```cypher
 CREATE REL TABLE CLAIM_HAS_VALUE(
@@ -243,24 +203,28 @@ CREATE REL TABLE CLAIM_HAS_VALUE(
 );
 ```
 
-Role:
-
-```text
-Claim gives subject/proof/context to one root typed value.
-```
-
----
-
 ## 6. `ValueNode`
 
-`ValueNode` is the runtime value object.
+`ValueNode` stores the actual claim value tree.
 
-It stores the actual primitive value, or acts as an object/list container when the value is compound.
+A scalar `ValueNode` stores a primitive value.
+An object/list `ValueNode` acts as a container.
 
 ```cypher
 CREATE NODE TABLE ValueNode(
+  // Stable value node identifier.
   value_id STRING PRIMARY KEY,
 
+  // Runtime representation shape.
+  // Expected values:
+  //   scalar
+  //   object
+  //   list
+  //   null
+  representation_kind STRING,
+
+  // Physical stored value.
+  // For object/list/null containers, use none_value.
   value UNION(
     none_value STRING,
     bool_value BOOL,
@@ -270,14 +234,13 @@ CREATE NODE TABLE ValueNode(
     string_value STRING,
     date_value DATE,
     timestamp_value TIMESTAMP,
-    json_value JSON,
     blob_value BLOB,
     ref_subject_id STRING
-  ),
+  )
 );
 ```
 
-The root claim value has an explicit type:
+The root claim value is explicitly typed:
 
 ```cypher
 CREATE REL TABLE VALUE_HAS_TYPE(
@@ -285,57 +248,99 @@ CREATE REL TABLE VALUE_HAS_TYPE(
 );
 ```
 
-Nested values are connected by field-slot edges:
+Object-member containment:
 
 ```cypher
-CREATE REL TABLE VALUE_HAS_FIELD_VALUE(
+CREATE REL TABLE VALUE_HAS_OBJECT_MEMBER(
   FROM ValueNode TO ValueNode,
+
+  // Stable containment edge identifier.
   containment_id STRING,
+
+  // Structural key in the represented object.
+  // Example: license_number, holder, date_of_birth
+  member_key STRING,
+
+  // Optional source/display order.
+  // This allows ordered-object behavior if desired,
+  // but member_key remains the object-member identity.
   ordinal INT64
 );
 ```
 
-Role:
+List-item containment:
 
-```text
-ValueNode stores the actual value tree of the claim.
+```cypher
+CREATE REL TABLE VALUE_HAS_LIST_ITEM(
+  FROM ValueNode TO ValueNode,
+
+  // Stable containment edge identifier.
+  containment_id STRING,
+
+  // Zero-based list position.
+  index INT64
+);
 ```
 
----
-
-## Core invariant
+## Core invariants
 
 ```text
-TypeDef defines ontological types.
+1. Claim is not typed.
 
-FieldSpec defines slots inside compound structures.
+2. Claim points to exactly one root ValueNode.
 
-Claim points to one root ValueNode.
+3. The root ValueNode has VALUE_HAS_TYPE -> TypeDef.
 
-The root ValueNode has VALUE_HAS_TYPE -> TypeDef.
+4. Nested ValueNodes do not need direct type edges.
 
-Nested ValueNodes are connected through VALUE_HAS_FIELD_VALUE edges.
+5. For object values:
+   ValueNode -- VALUE_HAS_OBJECT_MEMBER { member_key } --> child ValueNode
 
-The types for subfields of ValueNodes are expected to be inferred from the connected TypeDef and corresponding FieldSpecs.
+6. For list values:
+   ValueNode -- VALUE_HAS_LIST_ITEM { index } --> child ValueNode
+
+7. Object member identity is member_key.
+   ordinal is optional ordering metadata, not identity.
+
+8. List item identity is index.
+
+9. Type inference for nested values is done from:
+   root ValueNode -> TypeDef
+   then TypeDef / FieldSpec shape traversal
+   then runtime member_key / index traversal.
+
+10. Within one parent shape, FieldSpec.member_key should be unique.
+
+11. A FieldSpec is either:
+   a typed value slot via FIELD_VALUE_TYPE,
+   or an anonymous structural slot via FIELD_HAS_FIELD.
+
+12. Leaf FieldSpecs must have FIELD_VALUE_TYPE -> TypeDef.
 ```
 
-## Minimal mental model
+Minimal object set:
 
 ```text
-Ontology:
-
 TypeDef
-  -> FieldSpec
-      -> TypeDef
-          -> FieldSpec
-              -> TypeDef
-
-Runtime:
-
+FieldSpec
 Subject
-  <- Claim
-      -> root ValueNode
-          -> TypeDef
-          -> child ValueNode
-              -> child ValueNode
+Claim
+ValueNode
+```
+
+Minimal relationship set:
+
+```text
+TYPE_HAS_FIELD
+FIELD_HAS_FIELD
+FIELD_VALUE_TYPE
+
+SUBJECT_HAS_TYPE
+
+CLAIM_ABOUT
+CLAIM_HAS_VALUE
+
+VALUE_HAS_TYPE
+VALUE_HAS_OBJECT_MEMBER
+VALUE_HAS_LIST_ITEM
 ```
