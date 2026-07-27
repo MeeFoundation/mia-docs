@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The one device-replicated **directory** of an identity's own state: its devices, the tickets to its other stores, and its connections records. A dedicated pdn-store replica, one per identity, replicated across that identity's devices; its ticket is what the linking dialogue hands to a new device — see [device-linking.md](../pdn-node/device-linking.md) for the ceremony; this spec covers the store itself. Access is bounded by possession of the store's ticket (Invariant 1). Removing a device from the set is not provided at this stage — with bearer tickets, removal would not revoke access anyway; identity-bound, revocable access lands with UWill.
+The one device-replicated **directory** of an identity's own state: its devices, the tickets to its other stores, its connections records, and its write-retraction markers. A dedicated pdn-store replica, one per identity, replicated across that identity's devices; its ticket is what the linking dialogue hands to a new device — see [device-linking.md](../pdn-node/device-linking.md) for the ceremony; this spec covers the store itself. Access is bounded by possession of the store's ticket (Invariant 1). Removing a device from the set is not provided at this stage — with bearer tickets, removal would not revoke access anyway; identity-bound, revocable access lands with UWill.
 
 ## Requirements
 
@@ -103,6 +103,18 @@ Concurrent mutations of the same key on different devices SHALL resolve on every
 #### Scenario: Concurrent ticket updates converge
 - **WHEN** two devices concurrently publish a ticket under the same kind and then sync
 - **THEN** both devices resolve to the same single ticket
+
+### Requirement: Retraction markers, granted issuer in the key
+
+A write-retraction verdict SHALL be recorded as a directory entry at `retractions/<issuer-hex>/<author-hex>/<path>` — the granted data store's issuer, the retracted entry's author, and the retracted entry's path. The payload SHALL carry the bounding timestamp, the writing device's node id, and the retracted entry's content hash and timestamp; a marker acts once its payload is readable, since the bound lives in it. Markers replicate between the identity's devices like every directory entry, and only the identity's own devices ever write them (Invariant 1). A marker SHALL be pruned when the entry it addresses can no longer win — superseded by a newer own entry at that author and path, or aged out by a retention window — or in bulk when the issuer's namespace binding is forgotten; a bare re-grant of write SHALL NOT prune it. The consuming behaviour — removal, ingest refusal, the event — is [write retraction](write-retraction.md); this store carries the record.
+
+#### Scenario: A marker round-trips between devices
+- **WHEN** one device of the identity writes a retraction marker and a sibling's directory replica syncs
+- **THEN** the sibling reads the marker with its bound, node id, content hash, and timestamp once the payload arrives
+
+#### Scenario: Pruning follows the grant binding
+- **WHEN** the granted namespace of an issuer with live markers is forgotten
+- **THEN** the directory carries no markers for that issuer afterwards
 
 ### Requirement: The replica reports its namespace and waits for a sync session
 The directory SHALL expose the namespace of its replica, so a caller that imported it can name it to forget it, and SHALL offer a bounded wait for the first successful sync session of that replica which started after a given instant. The property waited on is "this replica has caught up with a peer" — a session that started and succeeded — not "some content arrived": polling contents cannot distinguish a replica that synced and found nothing new from one that never synced at all. A wait that elapses SHALL surface as a timeout, never as a hang. Importing a replica already starts its first session and enrols it in the node's periodic reconcile pass with the ticket's contacts, so the wait needs no trigger of its own and a first exchange that fails is re-dialed within the wait's own budget.
