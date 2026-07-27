@@ -8,12 +8,17 @@ The minimal read grant that drives capability-filtered reconciliation ([subset r
 
 ### Requirement: A read capability authorizes reading specific claims
 
-A read capability SHALL name an issuer, an audience, and the set of claims it grants read on within the issuer's data. It SHALL be a single grant, not a delegation chain. It SHALL always grant read and MAY additionally grant write, mirroring UWill's flat command set; write enforcement is deferred to the ingest hook (ADR-0008).
+A read capability SHALL name an issuer, an audience, and the set of claims it grants read on within the issuer's data — and, per claim, whether write is granted alongside read. It SHALL be a single grant, not a delegation chain. Every granted claim SHALL grant read; write is optional per claim, mirroring UWill's flat command set (one delegation per claim, its commands beside it). Write enforcement is the ingest gate ([capability-gated ingest](capability-gated-ingest.md)); read enforcement stays the egress filter.
 
 #### Scenario: Issuing a read grant
 
 - **WHEN** an issuer grants an audience read on a claim
 - **THEN** a read capability exists naming that issuer, audience, and claim, and no other claim is covered by it
+
+#### Scenario: Issuing mixed rights in one grant
+
+- **WHEN** an issuer grants an audience one claim read-only and another claim read-write
+- **THEN** one capability covers both claims, carrying write on exactly the second
 
 ### Requirement: Claim identity is derived from the entry (interim)
 
@@ -45,7 +50,7 @@ Before a serving node filters what it reveals, it SHALL determine the caller's e
 
 ### Requirement: A grant's ticket carries exactly the granted authority
 
-The ticket published alongside a grant SHALL match the grant's commands: a read-only grant SHALL carry a read ticket (no namespace secret — the holder cannot produce a valid entry), and a grant including write SHALL carry a write ticket (the namespace secret is the interim carrier of write authority until the ingest hook lands).
+The ticket published alongside a grant SHALL match the grant's commands as a whole: a grant carrying no write on any claim SHALL carry a read ticket (no namespace secret — the holder cannot produce a valid entry), and a grant carrying write on any claim SHALL carry a write ticket. The namespace secret is the transport interim of write authority: it lets the audience produce valid entries, and the scope of what the issuer keeps is the ingest gate's, judged per claim from this same grant.
 
 #### Scenario: Read-only audience cannot write by construction
 
@@ -56,6 +61,11 @@ The ticket published alongside a grant SHALL match the grant's commands: a read-
 
 - **WHEN** an issuer grants a claim with write and the audience writes that claim
 - **THEN** the audience's write reaches the issuer over reconciliation
+
+#### Scenario: A write ticket does not widen the write scope
+
+- **WHEN** a grant carries write on one claim only and the audience produces an entry at another claim over the write ticket's secret
+- **THEN** the issuer's gate refuses that entry, although the ticket that shipped with the grant carries the namespace secret
 
 ### Requirement: Per-claim evaluation
 

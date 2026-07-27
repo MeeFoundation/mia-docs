@@ -26,12 +26,12 @@ The reconciliation transcript a peer observes SHALL depend only on the claims it
 
 ### Requirement: The filter runs in pdn-store on the read side
 
-Filtering SHALL run at reconciliation time inside `pdn-store`, per peer, distinct from the ingest-only `validate_entry` hook. It SHALL consume the caller's effective rights as an opaque per-session predicate over entries, assembled above the fork — `pdn-store` SHALL know neither the grant format nor the identity vocabulary.
+Filtering SHALL run at reconciliation time inside `pdn-store`, per peer, distinct from the ingest gate at the `validate_entry` hook. It SHALL consume the caller's effective rights as an opaque per-session predicate over entries, assembled above the fork — `pdn-store` SHALL know neither the grant format nor the identity vocabulary. The ingest gate consumes the same session classification through its own predicate ([capability-gated ingest](capability-gated-ingest.md)): read on egress, write on ingest, independently.
 
-#### Scenario: Read filter is independent of the ingest hook
+#### Scenario: Read filter is independent of the ingest gate
 
-- **WHEN** the egress filter runs while the fork's `validate_entry` hook has no validator installed
-- **THEN** filtering applies unchanged, and it composes with any future ingest validator (ADR-0008) — read on egress, write on ingest, independently
+- **WHEN** the egress filter runs on a node with the ingest validator installed
+- **THEN** read filtering applies unchanged, and an entry refused at ingest neither widens nor narrows what egress reveals
 
 ### Requirement: Same-identity reconciliation is unfiltered
 
