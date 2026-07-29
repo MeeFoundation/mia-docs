@@ -1,10 +1,6 @@
-# Capability-gated ingest
+# Delta: data-layer-capability-gated-ingest
 
-## Purpose
-
-The write-side counterpart of [subset reconciliation](subset-reconciliation.md): which entries a hosted issuer's data replica admits over sync, judged from the transport-authenticated session peer and the issuer's recorded grants. The fork's `validate_entry` hook (ADR-0008) is installed with the data layer's validator; read filtering runs on egress, write gating on ingest, independently. The grant vocabulary the gate consumes is the [read capabilities](read-capabilities.md) mechanism, whose per-claim write flag it enforces.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Ingest into a hosted issuer's replica is capability-gated
 
@@ -45,39 +41,3 @@ On a replica data-bound to an identity the node hosts, an entry arriving over sy
 - **WHEN** an entry lands on the issuer's replica after a session's setup, so the frozen egress hides it and the audience re-offers it, and the gate refuses that audience
 - **THEN** the issuer keeps its stored entry, the reply carries no rejection for it, and the audience retracts nothing
 
-### Requirement: The write set is frozen per session
-
-The caller's write set SHALL be computed at session setup from the issuer's recorded grants — the same resolution and the same records the read side uses — and SHALL hold for that session's lifetime.
-
-#### Scenario: Rights are read at session setup
-
-- **WHEN** a grant's write set changes after a session has started
-- **THEN** the running session judges entries by the set read at its setup, and the next session judges by the changed set
-
-### Requirement: Own devices and unarmed replicas are not narrowed
-
-A session peer resolving as a device of the issuer SHALL be admitted in full. The gate SHALL arm only on replicas data-bound to a hosted identity: directories and connection metadata stores keep ticket-bounded admission (Invariants 1 and 3), a grantee-held replica of a foreign namespace admits what the serving side's egress delivers, and an unregistered replica admits as it serves — whole, bounded by ticket possession. Retraction markers SHALL be consulted on data replicas only, the only replicas whose entries a marker can name, so no state of the marker set can reach the stores that carry device records and grants.
-
-#### Scenario: Device replication is unaffected
-
-- **WHEN** two devices of the issuer's identity reconcile its data namespace
-- **THEN** every entry replicates between them, exactly as without the gate
-
-#### Scenario: A sibling relay of the read slice is not write-gated
-
-- **WHEN** a device of the audience identity catches up a granted replica from a sibling device holding read-only claims
-- **THEN** the read-slice entries arrive, although the relaying sibling holds no write on them
-
-### Requirement: Admitted writes compete by last-write-wins within a stated window
-
-An admitted entry SHALL compete with the issuer's own entries by per-path last-write-wins across authors. The fork admits entries dated up to 10 minutes ahead of the receiving clock and refuses anything beyond, so a write-granted audience can date an entry forward and hold the path against the issuer's same-clock writes for up to 10 minutes — the accepted window; the issuer's recourse is withdrawing the grant and outwaiting or outwriting the pinned timestamp.
-
-#### Scenario: The newest admitted entry wins on every device
-
-- **WHEN** the audience overwrites a write-granted claim after the issuer's older write
-- **THEN** the issuer's devices and the audience's devices all converge on the audience's newer entry
-
-#### Scenario: An entry dated beyond the window is refused regardless of grants
-
-- **WHEN** an entry is dated more than 10 minutes ahead of the receiving device's clock
-- **THEN** it is refused by the base validation, whatever the sender's grant covers
