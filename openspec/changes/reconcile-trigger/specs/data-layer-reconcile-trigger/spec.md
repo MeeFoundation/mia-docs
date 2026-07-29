@@ -20,9 +20,14 @@ When a write lands in a replica, the serving node SHALL trigger — directly, no
 
 ### Requirement: Triggers coalesce per peer
 
-Consecutive covered writes SHALL collapse into at most one pending trigger per peer until that peer reconciles, so a peer's trigger volume is bounded by its own reconciliation cadence, not the write rate.
+Consecutive covered writes SHALL collapse into at most one pending trigger per peer until that peer reconciles, so a peer's trigger volume is bounded by its own reconciliation cadence, not the write rate. A reconciliation SHALL clear only the triggers its session can actually serve. A session serves a view frozen at its setup — the rule stated by subset reconciliation in the data-layer specs — so a write landing after a session is already under way is not carried by it; the trigger for that write SHALL stay pending and prompt a further reconciliation, or the peer would learn of the write only on its next periodic pass.
 
 #### Scenario: A burst coalesces into one tick
 
 - **WHEN** several claims covered by peer B are written before B reconciles
 - **THEN** B has at most one pending trigger, and reconciling once delivers all the covered writes
+
+#### Scenario: A write during a running session keeps its trigger pending
+
+- **WHEN** a claim covered by peer B is written while B's reconciliation session is already exchanging rounds, so the session's frozen view cannot carry it
+- **THEN** B's trigger for that write survives the session it did not travel on, and B reconciles again and receives the claim
