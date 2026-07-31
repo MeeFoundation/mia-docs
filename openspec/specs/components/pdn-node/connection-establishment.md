@@ -74,3 +74,14 @@ A fresh invite between identities that already share establishment state — a c
 #### Scenario: The retry may swap directions
 - **WHEN** the first establishment ran from A's invite and the second runs from B's invite
 - **THEN** the outcome converges identically — one connection, the same metadata pair, no duplicates
+
+### Requirement: A refused establishment is legible to the dialer's caller
+Establishment SHALL report a refusal by the inviter to its own caller as a refusal, distinguishable from a failure to reach or complete the dialogue. The refusal SHALL carry no reason: it says that the inviter was reached and said no, and nothing about which of wrong, expired, or already burned applied — the uniformity the dialer's peer sees is unchanged. A caller — a host, a test, or an application — SHALL be able to make the distinction without inspecting human-readable error text.
+
+#### Scenario: A refusal is not a transport failure
+- **WHEN** establishment presents a secret that has already been burned, and separately when it dials an address where no inviter answers
+- **THEN** the first reports a refusal and the second does not, and the two are distinguishable without matching on error text
+
+#### Scenario: The refusal names no reason
+- **WHEN** establishment is refused for a wrong secret, for an expired one, and for an already burned one
+- **THEN** all three report the same refusal, carrying nothing that separates the three cases
