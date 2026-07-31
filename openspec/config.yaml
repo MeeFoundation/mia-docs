@@ -1,20 +1,22 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Shown to AI when creating any artifact of any change.
+context: |
+  PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over a forked iroh-docs) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Cross-cutting practices every change is held to — read the one that applies before writing, they are short:
+
+  - specs/code-practices/operating-conditions.md — the circumstances a design has to survive: several identities on one node, one device or several, a device linking before or during or after a process, an unstable connection, a disk that fills, capabilities granted and narrowed and widened and revoked and granted again. Walk the list while designing; back with a scenario and a test the paths where a condition changes the outcome; name the ones deliberately left out. Do not multiply every test by every condition.
+  - specs/code-practices/access-control-tests.md — an assertion of authorized access is paired, in the same place, with the tightest denial. A positive-only access test verifies nothing.
+  - specs/code-practices/flaky-tests.md — a rare failure is a rare defect. Reproduce with statistics before fixing, and stress the affected scenarios after.
+
+  Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands". Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
+
+# Per-artifact rules.
+rules:
+  design:
+    - Walk specs/code-practices/operating-conditions.md and state which of those conditions change the outcome of this change. "None of them" is a legitimate answer and is worth writing down; a condition that does change the outcome belongs in Decisions or in Risks, not only in prose.
+  specs:
+    - An operating condition that changes the outcome earns its own scenario. A condition deliberately out of scope is named in the proposal, not left unmentioned — an unmentioned condition reads as one nobody considered.
+  tasks:
+    - Every scenario the deltas add needs a task that makes it real, and a way to tell it is not vacuous — a scenario that would pass with the mechanism removed asserts nothing.
