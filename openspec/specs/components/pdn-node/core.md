@@ -84,7 +84,13 @@ The runtime SHALL expose a subscription to write-retraction events of its hosted
 
 ### Requirement: Granted namespaces bind and unbind with their grant record
 
-The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names. A grant whose ticket comes to name a different replica SHALL be re-imported onto it. A grant that disappears from the counterparty's replica SHALL take its namespace back out: the runtime SHALL forget what it imported under that grant, so the issuer resolves to nothing again rather than to a replica no grant justifies.
+The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names. A grant whose ticket comes to name a different replica SHALL be re-imported onto it. A grant that disappears from the counterparty's replica SHALL take its binding back out.
+
+The backing replica is shared: one namespace per issuer (ADR-0009) means every pair whose grant names this issuer binds the same replica. The runtime SHALL therefore forget the replica only with the last such binding — while any other pair still holds one, only the unbinding pair's bookkeeping leaves and the issuer keeps resolving. Once no pair holds it, the runtime SHALL forget what was imported, so the issuer resolves to nothing again rather than to a replica no grant justifies.
+
+The decision that destroys the replica SHALL be grounded in the durable grant records, not in in-memory bookkeeping alone: the bookkeeping is empty after a restart and rebuilds sweep by sweep, and a pair whose binder has not swept yet still holds its grant. A live readable grant record in any open pair therefore keeps the replica, whatever the bookkeeping says.
+
+The import bookkeeping SHALL be an optimization, not the arbiter. An issuer already resolving to the very namespace a grant names SHALL be adopted into the bookkeeping rather than re-imported: each import holds one more open handle on the replica, and the drop at the end of its life must find exactly one. An issuer resolving to nothing SHALL be re-imported even when the bookkeeping names exactly the namespace the grant carries, so a replica forgotten while the bookkeeping survived comes back on the pair's next sweep instead of being skipped forever.
 
 The runtime SHALL bound this to what it imported itself. A namespace imported by any other route SHALL never be forgotten by this mechanism, and the explicit import operation SHALL remain available for a ticket obtained out of band.
 
@@ -104,6 +110,21 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 
 - **WHEN** the granting peer withdraws the grant and the tombstone replicates to the grantee's copy of the pair
 - **THEN** the grantee forgets the namespace it imported under that grant, and operations addressing that issuer fail with an unknown-issuer error
+
+#### Scenario: A withdrawal toward one audience spares the co-hosted other
+
+- **WHEN** one node hosts two identities granted by the same issuer, and the issuer withdraws the grant toward one of them
+- **THEN** the other still reads the shared replica's entries and receives the issuer's fresh writes, and only the last withdrawal makes the issuer resolve to nothing
+
+#### Scenario: The unbind decision counts grants, not bookkeeping
+
+- **WHEN** the binder's record of one co-hosted audience's import is absent — as after a restart, before that pair's first sweep — while its grant sits live and readable in its pair, and the issuer withdraws toward the other audience
+- **THEN** the shared replica stays
+
+#### Scenario: A forgotten replica re-imports on the next sweep
+
+- **WHEN** a bound replica is forgotten while the binder's bookkeeping still names its import, and the pair's replica changes next
+- **THEN** the runtime re-imports the granted namespace and its entries are readable again
 
 #### Scenario: An out-of-band import is not unbound
 
