@@ -86,6 +86,8 @@ An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>`
 
 Publication on opening the pair SHALL be assert-once: a device asserts its record only when the set carries no record of it at all — a live record is left untouched, and a *withdrawn* record (tombstone) is never re-asserted as a side effect of opening. Re-asserting a withdrawn device is a deliberate publication act, distinct from opening. Without this, every pair opening would re-sign the record with a fresh wall-clock timestamp, and a revoked-but-still-running device would out-bid any tombstone the moment it next touched the connection. Revoking the *ability to write* is deferred, recorded in the design (subset-rbsr D9).
 
+The reading side SHALL surface only device records that resolve into endpoint ids. The key a record sits under is the counterparty's word, and roughly half of all 32-byte strings decompress into no curve point; a record that does not resolve SHALL be withheld exactly as an unreadable grant payload is — it withholds itself, never the set. This boundary is what lets every consumer of the published set convert it into endpoint ids without error handling; without it one garbage record would freeze the whole derived contact set of every audience sharing the granted replica.
+
 #### Scenario: Devices published at establishment
 
 - **WHEN** a connection is established
@@ -105,6 +107,11 @@ Publication on opening the pair SHALL be assert-once: a device asserts its recor
 
 - **WHEN** a device's record is withdrawn and that device — or any machinery on its node — opens the pair again
 - **THEN** the record stays withdrawn; only a deliberate publication act re-asserts it
+
+#### Scenario: An unresolvable device record withholds itself, not the set
+
+- **WHEN** the store carries a `devices/<64 hex>` record whose bytes decompress into no curve point, beside a resolvable device record
+- **THEN** the published set contains the resolvable device and omits the unresolvable record
 
 ### Requirement: Grant reads wait for content
 Reading a grant SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not SHALL read as absent, and a later read (after the payload lands) SHALL return the grant. Entry records and payloads travel independently; consumers poll, as they do for the directory's tickets.

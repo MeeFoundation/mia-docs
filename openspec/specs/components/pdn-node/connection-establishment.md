@@ -26,6 +26,12 @@ Suggestion (non-normative, host-side UX). Because the secret is one-time and sho
 ### Requirement: The dialogue is one raw exchange on the pairing ALPN
 Establishment SHALL dial the invite payload's node address under the dedicated pairing ALPN and run one raw bidirectional exchange: the scanner presents the secret, its own `PdnId`, its node address, and a read ticket to its own connection metadata store toward the inviter; the inviter — after the verify-and-burn below — answers with the read ticket to its own store toward the scanner. A payload whose format version the scanner does not speak SHALL be refused before dialing. Establishing on behalf of an identity the scanning runtime does not host SHALL be refused before dialing.
 
+The round-trip SHALL be bounded by a fixed ceiling: `establish` names no budget of its own, so the ceiling is a constant — generous against any live exchange, finite so a dialed inviter that never answers costs the caller the ceiling, surfaced as its own typed outcome distinct from the refusal, and never the transport's idle timeout.
+
+#### Scenario: A hung inviter costs the caller the ceiling and nothing more
+- **WHEN** the dialed inviter accepts the pairing dialogue, reads the request, and never answers
+- **THEN** `establish` fails within the ceiling with the dialogue-timeout outcome, distinguishable from the refusal without matching on error text
+
 #### Scenario: Establishment completes between two runtimes
 - **WHEN** runtime B establishes with a live invite minted on runtime A
 - **THEN** the dialogue completes over the pairing ALPN and both sides hold the exchanged read tickets
@@ -74,3 +80,14 @@ A fresh invite between identities that already share establishment state — a c
 #### Scenario: The retry may swap directions
 - **WHEN** the first establishment ran from A's invite and the second runs from B's invite
 - **THEN** the outcome converges identically — one connection, the same metadata pair, no duplicates
+
+### Requirement: A refused establishment is legible to the dialer's caller
+Establishment SHALL report a refusal by the inviter to its own caller as a refusal, distinguishable from a failure to reach or complete the dialogue. The refusal SHALL carry no reason: it says that the inviter was reached and said no, and nothing about which of wrong, expired, or already burned applied — the uniformity the dialer's peer sees is unchanged. A caller — a host, a test, or an application — SHALL be able to make the distinction without inspecting human-readable error text.
+
+#### Scenario: A refusal is not a transport failure
+- **WHEN** establishment presents a secret that has already been burned, and separately when it dials an address where no inviter answers
+- **THEN** the first reports a refusal and the second does not, and the two are distinguishable without matching on error text
+
+#### Scenario: The refusal names no reason
+- **WHEN** establishment is refused for a wrong secret, for an expired one, and for an already burned one
+- **THEN** all three report the same refusal, carrying nothing that separates the three cases
