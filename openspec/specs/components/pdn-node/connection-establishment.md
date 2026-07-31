@@ -26,6 +26,12 @@ Suggestion (non-normative, host-side UX). Because the secret is one-time and sho
 ### Requirement: The dialogue is one raw exchange on the pairing ALPN
 Establishment SHALL dial the invite payload's node address under the dedicated pairing ALPN and run one raw bidirectional exchange: the scanner presents the secret, its own `PdnId`, its node address, and a read ticket to its own connection metadata store toward the inviter; the inviter — after the verify-and-burn below — answers with the read ticket to its own store toward the scanner. A payload whose format version the scanner does not speak SHALL be refused before dialing. Establishing on behalf of an identity the scanning runtime does not host SHALL be refused before dialing.
 
+The round-trip SHALL be bounded by a fixed ceiling: `establish` names no budget of its own, so the ceiling is a constant — generous against any live exchange, finite so a dialed inviter that never answers costs the caller the ceiling, surfaced as its own typed outcome distinct from the refusal, and never the transport's idle timeout.
+
+#### Scenario: A hung inviter costs the caller the ceiling and nothing more
+- **WHEN** the dialed inviter accepts the pairing dialogue, reads the request, and never answers
+- **THEN** `establish` fails within the ceiling with the dialogue-timeout outcome, distinguishable from the refusal without matching on error text
+
 #### Scenario: Establishment completes between two runtimes
 - **WHEN** runtime B establishes with a live invite minted on runtime A
 - **THEN** the dialogue completes over the pairing ALPN and both sides hold the exchanged read tickets
