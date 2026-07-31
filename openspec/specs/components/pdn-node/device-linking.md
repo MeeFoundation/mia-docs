@@ -114,7 +114,7 @@ Linking SHALL report a refusal by the inviting device to its own caller as a ref
 
 #### Scenario: A refusal is not a transport failure
 - **WHEN** linking presents a secret that has already been burned, and separately when it dials an address where no inviting device answers
-- **THEN** the first reports a refusal and the second does not, and the two are distinguishable without matching on error text
+- **THEN** the first reports a refusal and the second reports the unreachable outcome — each recognizable as its own, distinguishable without matching on error text
 
 #### Scenario: A refusal is not a catch-up timeout
 - **WHEN** linking is refused by the inviting device, and separately when the dialogue succeeds but the imported directory does not catch up within the timeout
