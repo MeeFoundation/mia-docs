@@ -77,10 +77,13 @@ Handlers downcast the `anyhow::Error` against a fixed list and map each to a sta
 | `EstablishmentRefused`, `LinkingRefused`, `WriteNotGranted`, `DelegationUnsupported` | 403    | the runtime's rules said no                      |
 | `UnknownIdentity`, `data_layer::UnknownIssuer`                              | 409    | the runtime does not host what you addressed     |
 | `UnsupportedInviteVersion`, `UnsupportedLinkingVersion`, a malformed body or path | 400    | the request itself is wrong                      |
+| an unknown query parameter, an empty entry payload                          | 400    | the request itself is wrong, decided by the host |
 | an absent entry                                                             | 404    | nothing is there                                 |
 | anything unrecognized                                                       | 500    | the host does not know what happened             |
 
 An unhosted identity is 409 rather than the more natural 404 for one reason: route names are unpinned, so a test asserting 404 for an unhosted identity would keep passing after a route was renamed out from under it. Separating "the runtime refused you" from "this host serves no such route" costs one status code and buys a deny test that cannot pass by accident.
+
+Two statuses the host decides without a downcast are worth naming, because both would otherwise land on the 500 default and read as a host bug. An empty entry payload is one: the engine keeps no zero-length entry, so the write fails with an error the table cannot name, and the request that caused it is simply wrong. An unknown query parameter is the other, and it is refused rather than ignored for the reason the bind resolution fails on an unparseable value — a mistyped `lifetime_secs` that fell back to the default would mint an invite with a lifetime nobody asked for, and a mistyped listing prefix would widen a listing back to the whole namespace, with nothing in either answer saying so.
 
 The 500 default is deliberately the pessimistic one: an unmapped error is a host that does not understand what happened, and reporting that as a clean refusal is the laundering this whole design exists to prevent. The unreachable-peer case rides that default — it needs no type of its own, because 500 against 403 is already the distinction the deny test rests on.
 
