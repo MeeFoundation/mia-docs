@@ -49,7 +49,11 @@ The host SHALL report an operation the runtime refused with a client-error statu
 
 #### Scenario: An unhosted identity is refused, not absent
 - **WHEN** a debug request addresses an identity the runtime neither created nor linked
-- **THEN** the response carries a client-error status other than 404 and names the unknown-issuer refusal, and 404 remains reserved for a route the host does not serve
+- **THEN** the response carries a client-error status other than 404 and names the unknown-identity or unknown-issuer refusal, and 404 remains reserved for a route the host does not serve or for an absent entry
+
+#### Scenario: An absent entry is reported as absent, not as a refusal
+- **WHEN** a debug request reads a path no entry exists at, under an identity or issuer the runtime does host
+- **THEN** the response is 404
 
 #### Scenario: A write outside the grant's write set is refused
 - **WHEN** a caller writes, over the surface, a claim of a granted namespace that the local grant record covers read-only
