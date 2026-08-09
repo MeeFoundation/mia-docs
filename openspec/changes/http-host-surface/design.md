@@ -87,9 +87,9 @@ Two statuses the host decides without a downcast are worth naming, because both 
 
 The 500 default is deliberately the pessimistic one: an unmapped error is a host that does not understand what happened, and reporting that as a clean refusal is the laundering this whole design exists to prevent. The unreachable-peer case rides that default — it needs no type of its own, because 500 against 403 is already the distinction the deny test rests on.
 
-### D10. `/live` and `/debug/status` stay as they are
+### D10. `/live` touches the runtime, bounded by a budget; `/debug/status` stays
 
-`/live` is unchanged. `/debug/status` is subsumed by the sync routes but stays: it is the one human-readable probe, and the demo script leans on it.
+`/live` now shares the same coarse runtime lock every other route reads through, bounded by a short budget (2 seconds): a stalled lock reads as down within that margin instead of `/live` answering `200` regardless of the runtime's actual state. `/debug/status` and `/debug/identities` share the same budget, through the same helper, so a stalled lock reads as down uniformly across all three routes that read the hosted set. `/debug/status` is subsumed by the sync routes but stays: it is the one human-readable probe, and the demo script leans on it.
 
 ### D11. The product-path boundary is stated, not left to the crate layout
 
@@ -109,7 +109,7 @@ The spec now states both as requirements, because the container harness is exact
 
 ## Migration Plan
 
-Additive and gated: the new routes exist only under `PDN_DEBUG=1`, `/live` is untouched, and no persisted state or wire format changes. Rollback is deleting the routes.
+Additive and gated: the new routes exist only under `PDN_DEBUG=1`, `/live` answers the same `200` it always did on a healthy runtime (only its failure mode changed, from "cannot fail while the process is up" to "bounded by a budget"), and no persisted state or wire format changes. Rollback is deleting the routes.
 
 ## Open Questions
 

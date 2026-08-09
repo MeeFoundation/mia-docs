@@ -13,6 +13,17 @@ Debug endpoints are demo scaffolding, not platform API. The host SHALL NOT serve
 
 ## ADDED Requirements
 
+### Requirement: Liveness reflects the runtime, bounded by a budget
+`GET /live` SHALL confirm the embedded runtime answers, not merely that the process is up: it SHALL touch the runtime through the same coarse state lock every other route reads through, bounded by a short, named budget. On a healthy runtime it SHALL answer within the budget with a success status. On a runtime whose lock is held past the budget, it SHALL answer with a non-success status within the budget plus a small margin, rather than hang.
+
+#### Scenario: A healthy runtime answers live
+- **WHEN** `GET /live` is requested against a running host, no flag required
+- **THEN** the response is a success status, returned promptly
+
+#### Scenario: A stalled runtime lock answers down, not hung
+- **WHEN** the runtime's coarse state lock is held past the liveness budget
+- **THEN** `GET /live` answers a non-success status within the budget plus a small margin, rather than waiting indefinitely
+
 ### Requirement: The debug surface covers the embedded runtime's operations
 When enabled, the debug surface SHALL make the embedded runtime's service operations reachable over HTTP: creating an identity, minting and consuming a device-linking payload, minting and consuming an invite payload, listing an identity's connections, publishing and reading and withdrawing grants, writing and reading and listing entries of an issuer's data namespace, and reporting the node id and the hosted identities. The surface SHALL introduce no operation the runtime does not offer: each route delegates to one service call and adds no orchestration of its own.
 
