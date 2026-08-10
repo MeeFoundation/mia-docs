@@ -1,7 +1,5 @@
 # Proposal: http-host-surface
 
-**Depends on `product-path-gaps`, which lands first.** That change closes the two product gaps this one would otherwise trip over — a granted replica reaching only the device that published the grant, and a ceremony refusal indistinguishable from an unreachable peer — and rewrites the scenario tests onto the product path. This change assumes both are done: the two marker errors exist to be mapped, and a granted namespace converges from any reachable device of its issuer.
-
 ## Why
 
 The runtime's service surface is complete and proven in-process — identity, connections and grants, data, sync — but nothing outside the process can reach it: the HTTP host serves `/live` and a one-line status page. The container harness planned next has therefore nothing to drive: an image built today proves that the binary starts, not that two nodes pair, grant, and replicate. This change gives the host a debug surface wide enough to run the whole scenario from outside the process, so the harness can be written against it.
