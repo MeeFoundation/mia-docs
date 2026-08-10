@@ -45,7 +45,7 @@ None — the host capability already exists.
 ## Impact
 
 - **`crates/pdn-node-http`**: the router grows the debug routes and their handlers; a small host-side error mapping and the request and response shapes live here. New dependencies: `serde` and `serde_json` (axum's `json` feature); no new dependency on `data-layer`.
-- **`crates/pdn-node`**: untouched. Every handler delegates to a service method that exists once `product-path-gaps` has landed — including the two marker errors the error mapping downcasts. If a handler turns out to need something the services still do not offer, that is a finding to raise, not a runtime addition to slip in here.
-- **`crates/data-layer`, `crates/pdn-layer`, pdn-store fork**: untouched.
+- **`crates/pdn-node`**: review remediation changes runtime shutdown and the device-linking pending/confirmation lifecycle exercised by the host scenario.
+- **`crates/data-layer`**: review remediation adds durable pending-device metadata and cleanup. `crates/pdn-layer` and the pdn-store fork remain untouched.
 - **Tests**: the host's smoke test grows into a scenario test driving two in-process runtimes through their HTTP surfaces — establishment, grant, replication — plus the paired denials (an unhosted identity, a burnt invite secret, a write outside the grant's write set) asserted as refusals, with the gate itself still asserted absent without the flag. The `pdn-node` scenario suites are not touched here — `product-path-gaps` has already put them on the product path.
 - **The stand**: after this change the container harness can be written; nothing about the stand's orchestration is decided here.

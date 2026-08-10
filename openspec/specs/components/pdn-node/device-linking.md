@@ -80,6 +80,8 @@ After the burn, the inviter SHALL write the newcomer's device record into its ow
 ### Requirement: The newcomer confirms itself once the tickets are in hand
 A device that has imported the directory and its identity's data namespace SHALL promote its own pending record to confirmed, and SHALL do so before `link` reports success. Writing that record requires the directory's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
 
+Every pending registration SHALL carry a durable creation time. An unconfirmed registration SHALL expire after 24 hours and cleanup SHALL tombstone it; legacy marker-only records SHALL receive a creation time when observed. A post-burn storage or ticket-mint failure SHALL retain the uniform remote refusal while producing a typed local diagnostic.
+
 #### Scenario: A completed link leaves the newcomer confirmed
 - **WHEN** runtime B links into an identity hosted on runtime A
 - **THEN** the identity's device set contains B's node id and nothing remains pending for it
@@ -87,6 +89,17 @@ A device that has imported the directory and its identity's data namespace SHALL
 #### Scenario: A link that fails after the import confirms nothing
 - **WHEN** a linking fails after importing the replicas and rolls back
 - **THEN** the dialing device is not in the identity's confirmed device set
+
+#### Scenario: Abandoned pending registrations expire
+- **WHEN** pending registrations remain unconfirmed for 24 hours across re-import or restart
+- **THEN** cleanup tombstones them and none enters the confirmed device set
+
+### Requirement: Cancellation cleanup is supervised
+After importing replicas, a cancelled linking attempt SHALL retain its reservation until rollback completes. Runtime shutdown SHALL wait up to 10 seconds for tracked linking and establishment cleanup, and cleanup owned by an older attempt SHALL NOT remove state committed by a later retry.
+
+#### Scenario: Retry after cancellation remains hosted
+- **WHEN** linking is cancelled after import and the same identity is retried immediately
+- **THEN** the retry completes only after old rollback and remains hosted after cleanup settles
 
 ### Requirement: The reply hands over the bootstrap tickets
 The linking reply SHALL carry write tickets to the identity's directory and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through directory ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the directory as the identity's directory replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, founder or not.

@@ -87,9 +87,9 @@ Two statuses the host decides without a downcast are worth naming, because both 
 
 The 500 default is deliberately the pessimistic one: an unmapped error is a host that does not understand what happened, and reporting that as a clean refusal is the laundering this whole design exists to prevent. The unreachable-peer case rides that default — it needs no type of its own, because 500 against 403 is already the distinction the deny test rests on.
 
-### D10. `/live` touches the runtime, bounded by a budget; `/debug/status` stays
+### D10. `/live` is process liveness; `/ready` is bounded runtime readiness
 
-`/live` now shares the same coarse runtime lock every other route reads through, bounded by a short budget (2 seconds): a stalled lock reads as down within that margin instead of `/live` answering `200` regardless of the runtime's actual state. `/debug/status` and `/debug/identities` share the same budget, through the same helper, so a stalled lock reads as down uniformly across all three routes that read the hosted set. `/debug/status` is subsumed by the sync routes but stays: it is the one human-readable probe, and the demo script leans on it.
+`/live` reports process liveness without acquiring the runtime's coarse state lock. `/ready`, `/debug/status`, and `/debug/identities` use a 2-second budget for the hosted-set read, so ordinary lock contention cannot cause a liveness restart while a stalled runtime still fails readiness promptly.
 
 ### D11. The product-path boundary is stated, not left to the crate layout
 
@@ -109,7 +109,7 @@ The spec now states both as requirements, because the container harness is exact
 
 ## Migration Plan
 
-Additive and gated: the new routes exist only under `PDN_DEBUG=1`, `/live` answers the same `200` it always did on a healthy runtime (only its failure mode changed, from "cannot fail while the process is up" to "bounded by a budget"), and no persisted state or wire format changes. Rollback is deleting the routes.
+The HTTP routes remain additive and gated by `PDN_DEBUG=1`. Review remediation also changes persisted pending-device records, linking confirmation, and runtime cleanup ownership. Rollback therefore requires reverting the HTTP routes and those runtime/data-layer changes together; legacy pending markers remain readable during migration.
 
 ## Open Questions
 

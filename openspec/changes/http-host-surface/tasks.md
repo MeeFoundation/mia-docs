@@ -1,6 +1,6 @@
 # Tasks: http-host-surface
 
-Start after `product-path-gaps` is merged: the error table below downcasts two marker errors it adds, and the scenario tests expect a granted namespace that converges from any reachable device of its issuer. Nothing here edits `pdn-node` — if a handler seems to need something the runtime does not offer, that is a finding to raise, not a runtime edit to make in passing.
+Start after `product-path-gaps` is merged: the error table below downcasts 2 marker errors it adds, and the scenario tests expect a granted namespace that converges from any reachable device of its issuer. Review remediation also changes `pdn-node` and `data-layer` to make cancellation cleanup, shutdown, and pending-device confirmation safe under the scenarios this change exposes.
 
 ## 1. Shapes and error mapping (`pdn-node-http`)
 
@@ -16,7 +16,7 @@ Start after `product-path-gaps` is merged: the error table below downcasts two m
 - [x] 2.3 Grants: `POST` and `GET /debug/identities/{identity}/grants/{peer}` (publish, read), `DELETE /debug/identities/{identity}/grants/{peer}/{issuer}` (withdraw); reads report what is there now and never wait (D4, D8)
 - [x] 2.4 Data: `PUT` and `GET /debug/data/{issuer}/{*path}` with the raw body as the payload both ways, `GET /debug/data/{issuer}` with an optional prefix for listing; an absent entry is 404 (D2, D8)
 - [x] 2.5 No route for the out-of-band ticket handover, none that forces reconciliation, resets state, or reaches a store outside a service call — the absence is the requirement, so it is stated in the router's own docs where the next person would otherwise add one; likewise no handler addressing another host: the crate keeps zero HTTP-client dependencies, and inter-node traffic stays on the runtime's protocols (D4, D5, D11)
-- [x] 2.6 `/live` now shares the coarse runtime lock and a liveness budget with `/debug/status` and `/debug/identities`, through one helper, so a stalled lock reads as down uniformly across all three; `/debug/status` is otherwise unchanged, and the debug gate still decides the whole `/debug/` subtree in one place (D10)
+- [x] 2.6 `/live` is process liveness and never waits for the coarse lock; `/ready`, `/debug/status`, and `/debug/identities` use the 2-second readiness budget (D10)
 - [x] 2.7 Bind resolution moved out of `main` into a testable function (host and port from the environment, loopback when unset) and unit-tested for the loopback default and an explicit wider bind
 - [x] 2.8 The binary's stop path: the graceful shutdown answers SIGTERM as well as an interrupt, because a container stop sends the former and the graceful path would otherwise never run where it matters; axum's graceful drain is itself bounded by its own budget, independent of any ceremony's, and `runtime.shutdown()` runs unconditionally afterward — a drain timeout, a bind or configuration failure, or a clean stop signal all reach it the same way, `main`'s fallible setup and serving factored into their own function precisely so that every exit from it still does
 
