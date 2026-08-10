@@ -13,16 +13,16 @@ Debug endpoints are demo scaffolding, not platform API. The host SHALL NOT serve
 
 ## ADDED Requirements
 
-### Requirement: Liveness reflects the runtime, bounded by a budget
-`GET /live` SHALL confirm the embedded runtime answers, not merely that the process is up: it SHALL touch the runtime through the same coarse state lock every other route reads through, bounded by a short, named budget. On a healthy runtime it SHALL answer within the budget with a success status. On a runtime whose lock is held past the budget, it SHALL answer with a non-success status within the budget plus a small margin, rather than hang.
+### Requirement: Liveness is not readiness
+`GET /live` SHALL report success while the process and embedded runtime exist, without waiting for the runtime's coarse state lock. `GET /ready` SHALL perform the bounded coarse-lock check and SHALL report non-success when that check exceeds its named budget.
 
-#### Scenario: A healthy runtime answers live
-- **WHEN** `GET /live` is requested against a running host, no flag required
-- **THEN** the response is a success status, returned promptly
+#### Scenario: Long operation does not fail liveness
+- **WHEN** an ordinary runtime operation holds the coarse state lock beyond the readiness budget
+- **THEN** `GET /live` remains successful and `GET /ready` reports non-success within the budget plus a small margin
 
-#### Scenario: A stalled runtime lock answers down, not hung
-- **WHEN** the runtime's coarse state lock is held past the liveness budget
-- **THEN** `GET /live` answers a non-success status within the budget plus a small margin, rather than waiting indefinitely
+#### Scenario: Healthy runtime is live and ready
+- **WHEN** the runtime's coarse state lock is available
+- **THEN** both `GET /live` and `GET /ready` return success promptly
 
 ### Requirement: The debug surface covers the embedded runtime's operations
 When enabled, the debug surface SHALL make the embedded runtime's service operations reachable over HTTP: creating an identity, minting and consuming a device-linking payload, minting and consuming an invite payload, listing an identity's connections, publishing and reading and withdrawing grants, writing and reading and listing entries of an issuer's data namespace, and reporting the node id and the hosted identities. The surface SHALL introduce no operation the runtime does not offer: each route delegates to one service call and adds no orchestration of its own.
@@ -91,3 +91,21 @@ The host exists so a test can reach a node from outside its process — the cont
 #### Scenario: The runtime serves no HTTP of its own
 - **WHEN** the runtime crate is built on its own, with no host around it
 - **THEN** it names no HTTP server or client among its own dependencies, it opens no HTTP listener, and no crate in the workspace besides the host depends on the host
+
+### Requirement: Internal failures stay server-side
+The host SHALL log the full internal cause chain for an unrecognized failure and SHALL return a stable generic body for HTTP 500. Client-error responses SHALL expose only allow-listed messages belonging to the typed refusal or malformed request.
+
+#### Scenario: Internal cause is not disclosed
+- **WHEN** a handler returns an error with nested internal context that maps to HTTP 500
+- **THEN** the client receives `internal server error` and the server log retains the complete cause chain
+
+### Requirement: Aggregate request resources are bounded
+The host SHALL limit an entry request body to 16 MiB and SHALL admit at most 16 debug requests concurrently. Health and readiness probes SHALL remain outside debug admission control. A request above its body limit SHALL receive HTTP 413, and a debug request rejected by aggregate admission control SHALL receive HTTP 503 without entering its handler.
+
+#### Scenario: Oversized entry is refused
+- **WHEN** a caller sends an entry body larger than 16 MiB
+- **THEN** the host answers HTTP 413 without invoking the data service
+
+#### Scenario: Concurrent overload is shed
+- **WHEN** 16 admitted debug requests remain in flight and another debug request arrives
+- **THEN** the additional request receives HTTP 503 within a short margin and aggregate buffered work remains bounded

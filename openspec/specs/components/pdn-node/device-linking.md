@@ -75,7 +75,14 @@ After the burn, the inviter SHALL write the newcomer's device record into its ow
 
 #### Scenario: A dialogue lost after commit converges on a fresh invite
 - **WHEN** a linking dialogue fails after the burn and the registration, and the same device later links with a fresh invite
-- **THEN** the second linking completes and the device set contains the newcomer's node id once
+- **THEN** the public linking service completes the second link, the identity remains hosted, the device is confirmed exactly once, and no pending registration remains
+
+### Requirement: Post-verification local failures are observable
+The inviter SHALL preserve uniform remote refusal after a linking secret is verified, but SHALL record every storage or ticket-minting failure after the secret burns as a typed local diagnostic.
+
+#### Scenario: Pending registration fails after burn
+- **WHEN** durable storage refuses the pending-device write after a valid secret is burned
+- **THEN** the peer receives the uniform refusal and the inviter records the storage failure locally
 
 ### Requirement: The newcomer confirms itself once the tickets are in hand
 A device that has imported the directory and its identity's data namespace SHALL promote its own pending record to confirmed, and SHALL do so before `link` reports success. Writing that record requires the directory's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
@@ -94,12 +101,20 @@ Every pending registration SHALL carry a durable creation time. An unconfirmed r
 - **WHEN** pending registrations remain unconfirmed for 24 hours across re-import or restart
 - **THEN** cleanup tombstones them and none enters the confirmed device set
 
-### Requirement: Cancellation cleanup is supervised
+#### Scenario: Confirmation wins before expiry
+- **WHEN** a pending device confirms before 24 hours pass
+- **THEN** it enters the confirmed set exactly once and its pending record is removed
+
+### Requirement: Cancellation cleanup precedes retry
 After importing replicas, a cancelled linking attempt SHALL retain its reservation until rollback completes. Runtime shutdown SHALL wait up to 10 seconds for tracked linking and establishment cleanup, and cleanup owned by an older attempt SHALL NOT remove state committed by a later retry.
 
 #### Scenario: Retry after cancellation remains hosted
 - **WHEN** linking is cancelled after import and the same identity is retried immediately
 - **THEN** the retry completes only after old rollback and remains hosted after cleanup settles
+
+#### Scenario: Shutdown completes cancellation cleanup
+- **WHEN** runtime shutdown begins while rollback work is pending
+- **THEN** shutdown waits within its cleanup budget and leaves no reservation or imported replica from the cancelled attempt
 
 ### Requirement: The reply hands over the bootstrap tickets
 The linking reply SHALL carry write tickets to the identity's directory and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through directory ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the directory as the identity's directory replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, founder or not.

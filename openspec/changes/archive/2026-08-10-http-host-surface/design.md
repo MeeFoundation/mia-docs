@@ -70,7 +70,7 @@ Reading a peer's grants or a replicated entry can legitimately return "not yet":
 
 ### D9. The error table is closed and its default is 500
 
-Handlers downcast the `anyhow::Error` against a fixed list and map each to a status with the error's own text:
+Handlers downcast the `anyhow::Error` against a fixed list and map each to a status with allow-listed public text:
 
 | Error                                                                       | Status | Reading                                          |
 | --------------------------------------------------------------------------- | ------ | ------------------------------------------------ |
@@ -87,6 +87,8 @@ Two statuses the host decides without a downcast are worth naming, because both 
 
 The 500 default is deliberately the pessimistic one: an unmapped error is a host that does not understand what happened, and reporting that as a clean refusal is the laundering this whole design exists to prevent. The unreachable-peer case rides that default — it needs no type of its own, because 500 against 403 is already the distinction the deny test rests on.
 
+The full `anyhow` cause chain stays in tracing. An HTTP 500 exposes only `internal server error`; typed client failures expose only their stable public message.
+
 ### D10. `/live` is process liveness; `/ready` is bounded runtime readiness
 
 `/live` reports process liveness without acquiring the runtime's coarse state lock. `/ready`, `/debug/status`, and `/debug/identities` use a 2-second budget for the hosted-set read, so ordinary lock contention cannot cause a liveness restart while a stalled runtime still fails readiness promptly.
@@ -97,13 +99,28 @@ Two properties of the stand are true by construction but, before this change, st
 
 The spec now states both as requirements, because the container harness is exactly where an implicit boundary erodes: the first convenient handler that dials the other container would quietly turn a product-path scenario into an HTTP relay test, and nothing downstream would reveal it — the assertions would still read the right values. Stating the boundary where the assertions rest keeps a green container run meaning what it claims: the product's own inter-node path, driven from outside the process.
 
+### D12. A linking attempt owns 1 supervised cleanup lifecycle
+
+Reservation and rollback state remain owned together until rollback completes. Dropping the caller-facing future cannot release the identity for retry ahead of cleanup, and runtime shutdown waits within a named budget for supervised ceremony work rather than relying on independent destructor tasks.
+
+### D13. Pending registrations expire by durable timestamp
+
+A pending-device value carries its creation time while remaining backward-compatible with the existing marker. Cleanup tombstones records older than 24 hours; confirmation remains the only access transition, so expiry only bounds abandoned replicated state.
+
+### D14. Invite burn remains before durable registration
+
+The inviter keeps atomic verify-and-burn before any state change. Storage and ticket failures after verification remain a uniform close on the wire but produce a typed local diagnostic, preserving probe indistinguishability without hiding operator-visible failure.
+
+### D15. The host applies aggregate admission control
+
+The router limits entry bodies to 16 MiB and admits at most 16 concurrent debug requests. Overload answers 503 before entering a handler. Streaming is deferred because the runtime service accepts complete byte slices.
+
 ## Risks / Trade-offs
 
 - **The surface is unauthenticated remote control of the node** → it stays behind `PDN_DEBUG=1`, the host keeps its loopback default bind, and the spec states the exposure rather than leaving it to be discovered. A container that opens it wider does so explicitly.
 - **The harness depends on unpinned route names** → the harness lives in this repo and moves with the routes; nothing outside the repo may depend on them, which the spec says in as many words.
 - **A closed error table drifts as the runtime grows new typed errors** → the drift is visible: a new typed refusal that nobody mapped shows up as 500 in a deny test, which fails loudly rather than passing quietly.
 - **Blocking handlers hold a connection for the length of a dialogue** → acceptable at stand scale; `link`'s timeout bounds the longest of them, and the runtime lock is never held across a network round trip, so a slow dialogue does not freeze the other routes.
-- **The surface is built on a change that has not landed yet** → the dependency is one-way and narrow: two marker errors to downcast, and a granted namespace that converges from any reachable device of its issuer. If `product-path-gaps` lands differently, what breaks here is the error table, loudly, in its own unit test.
 - **Removing `share` and `import` from the surface may block a fixture nobody has written yet** — the scale measurements will want to plant a large namespace cheaply → they are absent, not deleted: the service keeps them, and a fixture that needs them argues for its route then, on its own terms.
 - **Multiple identities co-hosted on one node, including an issuer and its own grant audience, is a supported configuration** — reachable only via a connection made while apart, then a link that brings one of them onto the other's node → the grant-courtesy check and the revoke path both exempt a hosted identity's own namespace unconditionally: a hosted issuer's writes are never judged by a grant it made, and withdrawing a grant toward a co-hosted audience never forgets the issuer's own namespace. The container harness reaches this configuration whenever it links a device onto a node that already hosts a grant's audience, which is the cheaper way to assemble a two-identity stand.
 

@@ -14,6 +14,7 @@ The runtime's service surface is complete and proven in-process — identity, co
 - **The surface carries live ceremony secrets, and says so.** Invite and linking payloads cross it in the clear, each carrying its one-time secret — bearer-free in the ceremony specs' sense, since nothing in a payload grants durable access, yet live until burnt or expired, so a captured payload lets its holder consume the invitation. No namespace ticket crosses the surface at all. The host therefore keeps its default bind on loopback and the surface behind the flag, and the spec states the exposure instead of leaving it implied.
 - **Encoding is boring on purpose.** Structured values travel as JSON built from the types the runtime already serializes; entry payloads travel as raw request and response bodies, so no encoding sits between a written byte string and a read one.
 - **No authorization of the host's own.** The host authorizes nothing and adds no identity: every operation is the runtime's, refused by the runtime on the runtime's terms. Reaching the surface is reaching the node.
+- **Review fixes are part of the same change.** Device-linking cancellation cleanup remains ordered ahead of retry, pending registrations expire after 24 hours, and post-burn local failures remain observable without changing the uniform remote refusal. The host separates liveness from readiness, bounds aggregate request work, and keeps internal error chains server-side.
 
 ## Out of Scope (deferred)
 
@@ -30,6 +31,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)   | Archive destination                               |
 | -------------------- | ------------------------------------------------- |
+| `pdn-node-device-linking` | `openspec/specs/components/pdn-node/device-linking.md` |
 | `pdn-node-http-host` | `openspec/specs/components/pdn-node/http-host.md` |
 
 ### New Capabilities
@@ -39,6 +41,7 @@ None — the host capability already exists.
 ### Modified Capabilities
 
 - `pdn-node-http-host`: the debug surface gains requirements where it had none. Today the spec says only that `/debug/` is absent without the flag and that its shape is unspecified; that stays true of route names, but six properties become required — the surface covers the embedded runtime's operations, it offers no path the runtime's own callers lack, a refusal is reported as a refusal and never as success, it exposes live ceremony secrets and so stays gated with a loopback default bind, inter-node traffic stays on the runtime's own protocols with no HTTP between nodes, and the host itself stays off the product path: product hosts embed the runtime core, which carries no HTTP dependency.
+- `pdn-node-device-linking`: cancellation cleanup and retry ordering, post-burn failure observability, pending-device expiry, and lost-reply retry through the public service become explicit requirements.
 
 ## Impact
 
