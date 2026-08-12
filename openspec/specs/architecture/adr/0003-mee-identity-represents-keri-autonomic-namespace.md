@@ -1,80 +1,60 @@
 ---
-# These are optional elements. Feel free to remove any of them.
-status: {proposed | rejected | accepted | deprecated | … | superseded by ADR-0005 <0005-example.md>}
-date: {YYYY-MM-DD when the decision was last updated}
-deciders: {list everyone involved in the decision}
-consulted: {list everyone whose opinions are sought (typically subject-matter experts); and with whom there is a two-way communication}
-informed: {list everyone who is kept up-to-date on progress; and with whom there is a one-way communication}
+status: accepted
+date: 2026-08-11
 ---
-# {short title of solved problem and solution}
+
+# A MEE identity is a KERI autonomic namespace with delegated device identifiers
 
 ## Context and Problem Statement
 
-{Describe the context and problem statement, e.g., in free form using two to three sentences or in the form of an illustrative story.
- You may want to articulate the problem in form of a question and add links to collaboration boards or issue management systems.}
+`PdnId` was minted as random bytes, so no cryptographic history established which devices controlled an identity or whether bootstrap stores belonged to it. Device linking could authenticate the transport endpoint and one-time secret, but the inviter's assertion about the identity and tickets was not independently verifiable.
 
-<!-- This is an optional element. Feel free to remove. -->
+The identity model must preserve `PdnId`'s 32-byte domain representation, allow any existing device to invite another without copying root private keys to every device, survive restart, and keep namespace read capabilities out of a public key-event log.
+
 ## Decision Drivers
 
-* {decision driver 1, e.g., a force, facing concern, …}
-* {decision driver 2, e.g., a force, facing concern, …}
-* … <!-- numbers of drivers can vary -->
+- Derive the identity from reproducible signed history rather than an unauthenticated random label.
+- Bind every full-access device record to its authenticated transport `NodeId`.
+- Let any device invite without sharing its delegator's private keys.
+- Commit to the fixed directory/data store set without publishing namespace capability bytes.
+- Keep the version-1 protocol byte-for-byte interoperable and independently testable.
+- Fail closed on forks, duplicate endpoint bindings, missing secrets, and incomplete recovery.
 
 ## Considered Options
 
-* {title of option 1}
-* {title of option 2}
-* {title of option 3}
-* … <!-- numbers of options can vary -->
+- Keep random `PdnId` values and add only transport-level statements.
+- Delegate every device directly from the root and copy root authority to inviters.
+- Use a tree in which each device delegates the device it invites.
+- Implement the whitepaper Figure 12.7 location-seal profile literally.
+- Use a deliberately narrower `di`-only KERI profile with exact local wire rules.
 
 ## Decision Outcome
 
-Chosen option: "{title of option 1}", because
-{justification. e.g., only option, which meets k.o. criterion decision driver | which resolves force {force} | … | comes out best (see below)}.
+Chosen option: a self-addressing KERI root identifies the MEE identity, and devices form a delegation tree in which each inviter delegates its newcomer. The root inception seals opaque role-tagged commitments to exactly 2 device-replicated stores: private-metadata directory and data. The 32-byte digest behind the root AID maps canonically to the existing `PdnId` representation.
 
-<!-- This is an optional element. Feel free to remove. -->
+The first device is delegated by the root. Later devices are delegated by their inviting device and anchored in that delegator's accepted KEL. A complete endpoint binding is a replicated signed proof: linked devices retain request, inviter manifest, and newcomer confirmation; the founder retains a founder statement countersigned by the root. Full session access requires the authenticated `NodeId`, a valid proof for that exact endpoint, and an accepted anchored chain to the hosted root.
+
+Profile 1 intentionally uses `di`-only delegated inception rather than the prospective delegating-location seal in KERI Design v2.63 Figure 12.7. Exact KERI JSON, algorithms, CESR codes, signature preimages, frames, limits, and golden vectors are normative in `pdn-node-keri-wire-profile`; the whitepaper and pinned `keripy` are reference/oracle material, not alternate wire specifications.
+
+The implementation uses a narrow 3-event profile (`icp`, `dip`, `ixn`) over the workspace's Apache/MIT-compatible BLAKE3 and Ed25519 primitives. It does not link `keriox`. Key rotation, revocation, endpoint supersession, recovery, witnesses, receipts, and counterparty-device verification remain separate versioned decisions.
+
 ### Consequences
 
-* Good, because {positive consequence, e.g., improvement of one or more desired qualities, …}
-* Bad, because {negative consequence, e.g., compromising one or more desired qualities, …}
-* … <!-- numbers of consequences can vary -->
+- Good: an identity, its device authority, endpoint binding, and store set are independently reproducible and verifiable.
+- Good: any device can invite without distributing root or ancestor private keys.
+- Good: raw namespace identifiers remain below the data-layer boundary.
+- Bad: the tree has no implemented administrator; loss of a delegator freezes new establishment for its subtree until a later recovery/re-inception operation.
+- Bad: the chosen profile is deliberately not byte-compatible with the Figure 12.7 location-seal construction.
+- Bad: bounded full-history replay eventually needs a separately specified verifiable checkpoint.
+- Neutral: KERI permits ancestor recovery, but this decision neither implements it nor claims that device-key loss is universally unrecoverable.
 
-<!-- This is an optional element. Feel free to remove. -->
 ## Validation
 
-{describe how the implementation of/compliance with the ADR is validated. E.g., by a review or an ArchUnit test}
+- Strict OpenSpec validation covers the normative deltas.
+- Golden vectors must match both the local implementation and pinned `keripy` before protocol code is accepted.
+- Scenario tests cover creation, founder authorization, non-founder invitation, request/manifest/confirmation signatures, endpoint substitution, store commitment mismatch, competing histories, duplicate confirmed endpoints, restart recovery, and every size/depth bound.
+- The durable-runtime-storage predecessor must pass process-level crash/reopen tests before this change is implemented.
 
-<!-- This is an optional element. Feel free to remove. -->
-## Pros and Cons of the Options
-
-### {title of option 1}
-
-<!-- This is an optional element. Feel free to remove. -->
-{example | description | pointer to more information | …}
-
-* Good, because {argument a}
-* Good, because {argument b}
-<!-- use "neutral" if the given argument weights neither for good nor bad -->
-* Neutral, because {argument c}
-* Bad, because {argument d}
-* … <!-- numbers of pros and cons can vary -->
-
-### {title of other option}
-
-{example | description | pointer to more information | …}
-
-* Good, because {argument a}
-* Good, because {argument b}
-* Neutral, because {argument c}
-* Bad, because {argument d}
-* …
-
-<!-- This is an optional element. Feel free to remove. -->
 ## More Information
 
-{You might want to provide additional evidence/confidence for the decision outcome here and/or
- document the team agreement on the decision and/or
- define when and how this decision should be realized and if/when it should be re-visited and/or
- how the decision is validated.
- Links to other decisions and resources might appear here as well.}
- 
+ADR-0012 remains the historical decision for the version-0 raw linking ceremony. The `keri-backed-device-linking` change replaces that protocol with `/pdn/linking/1` when implemented and archived. Existing `PdnOp` device/key variants are reserved and do not acquire KERI semantics through this ADR.
