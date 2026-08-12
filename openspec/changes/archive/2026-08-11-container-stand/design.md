@@ -31,7 +31,7 @@ The existing helpers hand a request to a router. They move onto one small abstra
 
 Alternatives considered. Restating the scenarios in the stand's binary duplicates roughly 400 lines of assertions and lets the two copies drift, which is worse than usual here because the copies are meant to prove the same property under two transports. Deleting the in-process scenarios once the container ones exist loses the fast gate — seconds, no image, and it runs in continuous integration today. Keeping both, written once, costs one indirection.
 
-Scenarios that differ in more than transport stay separate: stopping a container has no in-process counterpart, and the in-process suite keeps its own bounded-surface tests (the debug gate, the readiness budget, the oversized body) where a container adds nothing.
+Scenarios that differ in more than transport stay separate: stopping a container has no in-process counterpart, and one test keeps no counterpart on the stand either — the readiness budget, which holds the runtime's own state lock from inside its process and so cannot be driven from outside it. The surface's other bounds, the debug gate and the oversized body, are asserted against a node started from the image, where the gate's answer is also the image's own default.
 
 ### D2: Convergence is waited for by repeating a read, at the runtime's own cadence
 
@@ -47,11 +47,11 @@ Two consequences the harness must respect. It must not pass the loopback bind va
 
 ### D4: The suite is opt-in through an ignore attribute plus a recipe — for cost, not for availability
 
-A container daemon is present on every machine this is developed on, the development container included, where the socket is mounted for exactly this purpose. The suite is opt-in for three other reasons. It needs a built image, so a default run either rebuilds one every time — minutes of release build inside the builder — or silently tests whatever image happens to be lying around, which is worse than testing nothing. It waits on convergence at the runtime's own cadence (D2), so its wall-clock time is in minutes while the in-process suite's is in seconds, and `just test` is the inner loop. And the flaky-hunt recipe selects the integration binaries by default, so a container binary joins every stress run, which is the one run in the workspace measured in hundreds of iterations.
+A container daemon is present on every machine this is developed on, the development container included, where the socket is mounted for exactly this purpose. The suite is opt-in for two other reasons, and neither is its running time: the scenarios themselves cost seconds, as the figures below record. It needs a built image, so a default run either rebuilds one every time — minutes of release build inside the builder — or silently tests whatever image happens to be lying around, which is worse than testing nothing. And the flaky-hunt recipe selects the integration binaries by default, so a container binary joins every stress run, which is the one run in the workspace measured in hundreds of iterations.
 
 `just test-docker` builds the image and runs the stand's binary with ignored tests enabled; the tests carry `#[ignore]` with a reason naming the image and the daemon. A cargo feature would gate them too, but it hides them from a plain listing and adds a feature to a crate that has none.
 
-The same cost is why continuous integration stays out of this change: the pipeline today is the default test run, and adding an uncached image build to every pull request is the expense the proposal defers, not a property the stand lacks.
+The pipeline runs the suite in a job of its own, and the expense that would have kept it out — an image rebuilt from nothing on every pull request — is answered by a layer cache rather than accepted: the job builds through the container builder's cache, so a run pays for the dependency stage once.
 
 ### D5: The image build follows whatever the workspace resolves, the local fork checkout included
 
@@ -83,7 +83,7 @@ Reference figures, on a 16-core machine whose container daemon holds 8: the firs
 
 ### D9: The paired denials that run in containers, and those that stay in process
 
-Per the access-control practice, the container scenario's authorized read is paired in the same place with its tightest denials: a third container that has no connection and no grant is refused, and the claims the grant withholds are absent from the grantee's view after a second replication wave is proven to have happened. The rest of the refusal table — a malformed request, an unhosted identity, a burnt invite secret, a write outside the write set — stays in the in-process suite, where it is already green and where a container adds only minutes.
+Per the access-control practice, the container scenario's authorized read is paired in the same place with its tightest denials: a third container that has no connection and no grant is refused, and the claims the grant withholds are absent from the grantee's view after a second replication wave is proven to have happened. The rest of the refusal table — a malformed request, an unhosted identity, a burnt invite secret, a write outside the write set — is asserted across containers too, in a binary of its own beside the scenarios.
 
 ### D12: A stopped node is confirmed by the daemon, not by a probe to its address
 
@@ -107,7 +107,11 @@ The list belongs at the repository root, and it collides with nothing there. An 
 
 ### Operating conditions
 
-Walked, with the outcome for each: several identities on one node (the scenario's third container hosts its own identity, and the stand's identities are created per container); one device or several (Alice runs on two containers in the linking and stopped-device scenarios); a device linking after data already exists (the linking scenario reads an entry written before the link); a device that goes away (the stopped-device scenario, which is the property containers exist to prove); capabilities granted and withdrawn (the whole scenario ends by withdrawing the grant and asserting access closes).
+Walked, with the outcome for each: several identities on one node (one container hosts two personas of Alice, each with an audience of its own, and the stand asserts that sharing a process is not sharing an audience — connections and grants are keyed by the hosting identity; what the stand cannot assert is read isolation between the two personas, and the reason is structural rather than a gap in the scenarios — see below); one device or several (Alice runs on two containers in the linking and stopped-device scenarios); a device linking after data already exists (the linking scenario reads an entry written before the link); a device that goes away (the stopped-device scenario, which is the property containers exist to prove); capabilities granted and withdrawn (the whole scenario ends by withdrawing the grant and asserting access closes).
+
+Why read isolation between two personas on one node is not among the scenarios: there is nothing to assert. The principal every enforcement point names is the device, not the identity. A serving node computes a caller's rights from its transport-authenticated node id resolved through the published device sets, and a device hosting two identities publishes one node id in both sets — so the resolution is one-to-many and the rights come out as the union, which `data-layer`'s classifier says in as many words. The ingest gate keys its write admission by namespace and node id for the same reason, and a namespace secret is a bearer ticket that no mechanism scopes to "while acting as this identity". Nor is the union a leak worth closing on its own: a device holding both identities' tickets can read either by opening a second session as the other, so refusing the union would cost a round trip and change no outcome.
+
+The boundary becomes assertable only when a session can authenticate *as an identity* rather than as a device — which needs identities to carry key material (KERI) and the reconciliation protocol to carry an identity-level authentication, with the ingest gate rekeyed from node id to identity. The first is planned; the second and third are not yet anywhere, and the KERI plan does not mention namespaces at all. Until all three exist, a scenario asserting that one persona cannot read the other's data would assert a property the system does not have, in a place that could not enforce it.
 
 Deliberately left out: a device that restarts, since a restarted container is a different node without persistence; an unstable connection, since the stand has no fault injection and adding it is not this change; a disk that fills, which does not apply to memory storage.
 
