@@ -113,10 +113,24 @@ The suite SHALL NOT run as part of the workspace's default test run, nor be sele
 - **WHEN** a change is proposed
 - **THEN** the pipeline builds the image and runs the suite against it
 
-
 ### Requirement: The image carries the workspace as it resolves
 The image SHALL be built from the workspace's own dependency resolution, including a store fork pointed at a checkout beside it.
 
 #### Scenario: A locally resolved fork reaches the image
 - **WHEN** the workspace points the store fork at a checkout beside it and the image is rebuilt
 - **THEN** the containers run that fork, and no step of the build refuses the resolution
+
+### Requirement: The live demo runs on the stand's image
+The demo SHALL run the same image the suite runs, with every node on one container network and each node's HTTP port published on loopback of the demo host. It SHALL remove its nodes on every exit, the failing one included, and it SHALL drive them over HTTP alone, so what passes between nodes is the runtimes' own traffic.
+
+#### Scenario: The demo brings up the nodes it names
+- **WHEN** the demo recipe runs
+- **THEN** it builds the image, brings up every node its compose file names, and waits for each of them to answer liveness before the first step
+
+#### Scenario: A run never meets the previous run's state
+- **WHEN** the demo exits, whether it finishes or fails
+- **THEN** its containers and its network are removed
+
+#### Scenario: The demo publishes on loopback
+- **WHEN** a node of the demo publishes its HTTP port
+- **THEN** the port is bound to loopback, because the debug surface is unauthenticated and mints live ceremony secrets

@@ -10,28 +10,29 @@ Two properties of the current runtime shape the design more than anything else. 
 
 **Goals:**
 
-- An image of `pdn-node-http` that a container runtime starts, and three recipes that build it, run one of it, and run the suite against it.
+- An image of `pdn-node-http` that a container runtime starts, and the recipes that build it, run one of it, and run the suite against it.
 - A harness that spawns several containers on one docker network and drives each only through its published HTTP port.
-- The scenarios already green in process — the whole stand scenario with its paired denials, and device linking — running across containers without being restated, plus one scenario that only containers can host: a granted peer still converging after the device that published the grant is stopped.
+- The scenarios already green in process — the whole stand scenario with its paired denials, and device linking — running across containers instead of in one, plus what only containers can host: a granted peer still converging after the device that published the grant is stopped, and the surface's own bounds asserted against the image.
 - An inner loop that stays as fast as it is now: the default test run neither builds an image nor waits on containers, and the flaky hunt does not sweep them in.
+- The suite as a gate the pipeline runs on every proposed change, paid for by a layer cache rather than by a rebuild from nothing.
+- The live show on the same image: several nodes on one network, fixed loopback addresses, and a narration that drives them over HTTP alone.
 
 **Non-Goals:**
 
 - Persistence of any kind, and therefore any scenario that restarts a node.
-- The live demo's orchestration (compose, fixed addressing, a script to run in front of an audience).
-- Continuous integration for the suite, and the image caching that would make it affordable.
+- Authentication on the debug surface; where the surface is published is the boundary this change works with.
 - Network fault injection, relays, hole punching, discovery, and scale.
 - Any change to the runtime, the data layer, or the fork. A scenario that cannot be expressed without one is a finding, not a task.
 
 ## Decisions
 
-### D1: The request layer is abstracted; the scenarios above it are written once
+### D1: Every test of the surface runs on the stand, and one property keeps its own process
 
-The existing helpers hand a request to a router. They move onto one small abstraction — a call taking a method, a path, an optional body, and returning a status and bytes — with two implementations: the router in process, and an HTTP client against a container's published port. Everything above that call (create an identity, mint and consume a payload, publish and read a grant, write and read an entry, poll until a value appears) is written against the abstraction, so the whole stand scenario and the linking scenario exist as one body each, invoked by both test binaries.
+The tests that drive the HTTP surface run against nodes on the stand and nowhere else. One helper names a node and a request — a method, a path, an optional body, into a status and bytes — and the node it names is a container; everything above it (create an identity, mint and consume a payload, publish and read a grant, write and read an entry, poll until a value appears) is written once against that helper. The surface's own bounds go there too: the debug gate route by route, the routes it gates, and the body ceiling, each asserted against a node started from the image, where the gate's answer is also the image's own default.
 
-Alternatives considered. Restating the scenarios in the stand's binary duplicates roughly 400 lines of assertions and lets the two copies drift, which is worse than usual here because the copies are meant to prove the same property under two transports. Deleting the in-process scenarios once the container ones exist loses the fast gate — seconds, no image, and it runs in continuous integration today. Keeping both, written once, costs one indirection.
+One test keeps its own process, and the reason is a property rather than a preference. The readiness split holds the runtime's coarse state lock from inside the process, and nothing on the surface can be made to hold it — every call that budget guards is, by design, never held across I/O. That test therefore builds its runtime and its router itself and does not come through the harness.
 
-Scenarios that differ in more than transport stay separate: stopping a container has no in-process counterpart, and one test keeps no counterpart on the stand either — the readiness budget, which holds the runtime's own state lock from inside its process and so cannot be driven from outside it. The surface's other bounds, the debug gate and the oversized body, are asserted against a node started from the image, where the gate's answer is also the image's own default.
+Alternatives considered. A request-level abstraction with two implementations — the router in process, an HTTP client against a container — is where this change starts: it keeps a fast gate that needs no image, at the cost of one indirection. It is not what the change ends with. The two copies prove one property twice and every scenario edit touches both, while the fast gate they buy already exists a layer down, where `pdn-node`'s own suite proves establishment, linking, grants and replication in seconds and without HTTP at all. An in-process copy of a stand scenario is then a third proof of the same property, and the one thing it does not prove is the surface. Restating the scenarios in a second binary instead is worse again, since two hand-written copies drift.
 
 ### D2: Convergence is waited for by repeating a read, at the runtime's own cadence
 
@@ -81,9 +82,13 @@ The builder stage uses cargo-chef so a dependency layer survives a source edit, 
 
 Reference figures, on a 16-core machine whose container daemon holds 8: the first image build is about 2 minutes, of which the dependency stage is 48 seconds and installing the recipe tool 25; a rebuild with no source change is 11 seconds. The three scenarios together take 11 seconds, ten stress iterations of them 113. The workspace's in-process suite is 112 seconds — the figure the stand is kept out of.
 
+Those scenario figures cover the three scenarios the change starts with, and by the end the suite is twelve tests across three binaries. Its wall clock is measured again together with the parallelism bound (D11), since the two answer one question and a rung chosen against the old size says nothing about the new one.
+
 ### D9: The paired denials that run in containers, and those that stay in process
 
 Per the access-control practice, the container scenario's authorized read is paired in the same place with its tightest denials: a third container that has no connection and no grant is refused, and the claims the grant withholds are absent from the grantee's view after a second replication wave is proven to have happened. The rest of the refusal table — a malformed request, an unhosted identity, a burnt invite secret, a write outside the write set — is asserted across containers too, in a binary of its own beside the scenarios.
+
+One half of the write denial stays out of the stand, and not for convenience. What a refused write here proves is the courtesy check on the grantee's own side: the write never leaves that node. The enforcement is the issuer's ingest gate, which derives its write set independently, and the only way to reach it is to get past the courtesy — which needs a runtime feature this surface does not expose and should not. That half is therefore proven where the bypass lives, in `pdn-node`'s own write-retraction scenario, which forces the write and asserts it never reaches the issuer.
 
 ### D12: A stopped node is confirmed by the daemon, not by a probe to its address
 
@@ -91,7 +96,9 @@ Whether a node this scenario stops is really gone is asked of the container daem
 
 ### D11: The stand's scenarios are bounded by a test group, not by this machine's core count
 
-The runner schedules one test per core of the machine it runs on, which is the right measure for a test whose node is a task and the wrong one for a test whose node is a container: the daemon holds a fixed share of the machine, and a run wide enough saturates it, at which point a node misses its readiness budget and the failure says nothing about the product. The stand's binary therefore sits in a test group with a small thread ceiling, and every other binary keeps the default.
+The runner schedules one test per core of the machine it runs on, which is the right measure for a test whose node is a task and the wrong one for a test whose node is a container: the daemon holds a fixed share of the machine, and a run wide enough saturates it, at which point a node misses its readiness budget and the failure says nothing about the product. The stand's binaries therefore sit in a test group with a small thread ceiling, and every other binary keeps the default.
+
+The ceiling comes from what the container daemon reports about itself rather than from the cores of the machine running the suite: the two differ whenever the daemon runs on a virtual machine or the suite runs inside a development container. A recipe reads that number and names the matching profile, and both the local run and the pipeline job go through that same recipe, so the bound cannot drift between them. The number of rungs and where each sits is a measurement, revisited when the suite grows — the decision here is only that the bound is the daemon's size and not the test host's.
 
 Raising the readiness budget instead would have been the wrong repair to the same observation — it makes an overloaded run take longer to fail without making it converge, and it hides the one condition the budget exists to report.
 
@@ -104,6 +111,18 @@ The repository root argues for it by itself: a denial list would have to name th
 Checking it is not a matter of reading the file: a throwaway image copies the context and lists every path it received, dotfiles included, and that listing is read against the allowed set. The criterion is presence, not bulk — a leaked private note weighs nothing and matters more than a large directory that was going to be excluded anyway; size only says which leak is expensive. It has a recipe of its own, so the check is a command rather than a remembered incantation.
 
 The list belongs at the repository root, and it collides with nothing there. An ignore file applies to a build context, not to a repository, and the development container's images are built from the `.devcontainer` directory as their context — so the root list has exactly one build under it, the stand's image, and would cover any later build that takes the root as its context. If a second root-context image ever needs a different set, the builder reads an ignore file named after the Dockerfile and sitting beside it, which replaces the root one for that build; the reason to prefer the root file until then is that a list nobody remembers to write is the one an unrelated tree travels through.
+
+### D13: The live demo runs the stand's image, on fixed loopback addresses
+
+The show and the gate share one artifact: the demo brings up the same image the suite runs, so what an audience watches is what the pipeline proved that morning, and a demo that works while the suite is red is a contradiction rather than a possibility. What the demo adds over the suite is orchestration and a narration — a compose file for the nodes and a script that drives them.
+
+Addresses are fixed and published on loopback, which is two decisions rather than one. Fixed, because the narration names devices — Alice's phone, Bob's laptop — and a daemon-assigned port would make each step's address an accident that has to be discovered before it can be spoken about; the suite has the opposite need, since its scenarios run side by side and must not collide. Loopback, because the debug surface is unauthenticated and mints live ceremony secrets, so publishing it further is asked for explicitly rather than inherited from a default.
+
+The nodes are torn down on every exit, the failing one included. A demo that leaves containers behind has the next run meeting the last run's state, which is the one thing a demo must never do — and with storage in memory, tearing down is also what makes every run start clean.
+
+Two smaller shapes follow from the same idea. The count of nodes the recipe reports comes from the compose file rather than from a number written in the recipe, because a number written there goes stale the first time a node is added. And the narration reads its base URLs from the environment, so it names no transport of its own and can be pointed at containers, at processes, or at anything else serving the surface.
+
+The device set is one device per identity, not per person: Alice keeps a laptop for work and another for leisure. That is what makes a device's belonging visible in the room — the leisure laptop hosts the leisure persona and knows nothing of the work one, which is the property the two-personas scenario asserts and the demo shows.
 
 ### Operating conditions
 
@@ -127,9 +146,8 @@ Deliberately left out: a device that restarts, since a restarted container is a 
 
 ## Migration Plan
 
-Nothing to migrate: the change adds files, three recipes, and two development dependencies. Rolling it back is deleting them, and nothing in the runtime, the data layer, or the fork changes, so no deployment, spec, or test outside this change depends on it.
+Nothing to migrate: the change adds files, recipes, a pipeline job, and two development dependencies. Rolling it back is deleting them, and nothing in the runtime, the data layer, or the fork changes, so no deployment, spec, or test outside this change depends on it. One thing rolling back does take with it: the surface's tests live on the stand and nowhere else, so removing the stand removes them rather than returning them to this process.
 
 ## Open Questions
 
-- Whether the suite eventually runs in continuous integration, and what image cache makes that affordable — deferred with the rest of the continuous-integration question.
-- Whether the live demo's compose file reuses the harness's environment conventions or defines its own; that change decides, and this one keeps the conventions in one place so it can.
+- Whether "HTTP only from the test host" is a security boundary or an arrangement. Where the surface is published is the whole of its boundary today: the demo publishes on loopback, and the suite's nodes share a network of their own, on which any of them reaches any other's surface. A control plane that authenticates its caller answers the question the other way, and it is its own change.

@@ -22,11 +22,12 @@
 - [x] 3.5 Add `test-docker`: build the image, then run the stand's test binary with ignored tests enabled. Keep the suite out of `just test`.
 - [x] 3.6 Check that `just test` runs none of the stand's tests and that `just stress` with no selection does not sweep its binary into a flaky hunt.
 
-## 4. The transport abstraction
+## 4. Where the surface's tests live
 
-- [x] 4.1 In `crates/pdn-node-http/tests/common/`, introduce the request-level abstraction (method, path, optional body, into status and bytes) and move the existing helpers onto it, keeping the in-process router implementation behind it.
-- [x] 4.2 Move the step helpers (identity creation, payload minting and consumption, grant publication and reading, entry write and read, poll-until-value) onto the abstraction, so they name no transport.
-- [x] 4.3 Lift the whole-scenario body and the linking body into shared functions parameterized by the harness, and have the in-process binaries call them. The suite must stay green with no behavior change — this step moves code and nothing else.
+- [x] 4.1 In `crates/pdn-node-http/tests/common/`, introduce the request-level helper (method, path, optional body, into status and bytes) and move the step helpers onto it — identity creation, payload minting and consumption, grant publication and reading, entry write and read, poll-until-value.
+- [x] 4.2 Point that helper at a container's published port and drop the in-process router implementation together with the scenario binaries that used it (D1): `pdn-node`'s own suite proves the runtime's behaviour without HTTP, so an in-process copy of a stand scenario is a third proof of one property and no proof of the surface.
+- [x] 4.3 Keep in this process only what a container cannot show — liveness answering while readiness reports a held state lock — in a test that builds its runtime and its router itself.
+- [x] 4.4 Check the tree against that rule: the crate's tests are the stand's binaries plus that one, so "every test of the HTTP surface runs on the stand" is a property of the tree rather than an intention.
 
 ## 5. The container harness
 
@@ -41,14 +42,16 @@
 - [x] 6.2 The linking scenario across 2 containers, calling the shared body: the joined device reports the identity as hosted and reads an entry written before the link.
 - [x] 6.3 The stopped-device scenario: an identity on 2 containers, the grant published from the first, that container stopped, and the peer converging on an entry written by the survivor. If the survivor turns out not to be dialable by endpoint id, stop and record it against the deferred device-record addressing branch (design, D6) instead of working around it.
 - [x] 6.4 Mark every test in the stand's binary ignored, with a reason naming the daemon and the image.
+- [x] 6.5 Move the surface's own bounds onto the stand, in a binary of their own: the debug gate route by route, the same routes present with the flag on, and the body ceiling — each asserted against a node started from the image, so the gate's answer is also the image's own default. Keep in this process only the property that cannot be reached from outside it, the one holding the runtime's state lock, and have it build its runtime itself.
+- [x] 6.6 Add the remaining scenarios and the refusal table beside them (D9): a write grant with its denial one claim over, two personas on one node with an audience each, and the refusals — a malformed request, an unhosted identity, a burnt invite secret — all across containers.
 
 ## 7. Verification
 
-- [x] 7.1 Run `just test-docker` from a clean image and confirm all three scenarios pass.
+- [x] 7.1 Run `just test-docker` from a clean image and confirm the whole suite passes.
 - [x] 7.2 Run the suite from inside the development container as well, where a spawned container is a sibling on the host's daemon and the development container sits in another network namespace: it works through the container client's host resolution, with nothing set by hand.
 - [x] 7.3 Stress the stand's suite (a bounded repeat, tens of runs) and treat any failure as a defect of this change, diagnosed here and not carried forward.
 - [x] 7.6 Bound the stand's binary to a test group (D11), so the runner's default width cannot saturate the daemon and leave a node short of its readiness budget.
-- [x] 7.4 Run `just precommit-check` — the in-process suite must be green and unchanged in behavior after the move in section 4.
+- [x] 7.4 Run `just precommit-check` — the workspace's own suites stay green after the move in section 4, and the recipe covers the container suite too, since a pass without it says nothing about this crate.
 - [x] 7.5 Record the suite's wall-clock time and the image build time from cold and from warm caches, so the next change knows what it costs.
 
 ## 8. Documentation
@@ -56,3 +59,18 @@
 - [x] 8.1 Note the recipes in the workspace's command list, including that the suite needs a daemon and a built image.
 - [x] 8.2 Update the crate's docs where the surface's tests are described, so the stand's suite is findable from the crate it drives.
 - [x] 8.3 Validate the change (`openspec validate container-stand --strict`) and archive it once the scenarios are green.
+
+## 9. The pipeline
+
+- [x] 9.1 Add a `stand` job to the workflow beside the existing one: the checkout, the toolchain, the test runner, and the container builder.
+- [x] 9.2 Build the image in that job through the builder's layer cache, loaded under the tag the scenarios look for, so a run pays for the dependency stage once instead of rebuilding from nothing.
+- [x] 9.3 Run the suite through the same profile-selecting recipe the local run uses (D11), so the parallelism of a pipeline run and of a development machine cannot drift apart.
+- [x] 9.4 Bound the job's wall clock: past a point the job is stuck rather than slow, and the runner's own ceiling is hours away.
+- [x] 9.5 Confirm on a proposed change that the job builds the image and the suite passes inside it.
+
+## 10. The live demo
+
+- [x] 10.1 Write `ops/compose.yml` (D13): seven nodes on one network, the debug flag on, each node's HTTP port published on loopback of the demo host at a fixed port of its own.
+- [x] 10.2 Write `ops/demo.sh`: the narration, driving the nodes over HTTP alone, reading its base URLs from the environment, and waiting for every node's liveness before the first step so a slow start is not mistaken for a broken one later.
+- [x] 10.3 Add the `demo` recipe: build the image, bring the nodes up and wait for them, run the narration, and remove the nodes on every exit including a failing one. Take the node count from the compose file rather than writing it in the recipe.
+- [x] 10.4 Run the demo end to end and confirm both halves of the show: every read converges by repeating the read, and a second run starts from nothing.

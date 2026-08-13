@@ -81,16 +81,31 @@ A scenario SHALL wait for convergence by repeating a read, bounded by a budget a
 - **WHEN** a scenario waits for a value written on another container
 - **THEN** it repeats the read until the value appears or its budget expires, and a failed wait names what it waited for
 
-### Requirement: The suite is opt-in and states what it needs
-The suite SHALL NOT run as part of the workspace's default test run, nor be selected by the flaky hunt's default selection, and SHALL be reachable through a recipe that builds the image first. Its tests SHALL state that they need a container daemon and a built image.
+### Requirement: The stand is where the HTTP surface is tested
+Every test of the HTTP surface SHALL run against nodes on the stand. A property that cannot be reached from outside a node's process — one that holds the runtime's own state lock — MAY be tested in the test's own process, and SHALL build its runtime itself rather than through the stand's harness.
 
-#### Scenario: The inner loop is untouched
+#### Scenario: A surface property is asserted against the image
+- **WHEN** the debug gate, the routes it gates, or the body ceiling is asserted
+- **THEN** the assertion runs against a node started from the image
+
+#### Scenario: The runtime's own behaviour is not re-proven here
+- **WHEN** a scenario asserts establishment, a grant, replication or linking
+- **THEN** it runs on the stand, and the runtime's own suite proves the same behaviour without HTTP
+
+### Requirement: The suite states what it needs and stays out of the default run
+The suite SHALL NOT run as part of the workspace's default test run, nor be selected by the flaky hunt's default selection. It SHALL be reachable through a recipe that builds the image first, SHALL run in the pipeline on every proposed change, and its parallelism SHALL be bounded to what the container daemon can start at once. Its tests SHALL state that they need a daemon and a built image.
+
+#### Scenario: A machine without a daemon still passes
 - **WHEN** the default test run or the flaky hunt runs with no selection given
-- **THEN** none of the stand's tests run and no image is built
+- **THEN** none of the stand's tests run, no image is built, and they are reported skipped
 
 #### Scenario: The recipe builds before it runs
 - **WHEN** the container-suite recipe runs
-- **THEN** it builds the image and then runs the stand's suite against it
+- **THEN** it builds the image and then runs the suite against it
+
+#### Scenario: The pipeline runs the suite
+- **WHEN** a change is proposed
+- **THEN** the pipeline builds the image and runs the suite against it
 
 ### Requirement: The image carries the workspace as it resolves
 The image SHALL be built from the workspace's own dependency resolution, including a store fork pointed at a checkout beside it.
@@ -98,3 +113,18 @@ The image SHALL be built from the workspace's own dependency resolution, includi
 #### Scenario: A locally resolved fork reaches the image
 - **WHEN** the workspace points the store fork at a checkout beside it and the image is rebuilt
 - **THEN** the containers run that fork, and no step of the build refuses the resolution
+
+### Requirement: The live demo runs on the stand's image
+The demo SHALL run the same image the suite runs, with every node on one container network and each node's HTTP port published on loopback of the demo host. It SHALL remove its nodes on every exit, the failing one included, and it SHALL drive them over HTTP alone, so what passes between nodes is the runtimes' own traffic.
+
+#### Scenario: The demo brings up the nodes it names
+- **WHEN** the demo recipe runs
+- **THEN** it builds the image, brings up every node its compose file names, and waits for each of them to answer liveness before the first step
+
+#### Scenario: A run never meets the previous run's state
+- **WHEN** the demo exits, whether it finishes or fails
+- **THEN** its containers and its network are removed
+
+#### Scenario: The demo publishes on loopback
+- **WHEN** a node of the demo publishes its HTTP port
+- **THEN** the port is bound to loopback, because the debug surface is unauthenticated and mints live ceremony secrets
