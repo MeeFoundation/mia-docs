@@ -82,7 +82,7 @@ The builder stage uses cargo-chef so a dependency layer survives a source edit, 
 
 Reference figures, on a 16-core machine whose container daemon holds 8: the first image build is about 2 minutes, of which the dependency stage is 48 seconds and installing the recipe tool 25; a rebuild with no source change is 11 seconds. The three scenarios together take 11 seconds, ten stress iterations of them 113. The workspace's in-process suite is 112 seconds — the figure the stand is kept out of.
 
-Those scenario figures cover the three scenarios the change starts with, and by the end the suite is twelve tests across three binaries. Its wall clock is measured again together with the parallelism bound (D11), since the two answer one question and a rung chosen against the old size says nothing about the new one.
+Those scenario figures cover the three scenarios the change starts with. By the end the suite is twelve tests across three binaries, measured again on a daemon holding 8 CPUs and one rung at a time: 1 test slot takes 28 seconds, 2 takes 14, 4 takes 11.5, and 8 takes 11.6. The floor is the suite's longest single test, which 4 slots already reach, so the rungs above it neither cost nor buy anything at this size — and no container misses its readiness budget at any rung, five stress iterations at the widest one included.
 
 ### D9: The paired denials that run in containers, and those that stay in process
 
