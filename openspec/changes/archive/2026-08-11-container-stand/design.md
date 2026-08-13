@@ -150,4 +150,4 @@ Nothing to migrate: the change adds files, recipes, a pipeline job, and two deve
 
 ## Open Questions
 
-- Whether "HTTP only from the test host" is a security boundary or an arrangement. Where the surface is published is the whole of its boundary today: the demo publishes on loopback, and the suite's nodes share a network of their own, on which any of them reaches any other's surface. A control plane that authenticates its caller answers the question the other way, and it is its own change.
+None. Whether the suite runs in the pipeline is answered by D4, what the demo runs on by D13, and whether "HTTP only from the test host" is a security boundary by the proposal's Out of Scope: it is an arrangement, and the surface it arranges is off the product path.
