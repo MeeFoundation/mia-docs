@@ -114,7 +114,7 @@ The list belongs at the repository root, and it collides with nothing there. An 
 
 ### D13: The live demo runs the stand's image, on fixed loopback addresses
 
-The show and the gate share one artifact: the demo brings up the same image the suite runs, so what an audience watches is what the pipeline proved that morning, and a demo that works while the suite is red is a contradiction rather than a possibility. What the demo adds over the suite is orchestration and a narration — a compose file for the nodes and a script that drives them.
+The show and the gate share one artifact: the demo brings up the same image the suite runs, so what an audience watches is what the pipeline proved that morning, and a demo that works while the suite is red is a contradiction rather than a possibility. One artifact and not one name — both resolve what was built to its content id and bring every node up from that, since a tag is a name any later build moves. What the demo adds over the suite is orchestration and a narration — a compose file for the nodes and a script that drives them.
 
 Addresses are fixed and published on loopback, which is two decisions rather than one. Fixed, because the narration names devices — Alice's phone, Bob's laptop — and a daemon-assigned port would make each step's address an accident that has to be discovered before it can be spoken about; the suite has the opposite need, since its scenarios run side by side and must not collide. Loopback, because the debug surface is unauthenticated and mints live ceremony secrets, so publishing it further is asked for explicitly rather than inherited from a default.
 
