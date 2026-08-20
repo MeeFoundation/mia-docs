@@ -41,13 +41,21 @@ At spawn, a runtime SHALL host every identity its record names whose directory r
 - **THEN** it is present, and it is the same node id it registered under
 
 ### Requirement: An identity is hosted only when its record is complete
-The record SHALL be written after an identity's store set is provisioned and before it is hosted, and hosting SHALL end by removing the record. A start that finds no record for a replica the node holds SHALL NOT host it: a process that died part-way through creating or linking an identity therefore leaves replicas nothing points at, which are never registered and never served.
+The record SHALL be written after an identity's store set is provisioned, and it SHALL be the last step of that provisioning that can fail — nothing after it may fail, so an identity is either recorded and hosted or neither. A start that finds no record for a replica the node holds SHALL NOT host it: a process that died part-way through creating or linking an identity therefore leaves replicas nothing points at, which are never registered and never served.
+
+A provisioning that fails before the record SHALL take back what it provisioned on the node it ran on, rather than leave replicas the node goes on reconciling for the rest of the process's life. On disk they remain, unnamed by any record and never served, and the next start does not adopt them.
+
+No operation ends an identity's hosting: the record only ever grows, and removing a line is not offered. Two states would use it — an identity a person no longer wants hosted on this device, and a line whose replica the store no longer holds, which recovery skips on every start — and neither is served today.
 
 The record line SHALL become durable only after the replicas it names are durable, so that the halves cannot disagree in the other direction — a line naming a replica the store has never committed.
 
 #### Scenario: An interrupted provisioning hosts nothing
 - **WHEN** a runtime restarts after a create or a link that ended before its record was written
 - **THEN** no identity is hosted from it, and reads addressed to it are refused as not hosted
+
+#### Scenario: A failed provisioning leaves the running node as it found it
+- **WHEN** creating an identity fails at its record write on a runtime that keeps running
+- **THEN** the replicas it provisioned are no longer tracked by that runtime, and the identities it hosted before are untouched
 
 #### Scenario: An unreadable record stops the start
 - **WHEN** a runtime starts on a directory whose record cannot be read or parsed
