@@ -22,7 +22,7 @@ A runtime with durable storage SHALL keep, in its directory, a record of the ide
 - **THEN** the first identity is hosted from the intact previous record, and the second is either fully hosted or absent, never half-recorded
 
 ### Requirement: A restarted runtime recovers each hosted identity along the product path
-At spawn, a runtime SHALL host every identity its record names, by opening that identity's private metadata directory from the replica the node already holds and performing the same registration a newly created identity performs: the directory arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the directory rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records. Recovery SHALL require no peer, no ceremony, and no network.
+At spawn, a runtime SHALL host every identity its record names whose directory replica its store holds, by opening that identity's private metadata directory from the replica the node already holds and performing the same registration a newly created identity performs: the directory arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the directory rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records. Recovery SHALL require no peer, no ceremony, and no network.
 
 #### Scenario: An identity comes back hosted
 - **WHEN** a runtime restarts on a directory whose record names one identity
@@ -41,11 +41,21 @@ At spawn, a runtime SHALL host every identity its record names, by opening that 
 - **THEN** it is present, and it is the same node id it registered under
 
 ### Requirement: An identity is hosted only when its record is complete
-The record SHALL be written after an identity's store set is provisioned and before it is hosted, and hosting SHALL end by removing the record. A start that finds no record for a replica the node holds SHALL NOT host it: a process that died part-way through creating or linking an identity therefore leaves replicas nothing points at, which are never registered and never served.
+The record SHALL be written after an identity's store set is provisioned, and it SHALL be the last step of that provisioning that can fail — nothing after it may fail, so an identity is either recorded and hosted or neither. A start that finds no record for a replica the node holds SHALL NOT host it: a process that died part-way through creating or linking an identity therefore leaves replicas nothing points at, which are never registered and never served.
+
+A provisioning that fails before the record SHALL take back what it provisioned on the node it ran on, rather than leave replicas the node goes on reconciling for the rest of the process's life. On disk they remain, unnamed by any record and never served, and the next start does not adopt them.
+
+No operation ends an identity's hosting: the record only ever grows, and removing a line is not offered. Two states would use it — an identity a person no longer wants hosted on this device, and a line whose replica the store no longer holds, which recovery skips on every start — and neither is served today.
+
+The record line SHALL become durable only after the replicas it names are durable, so that the halves cannot disagree in the other direction — a line naming a replica the store has never committed.
 
 #### Scenario: An interrupted provisioning hosts nothing
 - **WHEN** a runtime restarts after a create or a link that ended before its record was written
 - **THEN** no identity is hosted from it, and reads addressed to it are refused as not hosted
+
+#### Scenario: A failed provisioning leaves the running node as it found it
+- **WHEN** creating an identity fails at its record write on a runtime that keeps running
+- **THEN** the replicas it provisioned are no longer tracked by that runtime, and the identities it hosted before are untouched
 
 #### Scenario: An unreadable record stops the start
 - **WHEN** a runtime starts on a directory whose record cannot be read or parsed
@@ -54,6 +64,15 @@ The record SHALL be written after an identity's store set is provisioned and bef
 #### Scenario: A first start has no record
 - **WHEN** a runtime starts on a directory that holds no record
 - **THEN** it starts hosting nothing, and creating an identity writes the first entry of the record
+
+### Requirement: A record line whose replica is missing is skipped, not fatal
+A record line naming a directory replica the node's store does not hold SHALL be skipped: that identity is not hosted, the skip is reported, the line is left in the record, and every other line recovers as usual. A line whose replica the store does hold but cannot be opened SHALL stop the start, naming the identity — a runtime that silently hosted less than its record names would look healthy while refusing everything. The two SHALL be told apart by what the replica store holds, never by the wording of a failure.
+
+The asymmetry is the reason: skipping loses one identity's hosting on this device, and the line stays readable by whoever ends the hosting, while stopping the start loses every identity on that disk at once — and a runtime that cannot start cannot be asked to repair itself, leaving erasure of the storage directory as the only way back.
+
+#### Scenario: A line whose replica is absent is skipped and the rest comes back
+- **WHEN** a runtime starts on a record naming two identities, one whose directory replica its store holds and one whose it does not
+- **THEN** the first is hosted and its entries read back, the second is not hosted and reads addressed to it are refused, the start succeeds, and the record is left as it was
 
 ### Requirement: Access does not survive an outage, only bytes do
 A granted replica's bytes persist across a restart, but the issuer behind them SHALL NOT be registered until a live grant record is read again, so between the start and the pair's first sweep the replica is not readable and not served. A grant withdrawn while the runtime was off SHALL be honoured on the sweep that reads the withdrawal, exactly as one withdrawn while it was running.

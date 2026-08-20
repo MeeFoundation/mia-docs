@@ -85,7 +85,11 @@ The inviter SHALL preserve uniform remote refusal after a linking secret is veri
 - **THEN** the peer receives the uniform refusal and the inviter records the storage failure locally
 
 ### Requirement: The newcomer confirms itself once the tickets are in hand
-A device that has imported the directory and its identity's data namespace SHALL promote its own pending record to confirmed, and SHALL do so before `link` reports success. Writing that record requires the directory's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
+A device that has imported the directory and its identity's data namespace SHALL promote its own pending record to confirmed. Writing that record requires the directory's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
+
+The confirmation SHALL be written only after the newcomer's own hosting is durably recorded, and never before it. What a device writes into the directory replicates to every other device of the identity, and no rollback reaches it there — so a link that published before it committed could fail locally and still leave the identity naming a device that hosts nothing, with no operation anywhere able to take that name back. A confirmation that fails after the commit SHALL NOT fail the link and SHALL NOT be rolled back: the device is hosted and recorded, and it SHALL write the record itself whenever it finds its identity's directory without it — which is also how a device that was interrupted between the two comes back whole.
+
+The confirmed set is written by the devices themselves, each holding the directory's write ticket, and the newest write at a key is the one that reads back. Removal therefore cannot be expressed as the absence of a device's record: any device may write its own record again — and a device recovering its own hosting has reason to — after which the removal is simply gone, with nothing left to say it ever happened. Device revocation, when it is designed, SHALL be a record of its own, which a device consults before writing its own record and obeys, rather than the deletion of the record it revokes.
 
 Every pending registration SHALL carry a durable creation time. An unconfirmed registration SHALL expire after 24 hours and cleanup SHALL tombstone it; legacy marker-only records SHALL receive a creation time when observed. A post-burn storage or ticket-mint failure SHALL retain the uniform remote refusal while producing a typed local diagnostic.
 
@@ -96,6 +100,14 @@ Every pending registration SHALL carry a durable creation time. An unconfirmed r
 #### Scenario: A link that fails after the import confirms nothing
 - **WHEN** a linking fails after importing the replicas and rolls back
 - **THEN** the dialing device is not in the identity's confirmed device set
+
+#### Scenario: A link publishes nothing before it commits
+- **WHEN** a link is held at its commit point and the identity's directory is read from another of its devices
+- **THEN** the dialing device is not in the confirmed set, and it appears there only after the commit is released
+
+#### Scenario: A link that cannot be recorded leaves nothing on the identity
+- **WHEN** a link fails because the dialing device cannot write its hosted-identities record
+- **THEN** it hosts nothing, the identity's directory never names it, and a later link from the same device succeeds and is named
 
 #### Scenario: Abandoned pending registrations expire
 - **WHEN** pending registrations remain unconfirmed for 24 hours across re-import or restart
