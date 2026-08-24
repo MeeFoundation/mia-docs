@@ -53,3 +53,16 @@ A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHA
 #### Scenario: A panicking handler does not take down the node
 - **WHEN** node A spawns with a handler that panics mid-accept, and node B dials it and drives a stream
 - **THEN** that connection fails and node A still converges a replica with node B over the ordinary ticket flow
+
+### Requirement: Every replica the node holds open joins a periodic reconcile pass, at a cadence the spawn names
+`SyncNode` SHALL run a periodic pass that re-requests a sync for every document it holds open, whichever synchronization strategy that document follows, and the interval SHALL be named at the spawn with a default of 10 seconds.
+
+The interval is what bounds every convergence no read of its own nudges: a grant record reaching the peer's copy of a connection's metadata pair, a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It is written down here because a host that configures its own value — a phone trading battery against how long a person waits — needs somewhere to configure it *from*, and because the resulting speed is otherwise read as a property of the network rather than of a number somebody chose.
+
+#### Scenario: A spawn that names no interval gets the default
+- **WHEN** a node is spawned without naming a reconcile interval
+- **THEN** its periodic pass runs at 10 seconds
+
+#### Scenario: A host's own interval is what the node runs at
+- **WHEN** a node is spawned with an interval of its embedder's choosing
+- **THEN** the periodic pass runs at that interval, and no route, environment variable or harness call changes it afterwards
