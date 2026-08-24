@@ -79,6 +79,12 @@ The runtime holds every replica in memory. On a container an unbounded entry pay
 
 The other half of that pressure is the replica stores' own caches, and the spawn now names it: a node states the memory its replica stores may hold together, and one identity's store bounds its cache at that memory divided by the identities the storage directory holds when the store opens (identity-scoped-replicas D14). The count is the node's to read, not the facade's to state, so a mobile host states one number and a facade that names none still runs on the default. The figure to state it from is measured: a store of 100,000 entries holds 36 MiB resident, about half of its 64 MiB file, and a share below that costs evictions rather than correctness (identity-scoped-replicas, Measurement).
 
+### D10. The binding artifacts are packaged and released from a repository of their own
+
+The crate stays in this workspace, as D1 decides, and the packaging of what it produces does not. `pdn-sdk` is a repository of its own, cloned in place beside `mia-docs` and `pdn-app`, holding the binding generation, the XCFramework, the Android archive, and the versioned releases an application consumes. An artifact is not a source: producing one needs Xcode and the Android NDK, which the workspace's inner loop neither has nor should acquire, and an application needs a released version it can name rather than a build tree it reaches into. The recipe reads the crate from the `mee-pdn` checkout it is cloned inside, so what it packages is that tree at that commit.
+
+What the split can break is stated here rather than met on a phone. A release names the commit of `mee-pdn` it was built from, because an application built against a facade older than the runtime whose behaviour its screens describe fails as a refusal arriving from the runtime — and a refusal is exactly what the screens are required to show faithfully, so the one failure they cannot explain is the one where the mismatch is the cause.
+
 ## Operating conditions
 
 Walked per [operating-conditions](../../specs/code-practices/operating-conditions.md), for the facade rather than for the demonstration.
