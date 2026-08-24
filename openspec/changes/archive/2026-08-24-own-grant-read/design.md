@@ -55,11 +55,11 @@ It answered the same question with a boolean, and every one of its callers wants
 
 The observation of a replica's contact set stays where it is. It has no product caller — it is the reconciliation's own working-out in terms of node ids — so it remains an instrument: admitted, annotated, absent from product builds.
 
-### D6. The read answers for this device, and one empty answer covers three states
+### D6. The read answers for this device, and one empty answer covers four states
 
 The read is a local one: it opens the pair from this device's directory and reads the replicas this device holds. On the publishing device it says the record is here and never that it reached a sibling or the peer; on any device it says nothing about what the counterparty has received. A publishing device cannot learn the fate of its publication from it, and nothing else in the runtime offers that either — such an answer needs a per-peer synchronization progress out of the engine, or an acknowledgement a sibling writes into the pair, and neither exists. As an indicator that is a change of its own; as a precondition of publishing it is refused, because one device is a first-class configuration and a promise that degenerates where there is no sibling is worse than no promise.
 
-The same locality makes one answer serve three states: this identity holds no connection to that peer, the pair's tickets have not replicated to this device yet, and nothing is granted toward that peer. The peer-side read already answers that way, and refusing instead wherever no pair opens would turn a linked device's first minutes into failures — a directory that has not caught up is a normal state, not a caller's error. What no host may do is present the empty answer as the fact that nothing is shared.
+The same locality makes one answer serve four states: this identity holds no connection to that peer, the pair's tickets have not replicated to this device yet, a grant record is here whose payload cannot be read yet — the record and its payload replicate separately, and the store reports that third state apart from absence for exactly this reason — and nothing is granted toward that peer. The peer-side read already answers that way, and refusing instead wherever no pair opens would turn a linked device's first minutes into failures — a directory that has not caught up is a normal state, not a caller's error. What no host may do is present the empty answer as the fact that nothing is shared.
 
 ## Risks / Trade-offs
 

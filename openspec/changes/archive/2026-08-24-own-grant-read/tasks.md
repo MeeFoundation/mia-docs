@@ -7,7 +7,7 @@ Small and self-contained: one operation added, one test-only operation removed, 
 - [x] 1.1 `ConnectionsService` gains the read of the grants a hosted identity published toward a connected peer, over the pair's own half, opening the pair from the directory's tickets on demand (D1)
 - [x] 1.2 It reports the capability alone — granted issuer, exact claim set, write right per claim — and no ticket (D2)
 - [x] 1.3 It reports what is readable now and never waits; a record whose payload has not arrived reads as no grant (D3)
-- [x] 1.4 It answers for the device it runs on, and one empty answer covers no connection to that peer, a pair not yet replicated here, and nothing granted — no state of the sibling or of the peer is reported, and none is inferable (D6)
+- [x] 1.4 It answers for the device it runs on, and one empty answer covers no connection to that peer, a pair not yet replicated here, a record here whose payload cannot be read yet, and nothing granted — no state of the sibling or of the peer is reported, and none is inferable (D6)
 - [x] 1.5 An unhosted identity is refused with the unknown-identity error, as every other connections operation is
 - [x] 1.6 The test-only `grant_visible` deleted; the contact-set observation stays, having no product caller (D5)
 
