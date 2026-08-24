@@ -24,7 +24,7 @@ Everything the facade states about the state underneath it holds here without re
 
 5 screens on 2 platforms, with native code confined to what cannot be anything else: the generated bindings, the camera, and the lifecycle. The alternative was 2 native screen sets over the same facade, which removes a layer at the price of writing every screen twice; at this screen count the layer is cheaper than the duplication, and the camera and the lifecycle are native either way.
 
-The consequence to keep in view: the facade's outputs are Swift and Kotlin, so each platform has a thin module between the bindings and the shared screens. That module forwards calls and translates errors. It makes no decisions, and a decision appearing in it is a decision in the wrong place — with no test that would catch it, which is why the shells' specs say it is kept empty on purpose.
+The consequence to keep in view: the facade's outputs are Swift and Kotlin, packaged by `pdn-sdk` and consumed here as a release, so each platform has a thin module between the bindings and the shared screens. That module lives in this repository rather than in `pdn-sdk`, which packages artifacts and decides nothing about screens. It forwards calls and translates errors. It makes no decisions, and a decision appearing in it is a decision in the wrong place — with no test that would catch it, which is why the shells' specs say it is kept empty on purpose.
 
 ### D2. The screens are their own capability, not an appendix to the surface
 
@@ -92,7 +92,7 @@ No act depends on state outliving a process, and the narration states that state
 
 ## Migration Plan
 
-Nothing to migrate. The application is a new repository, and the facade is consumed unchanged.
+Nothing to migrate. The application is a new repository, and the facade is consumed unchanged, as a named release of `pdn-sdk`.
 
 ## Open Questions
 

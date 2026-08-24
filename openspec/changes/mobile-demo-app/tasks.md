@@ -5,7 +5,7 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 ## 1. The repository and the boundary
 
 - [x] 1.1 `pdn-app` exists as its own git repository, gitignored by `mee-pdn` and present in the workspace file, carrying its README and CLAUDE.md. What remains of it is task 6.1: keeping both true to what actually gets built
-- [ ] 1.2 React Native project across both platforms, consuming the facade's XCFramework and archive as artifacts rather than sources
+- [ ] 1.2 React Native project across both platforms, consuming a named release of `pdn-sdk` — its XCFramework and archive as artifacts rather than sources, and the release named in this repository, so what a phone was built against is readable without opening a build log
 - [ ] 1.3 The native module per platform: forwards calls, translates errors, decides nothing (D1)
 - [ ] 1.4 Bring-up and stop wired to explicit acts on both platforms, not to a lifecycle callback (D6)
 
@@ -53,8 +53,8 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 
 ## 6. Docs and spec tree (manual, not deltas)
 
-- [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, and the environment facts unchanged
-- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs`
+- [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, the facade's artifacts named as a release of `pdn-sdk` rather than as something built out of `mee-pdn`, and the environment facts unchanged
+- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs` and `pdn-sdk`
 - [ ] 6.3 Sweep the spec tree and the active changes for statements this change invalidates
 
 ## 7. Gates

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The HTTP host for the demo stand: a thin binary embedding the [runtime core](core.md) and serving it over HTTP. One process, one embedded runtime. The HTTP surface is a host over the core, not the platform API — other hosts (mobile, wasm) embed the same core later. What this host is packaged into, and the scenarios driven across containers through it, are the [container stand](container-stand.md)'s.
+The HTTP host for the demo stand: a thin binary embedding the [runtime core](core.md) and serving it over HTTP. One process, one embedded runtime. The HTTP surface is a host over the core, not the platform API: the mobile host (`pdn-mobile`, whose surface is [host-surface](../mobile-common/host-surface.md)) embeds the same core, and a wasm host would too. What this host is packaged into, and the scenarios driven across containers through it, are the [container stand](container-stand.md)'s.
 
 ## Requirements
 

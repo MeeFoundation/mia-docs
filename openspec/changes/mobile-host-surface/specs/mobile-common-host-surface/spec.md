@@ -24,6 +24,8 @@ Each exported call SHALL delegate to one service call and SHALL add no orchestra
 ### Requirement: The exported surface is exactly this set
 The facade SHALL export the operations named above and SHALL NOT export the runtime's remaining public surface. In particular it SHALL NOT export the out-of-band namespace share and import — neither the whole-store nor the scoped form — and SHALL NOT export anything the runtime gates behind its test-only feature. The facade SHALL build with that feature disabled, so a forced write or a contact-set observation is not merely unexported but absent from the binary.
 
+Beside those operations the facade SHALL export exactly 2 values that reach no service call: the claim derivation, which a caller needs to join a grant read against paths it knows, and the ceiling on one entry payload, so a caller can refuse an oversized write before making one. Both are stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
+
 #### Scenario: The withheld operations are absent, not merely undocumented
 - **WHEN** the facade's exported surface is enumerated
 - **THEN** it names no share, no import, no forced write, and no observation of a replica's contact set
@@ -86,6 +88,8 @@ A host that could hold several nodes invites a staging in which several devices 
 An entry's payload SHALL cross the facade as raw bytes on the way in and on the way out, with no encoding, escaping or transformation between what was written and what is read. An entry path SHALL cross as the runtime's own path form, and a path the runtime rejects SHALL be reported as malformed input rather than corrected.
 
 The facade SHALL bound a single entry payload by a stated ceiling and SHALL refuse one above it before the runtime is called. The runtime holds every replica in memory and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The HTTP host bounds its own for the same reason and a smaller one is appropriate here.
+
+The bound is on what this host puts in, and SHALL NOT be applied to what a read hands back. An entry another node wrote arrives in the replica whatever its size — a host over the same runtime bounds its own writes at a size a phone would not choose — and refusing to hand such a value over would make a claim the grant permits unreadable rather than making the device safer. What a caller has instead is the length a listing reports before any payload is fetched, which is why a listing reports it.
 
 #### Scenario: What was written is what is read
 - **WHEN** an arbitrary byte string is written at a claim and read back
