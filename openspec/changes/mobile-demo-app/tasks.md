@@ -54,7 +54,7 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 ## 6. Docs and spec tree (manual, not deltas)
 
 - [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, and the environment facts unchanged
-- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs` and `pdn-store`
+- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs`
 - [ ] 6.3 Sweep the spec tree and the active changes for statements this change invalidates
 
 ## 7. Gates
