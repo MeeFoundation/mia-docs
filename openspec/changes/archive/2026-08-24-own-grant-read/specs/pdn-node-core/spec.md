@@ -11,7 +11,11 @@ The connections service SHALL produce connections through the establishment dial
 
 Both reads SHALL report what is readable at the moment of the call and SHALL NOT wait for a record to arrive. A grant published on one device of an identity reaches that identity's other devices by replication of the pair, so a device that did not publish a grant reads it once the record and its payload have arrived, and reads nothing before then — the same waiting a peer does, for the same reason. Neither read is free of writes: opening a pair publishes the opening device's record into it and registers the connection, so "reports what is readable now" means the call does not wait and changes no grant, not that it writes nothing.
 
-Both reads SHALL resolve the pair through the acting identity's own directory. An identity hosted beside another therefore reaches only its own pairs, and an identity on another node reaches none of them at all: the pair's stores are addressed by the tickets the two sides exchanged, which no third party holds.
+Both reads answer for the device they run on, and SHALL be described that way wherever a caller reads about them. The read reports what this device holds in the pair's replicas: on the device that published a grant it is evidence the record is here, never that it reached a sibling or the peer, and no read reports what the counterparty has received. Nothing on this surface carries that answer, which would need a per-peer synchronization progress out of the engine or an acknowledgement a sibling writes into the pair.
+
+An empty answer therefore covers four states and SHALL NOT be presented as the fact that nothing is granted: this identity holds no connection to that peer, the pair's tickets have not replicated to this device yet, a grant record is here whose payload cannot be read yet, and nothing is granted toward that peer. The peer-side read answers the same way for the same reason, and refusing wherever no pair opens would turn a linked device's catching-up into failures rather than into an answer that changes when the directory arrives.
+
+Both reads SHALL resolve the pair through the acting identity's own directory. An identity hosted beside another therefore reaches only its own pairs, and a third party on another node reaches none of them at all: the pair's stores are addressed by the tickets the two sides exchanged, and only those two sides hold them.
 
 A grant SHALL name the granting identity itself as the data issuer; publishing or withdrawing a grant of any other issuer's data SHALL be refused loudly, with nothing minted or written. Granting foreign data is delegation: the serving side evaluates grants from the records of the *data issuer's* own connections, so a grant recorded under a different granting identity could never be honored — without the refusal it would publish successfully, replicate, and enforce as nothing, a silent no-op on both sides. The grant keying by data issuer is untouched — it is the groundwork delegation chains use; the boundary lifts when `UWill` chains make a foreign issuer's grant provable.
 
@@ -44,6 +48,10 @@ A grant SHALL name the granting identity itself as the data issuer; publishing o
 #### Scenario: A co-hosted identity reads none of another identity's published grants
 - **WHEN** identity Y, hosted on the same runtime as X and holding no connection to P, reads its own published grants toward P
 - **THEN** it obtains nothing, because the read resolves the pair through the acting identity's own directory, which holds no pair toward P — and X's grants toward P stay readable to X on the same runtime
+
+#### Scenario: Two identities connected to one peer read their own grants and no other's
+- **WHEN** X and Y are hosted on the same runtime, both hold a connection to P, both have published a grant toward P, and each reads its own published grants toward P
+- **THEN** each reads the claim set it published itself and never the other's, because each read resolves its own pair through its own directory
 
 #### Scenario: Granting a foreign issuer's data is refused
 - **WHEN** identity X publishes or withdraws a grant naming a data issuer other than X, even one hosted on the same runtime
