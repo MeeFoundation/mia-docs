@@ -114,11 +114,15 @@ The suite SHALL NOT run as part of the workspace's default test run, nor be sele
 - **THEN** the pipeline builds the image and runs the suite against it
 
 ### Requirement: The image carries the workspace as it resolves
-The image SHALL be built from the workspace's own dependency resolution, including a store fork pointed at a checkout beside it.
+The image SHALL be built from the workspace alone — its manifests, its lock file, and its crates, the store among them — and no input outside version control SHALL reach the build: a cargo configuration file beside the workspace is not carried, and no stage of the build reaches for a checkout beside it.
 
-#### Scenario: A locally resolved fork reaches the image
-- **WHEN** the workspace points the store fork at a checkout beside it and the image is rebuilt
-- **THEN** the containers run that fork, and no step of the build refuses the resolution
+#### Scenario: A store edit reaches the image
+- **WHEN** a source file under `crates/pdn-store` is edited and the image is rebuilt
+- **THEN** the containers run that edit, and no step of the build refuses the resolution or reaches outside the build context
+
+#### Scenario: A cargo configuration beside the workspace stays out
+- **WHEN** a `.cargo/config.toml` exists beside the workspace and the build context is listed
+- **THEN** the listing carries no `.cargo` entry
 
 ### Requirement: The live demo runs on the stand's image
 The demo SHALL run the same image the suite runs, with every node on one container network and each node's HTTP port published on loopback of the demo host. Each node SHALL have a volume of its own for its state. The demo SHALL remove its nodes, its network and those volumes on every exit, the failing one included, and it SHALL drive the nodes over HTTP alone, so what passes between nodes is the runtimes' own traffic.

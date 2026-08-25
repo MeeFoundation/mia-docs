@@ -8,7 +8,7 @@ The audience fixes the form. Nothing is shown that a person cannot see happening
 
 ## What Changes
 
-- **An application repository, `pdn-app`, nested beside `mia-docs` and `pdn-store`.** React Native screens shared by both platforms over a thin native module per platform. Native code appears only where the platform demands it: the generated bindings, the camera, and the lifecycle.
+- **An application repository, `pdn-app`, nested beside `mia-docs`.** React Native screens shared by both platforms over a thin native module per platform. Native code appears only where the platform demands it: the generated bindings, the camera, and the lifecycle.
 - **5 screens, and no sixth.** The identities this node hosts; the acting identity's own entries; its connections; one connection, showing what this peer granted and what was granted to it; and a code reader. A screen with no act behind it on the host surface has nothing to show.
 - **The screens are required to be honest about the node, which the surface cannot enforce from below.** An application over a truthful surface can still cache a grant, swallow a refusal into a spinner, or draw an absent value as a fact. None of those is visible in the facade's tests and none is platform-specific, so they become requirements of their own: waiting is a state with a cause, a refusal is shown as what was refused, an empty read is not a conclusion, both halves of a connection's grants are read from the node, and no control offers a ticket, an import, a forced synchronization or a reset.
 - **The person chooses the act before reading a code, and nothing above the facade parses a payload.** A payload is opaque above the host surface; the application asks whether this is an invitation to connect or a device joining an identity, and passes the value to that call. Reading a code for the wrong act produces the runtime's refusal, shown as a refusal.
@@ -51,7 +51,7 @@ None. `mobile-host-surface` states what the facade offers; nothing here changes 
 
 ## Impact
 
-- **`pdn-app`** (new repository, nested and gitignored beside `mia-docs` and `pdn-store`, added to the workspace file): the React Native screens, the two native modules, and the two platform projects.
+- **`pdn-app`** (new repository, nested and gitignored beside `mia-docs`, added to the workspace file): the React Native screens, the two native modules, and the two platform projects.
 - **`crates/pdn-mobile`**: consumed, not changed. If a screen turns out to need something the facade does not export, that is a change to `mobile-host-surface`'s capability rather than an addition made here.
 - **Tests**: none of the demonstration is covered by an automated test, and this change says so rather than implying otherwise. Two phones are not a test fixture; what stands in for coverage is a written run-through performed twice on the devices that will run it, with the applications restarted between the passes.
 - **The risk that outranks the rest**: the demonstration is only as good as its projection. Mirroring two phones onto one screen is the fragile part of the day, rehearsed with the same devices and cables, with a camera over the table as the fallback.
