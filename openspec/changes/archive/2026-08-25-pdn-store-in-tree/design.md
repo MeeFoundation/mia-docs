@@ -10,7 +10,7 @@ The checkout is clean and at the pinned revision, so a copy of it is exactly wha
 
 **Goals:**
 
-- The store as a member crate, with nothing of its code, tests, examples, or docs changed by the move.
+- The store as a member crate, with nothing of its code, tests, examples, or docs changed by the move — one test loop rewritten for a lint new in clippy 1.98 is the whole exception.
 - One tree, one commit, one review for a change that touches the store and its consumer.
 - Every check the store's pipeline was meant to run and could be run here — the three feature sets, rustdoc, the wasm32 build, the doctests, the tests marked flaky — carried by `just` recipes and by the pipeline, with the same command doing the same thing locally and in the pipeline.
 - An image build with no input outside version control.
@@ -77,6 +77,7 @@ None of the conditions in [operating-conditions](../../specs/code-practices/oper
 ## Risks / Trade-offs
 
 - [The nightly store job is red from its first night, on `sync_full_basic`] → Named here and in the proposal, with the failure characterized; the job's summary shows which test, and `--no-fail-fast` keeps the other two tests' figures visible beside it. The fix is a change of the store's code, tracked as such.
+- [A floating stable toolchain adds a clippy lint and `check-store` goes red with no change of ours] → Met on the first pipeline run: rustc 1.98.0 on the runner against 1.93.1 on the development machine, and clippy 1.98's `for_unbounded_range` on the ticker loop of `sync_big`, rewritten as a `loop` with a counter. The exposure is the price of warnings denied on the store's other configurations — the price the store's own pipeline paid — and a lint of this kind is fixed in the store's code, as upstream fixes it.
 - [The lock file grows by about 60 packages, the store's development dependencies among them `iroh`'s test utilities] → Development profile only: the image's dependency stage cooks normal dependencies, and a product build resolves none of them.
 - [The store's tests bind every interface, where the workspace's bind loopback through `PDN_BIND_ADDR`] → The store's tests are kept as they are; the variable is the data layer's. On a development machine the per-process startup cost the workspace's tests avoid applies to the store's, which the measured figures include.
 - [Upstream tracking becomes a manual patch] → Accepted with D1; the alternative was offered.

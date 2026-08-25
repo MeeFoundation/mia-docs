@@ -5,6 +5,7 @@ A move and its wiring. Nothing in the store's code, tests, or docs changes; ever
 ## 1. The crate
 
 - [x] 1.1 Copy the checkout at `721de62` into `crates/pdn-store` without `.git`, `target`, and the release and pipeline tooling (D8); what is kept is byte for byte the checkout's — `diff -rq` reports only the dropped files
+  - One exception, met on the pipeline's first run: the runner's rustc 1.98.0 (the development machine: 1.93.1) brought clippy's `for_unbounded_range`, which `-Dwarnings` turned into an error on the endless ticker `for i in 0.. {` of `sync_big` (`tests/sync.rs:928`). The loop is now a `loop` with a `u64` counter — the one line of the store's code this change touches. All four `check-store` commands re-run under 1.98.0 locally: clean, the wasm build 2 min 28 s from cold.
 - [x] 1.2 `Cargo.toml`: `publish = false`, a description naming the variant, the docs.rs block gone; the README's head names the variant in place of upstream's badges
 - [x] 1.3 Workspace: `crates/pdn-store` a member, `pdn-store = { path = "crates/pdn-store", package = "iroh-docs" }`, the checkout gone from `exclude` and from `.gitignore`
 
