@@ -29,16 +29,16 @@ Scope: the cell as a platform primitive — a keyless id, one cell store replica
 ## 3. pdn-node: the cells service
 
 - [ ] 3.1 `create`, `list`, `members`, the name carried with the cell and never used as an address
-- [ ] 3.2 The invite and join dialogue per B4: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded and handed the store's ticket, catch-up before the join returns
+- [ ] 3.2 The invite and join dialogue per B4: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed the store's ticket, catch-up before the join returns
 - [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error) and a document with its mode; reading and listing by cell id
-- [ ] 3.4 Remove and leave: the removal record; removing an owner available only to another owner; leaving forgets the store locally
+- [ ] 3.4 Remove and leave: the removal record; removal an owner-only act, its target an owner or a plain member alike; leaving forgets the store locally
 - [ ] 3.5 A member's other devices: the cell's tickets in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself into the cell's member device records
 - [ ] 3.6 Restart recovery per G1: hosted cells re-hosted from durable state on a directory-configured runtime
 - [ ] 3.7 Ownership: the creator recorded as the first owner; an owner makes a member an owner; ownership taken only by another owner; owners listed beside the members
 
 ## 4. Tests
 
-- [ ] 4.1 Access-control pairs in one place each: a member device served whole beside a ticket holder that is no member refused, and a removed member refused from the next session; a claim from its issuer admitted beside another member's entry under those claims dropped; a read-write document written by another member beside a read-only one refused; a relayed entry admitted on its author's merit while the same peer's own forgery is dropped; an ownership grant by an owner taking effect beside the same act by a plain member refused; an owner removed by another owner beside a plain member's attempt on an owner refused
+- [ ] 4.1 Access-control pairs in one place each: a member device served whole beside a ticket holder that is no member refused, and a removed member refused from the next session; a claim from its issuer admitted beside another member's entry under those claims dropped; a read-write document written by another member beside a read-only one refused; a relayed entry admitted on its author's merit while the same peer's own forgery is dropped; an ownership grant by an owner taking effect beside the same act by a plain member refused; a member removed by an owner beside a plain member's removal attempt refused
 - [ ] 4.2 Operating conditions: a node hosting a member and a non-member identity side by side; a second device linked before and after the join; a restart with a write made meanwhile; the author offline and the entry reaching a third member through a second; a concurrent add and remove of one member resolving per B3; a member leaving and rejoining; a document's mode flipped read-only to read-write and back; a member made an owner, unmade, and made again
 - [ ] 4.3 Three identities with no connections sharing through one cell, and two cells with the same members keeping their entries apart
 - [ ] 4.4 Stress pass on join, removal and relay scenarios (`--stress-count`, per the flaky-tests practice); every failure diagnosed in isolation before anything is built on top

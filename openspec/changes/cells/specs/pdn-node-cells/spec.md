@@ -25,7 +25,7 @@ The cells service SHALL create a cell for a hosted identity: it mints the cell i
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member and hand it the cell store's ticket. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the cell store's ticket. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -85,19 +85,19 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 - **WHEN** owner A takes owner B's ownership away and the record reaches the members' devices
 - **THEN** B is listed among the members and not among the owners
 
-### Requirement: Any member removes a non-owner; an owner is removed only by another owner; leaving is forgetting
+### Requirement: Only an owner removes a member; leaving is forgetting
 
-Any member's device SHALL be able to remove any member that is no owner, itself included. Removing an owner SHALL be available only to another owner: the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected.
 
-#### Scenario: A member removes another
+#### Scenario: An owner removes a member
 
-- **WHEN** B removes C, neither an owner, from a cell with members A, B and C, and the removal reaches A's devices
+- **WHEN** owner A removes member C from a cell with members A, B and C, and the removal reaches B's devices
 - **THEN** A and B still sync the cell, and C's next session is refused
 
-#### Scenario: A plain member cannot remove an owner
+#### Scenario: A plain member removes nobody
 
-- **WHEN** member C, no owner, attempts to remove owner A
-- **THEN** the attempt is refused with a typed error, A is still listed as member and owner, and every member's sessions continue
+- **WHEN** member C, no owner, attempts to remove member B
+- **THEN** the attempt is refused with a typed error, B is still listed by every member, and B's devices are still served
 
 #### Scenario: An owner removes another owner
 
