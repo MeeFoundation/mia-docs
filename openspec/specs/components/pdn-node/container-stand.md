@@ -18,7 +18,7 @@ The stand SHALL run every node as a separate process in a separate container, al
 - **THEN** its network is removed and its containers are gone
 
 ### Requirement: The image serves the host binary and nothing else
-The image SHALL contain the HTTP host binary, run it as a non-root user, and listen for HTTP on all interfaces. It SHALL leave the runtime's endpoint bind unconfigured, so the endpoint binds every interface and publishes the container's own address. It SHALL name the directory the runtime stores its state in, writable by the user the binary runs as, and SHALL declare no volume of its own — what is mounted over that directory is the caller's decision, so an image-declared volume is never created behind a caller's back.
+The image SHALL contain the HTTP host binary, run it as a non-root user, and listen for HTTP on all interfaces. It SHALL leave the runtime's endpoint bind unconfigured, so the endpoint binds every interface and publishes the container's own address, and SHALL leave the runtime's reachability at its default of direct paths only, so the address it publishes is a direct one, no relay stands between two containers, and a peer that reaches it reached it directly. It SHALL name the directory the runtime stores its state in, writable by the user the binary runs as, and SHALL declare no volume of its own — what is mounted over that directory is the caller's decision, so an image-declared volume is never created behind a caller's back.
 
 #### Scenario: A container answers liveness
 - **WHEN** a container starts from the image
