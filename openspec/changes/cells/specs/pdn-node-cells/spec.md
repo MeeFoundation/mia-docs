@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, reaching a member's other devices, removing and leaving, writing claims and documents into the cell, and recovering hosted cells across a restart. The store underneath is the data layer's [cell store](../data-layer-cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has no owner and no roles: every operation below is available to every member alike.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims and documents — into the cell, and recovering hosted cells across a restart. The store underneath is the data layer's [cell store](../data-layer-cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has owners — the creator the first of them (cells D11); the ownership requirement below is the only one whose acts sit with owners, and every other operation is available to every member alike.
 
 ## ADDED Requirements
 
@@ -61,14 +61,48 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 - **WHEN** a node hosts identity B, a member, and identity D, a non-member, and a caller resolves only as a device of D
 - **THEN** D lists no such cell, and the caller is refused as for an unhosted store
 
-### Requirement: Any member removes a member; leaving is forgetting
+### Requirement: The creator is the first owner; owners make and unmake owners
 
-Any member's device SHALL be able to remove any member, itself included. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected.
+A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to make any member an owner, and taking ownership from a member SHALL be available only to another owner. An ownership act by a member that is no owner SHALL be refused with a typed error and change no state. A member whose ownership is taken remains a member.
+
+#### Scenario: The creator is listed as owner
+
+- **WHEN** a hosted identity creates a cell
+- **THEN** the cell's owners are exactly the creating identity
+
+#### Scenario: An owner makes a member an owner
+
+- **WHEN** owner A makes member B an owner and the record reaches member C's devices
+- **THEN** C lists both A and B among the owners
+
+#### Scenario: A plain member's ownership act is refused
+
+- **WHEN** member C, no owner, attempts to make a member an owner or to take owner B's ownership away
+- **THEN** the act is refused with a typed error and every member still lists the owners unchanged
+
+#### Scenario: An owner takes ownership from another owner
+
+- **WHEN** owner A takes owner B's ownership away and the record reaches the members' devices
+- **THEN** B is listed among the members and not among the owners
+
+### Requirement: Any member removes a non-owner; an owner is removed only by another owner; leaving is forgetting
+
+Any member's device SHALL be able to remove any member that is no owner, itself included. Removing an owner SHALL be available only to another owner: the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected.
 
 #### Scenario: A member removes another
 
-- **WHEN** B removes C from a cell with members A, B and C, and the removal reaches A's devices
+- **WHEN** B removes C, neither an owner, from a cell with members A, B and C, and the removal reaches A's devices
 - **THEN** A and B still sync the cell, and C's next session is refused
+
+#### Scenario: A plain member cannot remove an owner
+
+- **WHEN** member C, no owner, attempts to remove owner A
+- **THEN** the attempt is refused with a typed error, A is still listed as member and owner, and every member's sessions continue
+
+#### Scenario: An owner removes another owner
+
+- **WHEN** owners A and B both own the cell and A removes B
+- **THEN** B's next session is refused, and B is listed by no remaining member
 
 #### Scenario: A member leaves
 

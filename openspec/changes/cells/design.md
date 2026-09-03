@@ -41,9 +41,9 @@ Membership rests on the cell: a member joins on one member's invitation and sees
 
 The cell store. Not one replica for all cells, and not one replica per member inside a cell. ADR-0009's case against a shared namespace — a set that is never quiescent, and work spent on entries the filter discards — does not apply: every member wants every entry, and nothing is discarded. The replica is the authorization unit (who may sync it), the swarm topic and the reconciliation unit, exactly the roles ADR-0009 keeps for a namespace.
 
-### D4. Two kinds of content: claims and documents
+### D4. Content is records, of two kinds: claims and documents
 
-A claim is an assertion by an issuer about a subject — in mia-ontologies a graph with a claimant and a subject, such as a `persona:DriversLicenseDocument`. A document is content that is edited — in mia-ontologies the cell's note and its files. The difference is in mutability and in who writes (D5, D6), not in payload format: payloads stay opaque below pdn-layer.
+A **record** is what a member places into a cell; claims and documents are the two kinds of record. A claim is an assertion by an issuer about a subject — in mia-ontologies a graph with a claimant and a subject, such as a `persona:DriversLicenseDocument`. A document is content that is edited — in mia-ontologies the cell's note and its files. The difference is in mutability and in who writes (D5, D6), not in payload format: payloads stay opaque below pdn-layer. Membership material — member records, device records, removal records — is the cell's bookkeeping, not a record in this sense.
 
 ### D5. Claims are immutable and, inside a cell, shared with every member
 
@@ -51,7 +51,7 @@ A claim does not change after it is written — a changed assertion is a new cla
 
 ### D6. A document is shared read-only or read-write with the whole cell
 
-The mode is chosen per document. There is no "only Carol writes". The enforcing mechanism is the ingest gate on every honest member device, judging by the entry's author; the encoding of the mode — in the key or in a record — is open (C4).
+The mode is chosen per document and is not fixed for life: a document's mode flips read-only to read-write and back — an operating condition, not an edge case. There is no "only Carol writes". The enforcing mechanism is the ingest gate on every honest member device, judging by the entry's author; the encoding of the mode, which has to survive the flip, and who flips it are open (C4).
 
 ### D7. Inside a cell, gossip replaces subset-rbsr
 
@@ -71,6 +71,28 @@ The member set does not identify a cell.
 
 Below pdn-layer a cell entry is a key and opaque bytes. The platform reads from the key what it enforces: the cell, the author member, the content kind and a document's mode. Subject, template, SHACL shapes, categories and the DataBook's fields are the application's, carried inside payloads or derived from them. This is the existing layering — the data layer treats tokens and payloads as opaque, the domain lives in pdn-layer — applied to cells.
 
+### D11. A cell has owners
+
+The creator is the cell's first owner. An owner makes any member an owner, and ownership is taken from a member only by another owner — no other act narrows the owner set. In particular, an owner is removed from the cell only by another owner: a member that is no owner cannot remove an owner, since that removal would end an ownership only another owner may end. Inviting, and removing a member that is no owner, stay every member's acts. Ownership is a role inside membership: an owner is a member, and losing ownership does not touch membership. Members become owners and stop being owners repeatedly over a cell's life — an operating condition, not an edge case. Where the owner set lives follows B1's membership material; the edges of the role are B10.
+
+Rejected: equal-rank membership with no roles at all. It leaves a cell without a repair channel: records nobody may delete and states nobody may fix (D12, D14).
+
+### D12. An owner deletes any member's record
+
+An owner deletes records of any member — its own, another current member's, a removed member's alike (D13). Deletion is the owners' repair power over content; its mechanics — the tombstone surface — are C7. Nothing in this power edits a record in place or writes under another member's name (D15).
+
+### D13. Acting on a record does not depend on its member's standing
+
+The rights to act on a record are the same whether the member that placed it in the cell is a current member or a removed one. Removal changes admission alone — sessions refused, newly authored entries dropped — and changes nothing about what members and owners may do to the records already in the cell: no power over a member's records appears at its removal, and none disappears. Members leave, rejoin and are removed over a cell's life (B2), and the rules for its records read the same throughout.
+
+### D14. Every reachable state is repairable by owners
+
+No sequence of acts — joins, leaves, removals, mode flips, ownership changes, deletions — leaves the cell in a state its owners cannot repair from inside. Recreating the cell — a new store, re-invited members, re-uploaded content — is never the only way out. Every rule in this design is measured against this invariant; the act that could strand it — the last owner gone — is the open edge (B10).
+
+### D15. Authorship is forged by no one
+
+A record's authorship is cryptographic — the author signature on its entries — and no role weakens it: an owner deletes another member's record but writes nothing under that member's name, and every act in a cell reads as the signed act of its actor. The binding of author keys to members stays what the member publishes (F2); signed claims per the KERI roadmap strengthen the same property (C11).
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (F1).
@@ -82,6 +104,7 @@ Below pdn-layer a cell entry is a key and opaque bytes. The platform reads from 
 - [Reachability] → the stack is relay-free; in a 100-member cell most device pairs sit behind NATs; the swarm needs one reachable neighbour per device (D3').
 - [Concurrent editing of one document under per-key last-writer-wins loses edits] → the document's representation — whole value or an operation log merged above the platform — is open (C5).
 - [The join is bearer-level] → the invitation carries no bearer material and the secret burns, but the newcomer's identity is asserted, not proven; KERI's proof step slots into the same dialogue (B7).
+- [An owner deletes another member's records] → accepted as the repair channel (D12, D14); the deletion is the owner's own signed act and forges nothing (D15), and a hostile owner sits inside the trust boundary already (F1).
 
 ## Migration Plan
 
@@ -99,7 +122,7 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 ### B. Membership
 
 - B1 (**blocking**). Where membership lives: records in the cell store itself, inductively from the founding record — the inviter writes the newcomer's first device and author key, the newcomer registers its further devices, and the gate refuses a device record written under another member's name; or one directional store per member; or only in each member's own directory with no shared record. Leaning: in the cell store, author-gated.
-- B2. Adding and removing: any member, since there are no roles. Is leaving the same act as a removal? Does a member removed by one member and re-added by another come back?
+- B2. Leaving versus removal: is leaving the same act as a removal? Members leave and rejoin, and a removed member is re-added — ordinary conditions, not edge cases; what a rejoin restores — the old member record, the standing of the records under the member's name — is open, bounded by D13.
 - B3. Removal semantics under bearer tickets: gate-only — sessions refused and the removed member's authors dropped from the next session. A concurrent add and remove of one member: remove-wins, last-writer-wins, or a threshold of removal records. An entry authored before the removal but arriving after it.
 - B4 (**blocking**). Join path: a one-time-secret dialogue on a dedicated ALPN, linking-shaped (ADR-0012), carried as a QR code or an invite link; or an invite record carried over an existing channel with the newcomer — a connection or a common cell — where the store's ticket travels inside an Invariant-3 store as data tickets do; or both. An invite link for someone without the app.
 - B5. A member's other devices: the cell's tickets in the member's directory under a cell kind, opened on demand as connection-metadata pairs are. Who writes the sibling's device record into the cell — the sibling itself, holding the store's write ticket, or the device that joined.
@@ -107,13 +130,14 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 - B7. Proof at join: the newcomer's `PdnId` is the inviter's word. KERI's proof step — challenge-response, exchange of key event logs — is the same slot as in pairing and linking.
 - B8. A cell with 0 members: representable at all — a store nobody holds — or is the minimum 1.
 - B9. Whether joining requires a claim by the newcomer about itself, as mia-ontologies' `c:members` baseline does (one graph per member), or that is the app's business.
+- B10. Ownership at the edges: an owner leaving — the one act that ends an ownership without another owner's hand, the last owner's leaving included; whether the rule set keeps at least one owner, so that D14's repairability never loses its subject; a concurrent grant and revoke of one member's ownership; how the owner set is encoded in B1's membership material.
 
 ### C. Content
 
 - C1. Vocabulary: the platform's claim is mia-ontologies' graph (`g:SCGraph` — subject, claimant, template, triples); mia-ontologies' "claim" is a triple inside one. Fix the mapping in the glossary; decide whether the spec tree keeps "claim" for the graph.
 - C2 (**blocking**). Immutable claims and editable graphs: mia-ontologies' graphs are edited by their claimant — Bob updates his contact card. Either a claim is one version of a graph — a new claim per edit, with a head the app follows — or claims are immutable and graphs are documents. If versions: history retained (the version in the key, append-only) or head only (one key, last-writer-wins among the claimant's own writes).
 - C3. Chat: a third kind — an append-only stream of immutable messages, each written only by its author, which the gate treats as claims — or a document.
-- C4. Key layout: an author prefix (`by/<member>/…`) so the gate reads the author member from the key; a document's mode in the key (fixed at creation) or in a record the creator writes (changeable, at the price of a lookup per entry).
+- C4. Key layout: an author prefix (`by/<member>/…`) so the gate reads the author member from the key. Where the mode lives: a document's mode flips read-only to read-write and back over its life (D6), so an encoding that fixes the mode at creation does not suffice on its own — a record the mode's holder writes (a lookup per entry), or a key encoding paired with a mechanism that survives the flip. Who flips a document's mode — its creator, an owner — is also open.
 - C5 (**blocking**). Documents under concurrency: per-key last-writer-wins on the whole value — an edit is lost when two members edit at once — or an operation log, every operation an immutable entry written by its author and merged by a CRDT above the platform. With an operation log the platform has one rule for everything — every entry is written by its author — and read-write means "any member may append operations to this document".
 - C6. Files: attachments as blobs; lazy payloads through the fork's download policy; size limits; a rename or move as a new key plus a tombstone.
 - C7 (**blocking**). Deletion: the data layer offers no delete on data replicas, and a cell needs one — unsharing a claim, removing a file, deleting a document. Tombstones as the directory uses them, exposed for cell stores.
