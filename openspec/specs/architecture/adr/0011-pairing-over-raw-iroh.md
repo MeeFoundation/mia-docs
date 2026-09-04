@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-07-15
+date: 2026-09-04
 ---
 # Establish connections over a raw iroh dialogue: pairing is its own protocol, not pdn-store sync
 
@@ -35,22 +35,22 @@ Facts about the stack:
 
 Chosen option: **a dedicated pairing protocol on its own ALPN**, because it is the only option that requires no pre-shared state, keeps bearer material out of the QR, and gives the secret's verify-and-burn one atomic home — while leaving pdn-store untouched.
 
-The shape (names are working titles; the store-level realization is specified in the [connection metadata store spec](../../components/data-layer/connection-metadata-store.md)):
+The shape, whose store-level realization is specified in the [connection metadata store spec](../../components/data-layer/connection-metadata-store.md):
 
-* **The QR carries**: the inviter device's node address (endpoint public key plus every address the endpoint publishes about itself: direct socket addresses, and a relay URL on a runtime that binds relays — reachability is a spawn-time choice, and a QR minted by the suites and by the container stand, which take the direct-paths-only one, carries direct addresses alone; on a runtime that also binds address lookup the public key resolves to a current address on its own, so addresses that have gone stale between minting and scanning are not fatal there), a one-time short-lived pairing secret (random, not a counter), the inviter's PdnId, and a format version. It carries **no** tickets and **no** identity proof.
+* **The QR carries**: the inviter device's node address — the endpoint public key together with the addresses that endpoint publishes about itself — a one-time short-lived pairing secret (random, not a counter), the inviter's PdnId, and a format version. It carries **no** tickets and **no** identity proof. Which addresses travel is a spawn-time choice: a runtime on direct paths alone publishes socket addresses, and that is what the suites and the container stand mint; a runtime that binds relays publishes a relay URL as well, so the addressing outlives the network the QR was minted on; and where address lookup is bound too, the public key resolves to a current address on its own, so an address that went stale between minting and scanning is not fatal.
 * **The dialogue**: the scanner's endpoint dials the address over the pairing ALPN — a raw bidirectional QUIC stream, not a document-sync session. The scanner presents the pairing secret, its PdnId, its own node address, and a read ticket to the metadata replica it issues for the counterparty; the inviter **atomically verifies and burns** the secret — present and unburned → burn and continue, anything else → refuse — *before* creating or writing any state, then answers with the read ticket to its own metadata replica. The secret also burns on timeout, whichever comes first.
 * **After the dialogue**: each side records the connection among its private-metadata directory's connections records and imports the counterpart's ticket. Everything later — capability grants, data-store tickets, further sharing, revocation — travels *inside* the exchanged metadata replicas over ordinary pdn-store sync, and reaches both identities' other devices through device replication. The raw channel is used once per establishment; it is not a data path.
-* **Deferred**: the KERI proof of control over the presented PdnId is a marked step of this same dialogue, not built yet; until it lands the exchange is bearer-level (secret plus tickets), consistent with the interim posture of [ADR-0008](0008-iroh-without-willow.md).
+* **What the dialogue does not establish**: the presented PdnId is asserted, not proven. The exchange authenticates the transport peer and the one-time secret, so it is bearer-level — secret plus tickets — consistent with the posture of [ADR-0008](0008-iroh-without-willow.md).
 
 ### Consequences
 
 * Good — no pre-shared state: the dialogue is what creates shared state, so the bootstrap circularity disappears.
 * Good — a photographed QR expires with the secret; replay and double-scan close at one atomic point; a handshake that fails after the burn is repeated with a fresh invite, and re-running establishment is safe (re-creating one's own metadata replica is idempotent).
 * Good — pdn-store stays untouched: pairing is runtime code behind its own ALPN, so upstream tracking of the fork is unaffected.
-* Good — the dialogue has a natural slot for the KERI proof, and the format version in the QR gives the protocol room to evolve.
+* Good — the dialogue has a natural slot for an identity proof, and the format version in the QR gives the protocol room to evolve.
 * Bad — both peers must be online simultaneously; inviting an offline party (pending connections) needs separate machinery later, which this decision leaves possible but does not build.
 * Bad — a second protocol surface to design, version, and secure, next to the sync protocol.
-* Bad — `data-layer`'s node assembly currently builds its protocol router internally (blobs, gossip, docs); it must gain a way to register an externally supplied protocol handler.
+* Bad — `data-layer`'s node assembly builds its protocol router internally (blobs, gossip, docs), so it carries a spawn-time slot through which an externally supplied handler registers beside them.
 * Neutral — an observer of the QR learns the inviter's PdnId (a linkability leak, accepted for now).
 * Neutral — the connection model above is unchanged: a connection is mutual knowledge plus exchanged metadata replicas; access to data remains a separate, capability-gated act.
 
@@ -88,6 +88,10 @@ Re-establishment, the recovery path the Consequences claim: a fresh invite betwe
 * Bad — entangles the fork with a dialogue that has nothing to do with set reconciliation, deepening divergence from upstream against [ADR-0008](0008-iroh-without-willow.md)'s minimalism; pairing logic belongs to the runtime, not the store.
 
 ## More Information
+
+The dialogue holds a marked step for a proof of control over the presented PdnId, which arrives with a root identifier that can carry one ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)).
+
+The cells change reuses this shape rather than competing with it: joining a cell is a one-time-secret dialogue on a dedicated ALPN, modelled on device linking, which is this decision applied to higher stakes. What cells leave open is whether pairing keeps a subject of its own, since a connection between two identities may stay as it is or become a cell of two. In the second case this decision is replaced by the join it shaped, and the record of what the exchange had to carry is what makes the replacement readable.
 
 Open questions, none blocking this decision: exact QR encoding and size budget; the later shape of pending/offline invitations; the exact contents of the KERI proof step; the QR linkability leak: whether the inviter's PdnId needs to be in the QR at all (it could travel inside the encrypted dialogue instead), and whether pairing should later present a per-relationship identifier rather than the long-lived PdnId — KERI makes minting per-context autonomic identifiers cheap, which is the hoped-for path, not yet a design.
 

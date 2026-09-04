@@ -18,7 +18,6 @@ Due to the earlier design decision (not captured here), PDN uses [capability-bas
 
 - Revocation, expiry, and key rotation must be expressible in the capability format.
 - Capabilities must be bound to Mee identities, not per-device keys.
-- Willow's Private Interest Overlap (PIO) requires structurally extractable rectangular `Area`s from capabilities.
 - Ecosystem alignment over bespoke crypto / serialization.
 - Read/write attenuation along the chain is not currently required.
 
@@ -35,16 +34,16 @@ Due to the earlier design decision (not captured here), PDN uses [capability-bas
 
 ## Decision Outcome
 
-Chosen option: **UWill**. It is the only option that addresses three Meadowcap gaps (revocation, expiry, rotation), bound to Mee identity, preserves PIO's structural Area requirement, and reuses ecosystem-standard formats (UCAN, DID, CBOR/IPLD).
+Chosen option: **UWill**. It is the only option that addresses three Meadowcap gaps (revocation, expiry, rotation), bound to Mee identity, and reuses ecosystem-standard formats (UCAN, DID, CBOR/IPLD).
 
-Technical specification — token format, command semantics, Area encoding, chain validation rules, revocation propagation, identity resolution — lives in [components/pdn-node/uwill.md](../../components/pdn-node/uwill.md). The implementation crate is the `MeeFoundation/iroh-willow` fork.
+Technical specification — token format, command semantics, Area encoding, chain validation rules, revocation propagation, identity resolution — lives in [components/pdn-node/uwill.md](../../components/pdn-node/uwill.md). The token types live in the `uwill` module of `pdn-layer`; enforcement runs on the read-capabilities grant vocabulary instead ([capability-gated ingest](../../components/data-layer/capability-gated-ingest.md)).
 
 ### Consequences
 
 - Good, because revocation, expiry, and key rotation — three of the four Meadowcap gaps — are addressed.
 - Good, because capabilities are bound to PdnId, so devices can be added or removed under an identity without re-issuing delegations.
 - Good, because reuse of the UCAN Invocation model and the DID / CBOR / IPLD ecosystem reduces bespoke surface.
-- Good, because revocation propagates over willow sync — no separate distribution channel.
+- Good, because revocation propagates as store entries alongside the capabilities themselves — no separate distribution channel.
 - Bad, because tokens are roughly 2–2.5× larger than Meadowcap.
 - Bad, because chain verification gains complexity: UCAN verification + Area narrowing + PdnId↔key resolution.
 - Bad, because the `ucan` crate requires a fork (upstream lacks `verify()` methods).
@@ -95,6 +94,7 @@ Technical specification — token format, command semantics, Area encoding, chai
 
 ## More Information
 
+- **This decision has one consumer: sharing outside a cell.** A UWill capability grants an audience per-claim access to an issuer's own data. Inside a cell there is no narrower audience — the store is served whole to the members, and the gate judges an entry by its author — so a cell needs no capability format at all. If cells absorb sharing entirely, nothing is left for UWill to authorize and the decision loses its subject rather than being answered differently, which is the case the ADR conventions call `obsolete`. Whether it happens is the cells change's open question about connections; while sharing outside a cell exists, so does this decision.
 - The design evolved through an earlier draft that included a `/willow`-rooted UCAN command hierarchy for read/write narrowing. The hierarchy was dropped when the narrowing it enabled turned out not to be required for current use cases.
 - External references: [UCAN spec v1.0.0-rc.1](https://github.com/ucan-wg/spec), [UCAN revocation](https://github.com/ucan-wg/revocation), [Willow](https://willowprotocol.org/specs/), [Meadowcap](https://willowprotocol.org/specs/meadowcap/), [Biscuit](https://www.biscuitsec.org/), [KERI](https://weboftrust.github.io/ietf-keri/draft-ssmith-keri.html).
 - Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md).

@@ -14,12 +14,12 @@ Can we collapse to a single addressing axis — and, once collapsed, does a "nam
 ## Decision
 
 - **Drop the domain `NamespaceId = (about, issued_by)`.** `about` becomes a field _inside_ the claim (it already is: `Claim.about`), not a namespace coordinate.
-- **One `pdn-store` namespace per issuer.** All of an issuer's claims (about anyone) live in that one namespace — a separate set-reconciliation unit and gossip topic per issuer, not the issuer as a key-prefix inside a single shared namespace. The data binding is keyed by the issuer `PdnId`: `Binding::Data { issuer }`.
-- **Granularity lives entirely in UWill** (per-claim), not in the namespace boundary.
-- **pdn-node is namespace-free.** Nothing above `data-layer` names a namespace: claims are addressed by `ClaimId` and authorized by UWill. `Binding` and `BindingIndex` are `data-layer` internals.
-- **The namespace is demoted to a `data-layer`-internal replication bucket** — the iroh-docs set-reconciliation unit and gossip topic, nothing more. Addressing moves to `ClaimId`, write-authority to UWill.
+- **One `pdn-store` namespace per issuer.** All of an issuer's claims (about anyone) live in that one namespace — a separate set-reconciliation unit and gossip topic per issuer, not the issuer as a key-prefix inside a single shared namespace. The data layer's registry keys each data replica by its issuer `PdnId`.
+- **Granularity lives entirely in the capability** (per claim), not in the namespace boundary. What carries it is the issuer's recorded read capabilities; UWill ([ADR-0007](0007-uwill.md)) is the format that grant grows into.
+- **pdn-node's surface is namespace-free.** Nothing in its API names a namespace: claims are addressed by `ClaimId` and authorized per claim. Inside the runtime the ids are held all the same — the ceremonies hand over tickets to the directory and the data namespace, and the replicas they open have to be registered — so the property is one of the surface, not of the crate.
+- **The namespace is demoted to a replication bucket** — the iroh-docs set-reconciliation unit and gossip topic, nothing more. Addressing moves to `ClaimId`, write-authority to the capability.
 
-A namespace survives because **UWill authorizes, it does not replicate**: a per-issuer set that replicates by reconciliation is irreducible on iroh-docs, so we coarsen it to one-per-issuer rather than try to remove it.
+A namespace survives because **a capability authorizes, it does not replicate**: a per-issuer set that replicates by reconciliation is irreducible on iroh-docs, so we coarsen it to one-per-issuer rather than try to remove it.
 
 This is orthogonal to the device-internal store (`PrivateMetadataStore`, the directory), which is bound by `identity` and admitted by Invariant 1 (see `../../components/pdn-node/invariants.md`): unaffected by how data namespaces are addressed.
 
@@ -41,6 +41,8 @@ Both layouts put every issuer's claims in the node's single physical store — i
 - Independently of reconciliation cost, the per-issuer namespace is the authorization unit (a device fully owns its issuer's namespace — Invariant 1), revocation drops a whole namespace rather than excising claims scattered through a shared one, and gossip membership is per-namespace (an issuer's own devices swarm its namespace while scoped readers reconcile point-to-point outside it) — none of which one shared namespace can express.
 
 ## More Information
+
+A cell, as the cells change designs it, is one shared replica held whole by every member's devices — a namespace that is not per issuer. The rejected alternative above does not argue against it: that argument is about one namespace holding every issuer's claims and serving each peer a filtered view of it, whereas a cell has bounded membership, runs no egress filter, and its members' devices are its own swarm. An identity's own data keeps the per-issuer namespace either way.
 
 The realization is specified in `../../components/pdn-node/namespace-addressing.md` (the namespace-free addressing surface). The interim namespace-key/mapping path, confidentiality, device bootstrap, and pre-UWill relaxations live in the design of the archived `per-issuer-namespace` change, not in this ADR.
 

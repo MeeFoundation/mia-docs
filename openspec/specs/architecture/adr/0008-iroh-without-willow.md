@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-06-03
+status: accepted
+date: 2026-09-04
 ---
 # Use iroh-docs without Willow: our own iroh-docs variant with a capability-gated ingest
 
@@ -12,10 +12,10 @@ Can we ship document replication **sooner** by syncing over `iroh-docs` — defe
 
 The obvious answer is to treat iroh-docs as an immutable black box: sync everything unchanged into an *untrusted* store, and authorize after the fact at a PDN-side promotion gate. That works, but it buys shipping speed with a permanent tax: no prevention (the untrusted store can be spammed and must be GC'd), data duplicated across an untrusted and a trusted copy, and an observe-then-evict window between "synced" and "trusted". The sharper question the black-box assumption skips: **iroh-docs is small — a multi-writer KV store plus automerge-style reconciliation — so do we actually have to treat it as immutable?**
 
-Facts verified against iroh-docs 0.100 (our fork: `github.com/MeeFoundation/pdn-store`):
+Facts verified against iroh-docs 0.100, the release the variant starts from:
 
-1. Ingest funnels through **one** validation chokepoint: `validate_entry()` (`src/sync.rs:622`), called by both the direct `insert_remote_entry → insert_entry` path (`src/sync.rs:452`) and the live-sync path. It accepts on **namespace+author Ed25519 signature, namespace-id match, and timestamp ≤ now+10min** (`MAX_TIMESTAMP_FUTURE_SHIFT`, `src/sync.rs:48`) — nothing else.
-2. That chokepoint sits on top of an **already-existing, per-entry, pre-persist accept/reject callback**. The set-reconciliation engine's `process_message()` takes a `validate_cb(&store, &entry, content_status) -> bool` (`src/ranger.rs:324`, doc at `:314`); when it returns `false` the entry is **dropped and never stored** (the `put` at `src/ranger.rs:394` is guarded by it). iroh-docs simply hardwires that callback to `validate_entry(...).is_ok()` (`src/sync.rs:548–555`) and does **not** expose it through its public API.
+1. Ingest funnels through **one** validation chokepoint: `validate_entry()` in `src/sync.rs`, called by both the direct `insert_remote_entry → insert_entry` path and the live-sync path. It accepts on **namespace+author Ed25519 signature, namespace-id match, and timestamp ≤ now+10min** (`MAX_TIMESTAMP_FUTURE_SHIFT`) — nothing else.
+2. That chokepoint sits on top of an **already-existing, per-entry, pre-persist accept/reject callback**. The set-reconciliation engine's `process_message()` takes a `validate_cb(&store, &entry, content_status) -> bool` in `src/ranger.rs`; when it returns `false` the entry is **dropped and never stored**, because the `put` is guarded by it. iroh-docs simply hardwires that callback to `validate_entry(...).is_ok()` and does **not** expose it through its public API.
 3. iroh share tickets are **bearer tokens with no expiry and no revocation**: once a `Write` ticket is handed out, the holder can produce namespace-signed entries indefinitely.
 
 So while iroh-docs exposes no injectable pre-persist hook through its public API, internally the veto already exists, it is clean (one boolean per entry, evaluated before `put`), and it sits exactly where iroh-docs already does signature/timestamp validation. The forcing question becomes: **do we author our own variant of iroh-docs that runs our capability check at that chokepoint — accepting or rejecting each entry at write time — or do we keep iroh-docs verbatim and pay the untrusted-store tax forever?**
@@ -39,16 +39,15 @@ So while iroh-docs exposes no injectable pre-persist hook through its public API
 
 Chosen option: **our own minimal variant of iroh-docs with a capability-gated ingest**, because it restores native, write-time capability enforcement at the cost of a *thin, well-located* modification — far cheaper than the Willow fork, and without the untrusted-store tax of the verbatim option.
 
-It is a **fork in the git sense, but deliberately not a divergent one**: we do not re-architect iroh-docs, we vendor it and change a single point (a variant of our own, not a rewrite). We still do **not** fork iroh itself, and the change is small enough to re-base onto upstream iroh-docs releases. The fork lives at `github.com/MeeFoundation/pdn-store`; the `data-layer` crate, building against it, is the staging ground.
+It is a **fork in the git sense, but deliberately not a divergent one**: we do not re-architect iroh-docs, we vendor it and change a single point (a variant of our own, not a rewrite). We still do **not** fork iroh itself, and the change is small enough to re-base onto upstream iroh-docs releases. The variant lives in this workspace as `crates/pdn-store`, keeping the package name `iroh-docs`; the `data-layer` crate, building against it, is the staging ground.
 
-**The modification.** `validate_entry()` (`src/sync.rs:622`) — the single chokepoint both ingest paths already call — gains a capability check. Equivalently/additionally, the ranger's `validate_cb` (`src/ranger.rs:324`) is plumbed out to a PDN-supplied validator instead of being hardwired to `validate_entry(...).is_ok()`. The callback already returns `bool` and already runs before `put`, so the semantics are exactly: **valid capability chain → auto-merge into the persistent store; invalid → turned away, never stored.** No separate untrusted store, no GC of junk, no observe-then-evict window.
+**The modification.** The ranger's `validate_cb` is plumbed out to a validator the data layer supplies, instead of being hardwired to `validate_entry(...).is_ok()`; `validate_entry` keeps its signature, namespace and timestamp checks untouched. The verdict is three-valued rather than boolean: **accept** — auto-merged into the persistent store; **reject** — turned away and echoed back on the reconciliation reply, so the sender retracts its own copy; **drop** — turned away in silence, for everything that is not a verdict on the sender's authority, such as a retraction this node already holds or a state it cannot read. No separate untrusted store, no GC of junk, no observe-then-evict window.
 
-**Capabilities are a verifiable key-chain, carried as payload/metadata — not transport ACLs.**
+**What the gate judges.** Only a replica data-bound to an identity this node hosts: an entry from a device of the issuer is admitted whole, an entry from a granted writer is admitted when the claim it derives from lies inside that grant's write set, and a session the node cannot classify admits nothing — fail-closed. Directories and connection metadata stores are not capability-gated: they stay bounded by ticket possession and by the serving side's egress filter. The vocabulary the gate consumes is the issuer's recorded [read capabilities](../../components/data-layer/read-capabilities.md), resolved against the session peer at session setup ([capability-gated ingest](../../components/data-layer/capability-gated-ingest.md)).
 
-* **UWill** ([ADR-0007](0007-uwill.md)) — the heavyweight, per-claim, expiring, revocable, PdnId-bound capability: a delegation chain of keys plus a `PdnIdentityProof`, verifiable offline. Checked at the gate; governs admission of **data** entries.
-* **Peering** — the lightweight connection capability ("does a connection with this PdnId exist"): a cheap pre-filter, carrying its own expiry/revocation since iroh tickets cannot. Governs admission of **metadata** entries.
+**Capabilities are data we control, not transport ACLs.** A grant is a record the issuer writes and can narrow or withdraw, so authority never rests on ticket possession.
 
-**Capability delivery (metadata channel).** For the gate to validate a data entry, the relevant capability must already be local. Issued capabilities are therefore delivered to the peer **as metadata** ahead of the data they authorize: a dedicated metadata store/namespace, reachable by its own ticket, into which capabilities are written (and themselves Peering-gated on ingest). When data entries then arrive, the data-side validator looks the chain up locally. This matters because `validate_cb` sees the entry's record (key, author, content hash, timestamp, `ContentStatus`) but **not necessarily the blob content** — so authorization cannot depend on downloading the payload first.
+**Capability delivery (metadata channel).** For the gate to validate a data entry, the relevant capability must already be local. Issued capabilities are therefore delivered to the peer **as metadata** ahead of the data they authorize: a dedicated metadata store/namespace, reachable by its own ticket, into which capabilities are written. When data entries then arrive, the data-side validator looks the chain up locally. This matters because `validate_cb` sees the entry's record (key, author, content hash, timestamp, `ContentStatus`) but **not necessarily the blob content** — so authorization cannot depend on downloading the payload first.
 
 **iroh tickets are demoted to transport bootstrap only** — "can this peer reach / write to this store", never "is this peer authorized". Their lack of expiry/revocation is acceptable because authority lives entirely in the capability chains we check at the gate.
 
@@ -66,7 +65,7 @@ It is a **fork in the git sense, but deliberately not a divergent one**: we do n
 
 ## Validation
 
-A draft `impl` of the PDN data layer (the `DataLayer` trait) over the iroh-docs variant that: rejects forged / expired / revoked / un-peered entries **at the `validate_entry` / `validate_cb` hook** under adversarial test inputs (rejected entries must be *absent* from the store, not merely unpromoted); admits valid entries by auto-merge; delivers capabilities over the metadata channel ahead of data; and evicts previously-admitted entries when a later revocation arrives. The `data-layer` crate, depending on the variant via git (`MeeFoundation/pdn-store`), is the staging ground. Compliance criterion: **no entry is stored that fails Peering (metadata) or UWill (data) validation at ingest.**
+A draft `impl` of the PDN data layer (the `DataLayer` trait) over the iroh-docs variant that: rejects forged / expired / revoked / un-peered entries **at the `validate_entry` / `validate_cb` hook** under adversarial test inputs (rejected entries must be *absent* from the store, not merely unpromoted); admits valid entries by auto-merge; delivers capabilities over the metadata channel ahead of data; and evicts previously-admitted entries when a later revocation arrives. The `data-layer` crate, building against the in-tree variant, is the staging ground. Compliance criterion: **no entry is stored that the validator refuses** — an entry outside the sender's recorded write set is absent from a hosted issuer's replica, not merely unpromoted.
 
 ## Pros and Cons of the Options
 
@@ -89,17 +88,17 @@ A draft `impl` of the PDN data layer (the `DataLayer` trait) over the iroh-docs 
 
 ## More Information
 
-The crux: iroh-docs is small enough (KV store + automerge over iroh's set-reconciliation) that we don't have to treat it as immutable — and the pre-persist accept/reject callback we need **already exists** internally (`ranger::process_message`'s `validate_cb`, currently hardwired to `validate_entry(...).is_ok()`), it just isn't exposed. Owning a thin variant that runs our capability chain there is far cheaper than the Willow fork and avoids the verbatim option's permanent untrusted-store cost. Names ("Peering", "metadata / data store") are working titles.
+The crux: iroh-docs is small enough (KV store + automerge over iroh's set-reconciliation) that we don't have to treat it as immutable — and the pre-persist accept/reject callback we need **already exists** internally (`ranger::process_message`'s `validate_cb`, currently hardwired to `validate_entry(...).is_ok()`), it just isn't exposed. Owning a thin variant that runs our capability chain there is far cheaper than the Willow fork and avoids the verbatim option's permanent untrusted-store cost. The two capability kinds this decision expected at the gate are not what runs: UWill's token types live in `pdn-layer` and nothing enforces them, and Peering never became a token. Enforcing a delegation chain here waits on identity proofs ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md), [ADR-0007](0007-uwill.md)).
 
-Open questions to resolve before `accepted`:
+What those open questions became:
 
-1. **Check placement** — extend `validate_entry()` directly vs. plumb `validate_cb` out as a public, PDN-supplied validator; how to give it access to the capability/metadata index without the blob content.
-2. **Revocation after admission** — revocations-as-entries + eviction / re-validation pass; how it interacts with automerge's last-writer-wins.
-3. **Capability delivery** — the metadata-channel bootstrap: ticketed metadata store, write / Peering rules, and ordering vs. the data it authorizes.
-4. **Upstream tracking** — vendoring / rebase strategy for the variant; pinning vs. following iroh-docs releases.
-5. **Peering spec** — exact format, expiry / revocation, relationship to UWill (a degenerate UWill, or a separate token?).
-6. **Confidentiality** — payload encryption for sensitive entries and how the gate validates over it.
+1. **Check placement** — the ranger's callback is plumbed out and the data layer supplies the validator, so the gate reads the node's own recorded state and never the blob content.
+2. **Revocation after admission** — retraction markers refuse the exact entries a withdrawal covers, and a rejected sender retracts its own copy on the echoed verdict ([write retraction](../../components/data-layer/write-retraction.md)).
+3. **Capability delivery** — grants travel in the [connection metadata store](../../components/data-layer/connection-metadata-store.md) ahead of the data they authorize, and a session's write set is resolved from them at setup.
+4. **Upstream tracking** — the variant is vendored into this workspace as `crates/pdn-store` and rebased onto upstream releases there.
+5. **Peering** — dissolved. No such token exists: metadata replicas are not capability-gated, and admission there rests on ticket possession and the recorded connection.
+6. **Confidentiality** — open. Entries are readable by every peer that can sync the store, and payload encryption is not built.
 
-Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md). ADR-0005 (why Willow) and ADR-0006 (why a fork of Willow) were removed when the Willow-assuming material was cleaned up (commit e8a352a) and survive only in git history; the numbers 0005 and 0006 are not reused.
+Related ADRs: [ADR-0004](0004-capabilities-should-refer-to-mee-identity.md), [ADR-0007](0007-uwill.md). [ADR-0005](0005-why-willow.md) (why Willow) and [ADR-0006](0006-why-fork-of-willow.md) (why a fork of Willow) are obsolete stubs: both were taken by decisions that stayed unwritten, and their files went when the Willow-assuming material was cleaned up (commit e8a352a). Neither number is reused.
 
-External references: iroh-docs 0.100 — single ingest chokepoint `validate_entry` (`src/sync.rs:622`), called from `insert_entry` (`:452`) and the live-sync `validate_cb` closure (`:548–555`); per-entry pre-persist accept/reject `validate_cb` in `ranger::process_message` (`src/ranger.rs:314,324,394`), not exposed publicly; share tickets are non-expiring bearer tokens.
+External references: iroh-docs 0.100 — a single ingest chokepoint, `validate_entry` in `src/sync.rs`, called from `insert_entry` and from the live-sync closure; a per-entry pre-persist accept/reject `validate_cb` in `ranger::process_message`, not exposed publicly; share tickets are non-expiring bearer tokens.

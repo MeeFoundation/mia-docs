@@ -29,6 +29,8 @@ Nothing in this generation implements it, which is what the name v4-non-keri rec
 
 ## More Information
 
+The cells change builds a stand-in for the missing key event log, and its shape is what this decision has to replace. An identity holds a device-announcement key pair; it publishes device-list statements signed by that key, each carrying a version counter inside the signed bytes, and the gate judges an entry in a cell's membership area by that signature rather than by the entry's author. Two properties of the stand-in therefore have to survive the arrival of a key event log: the device set is enumerable and verifiable by anyone holding what the identity published about itself, and its ordering comes from the statements themselves, never from entry timestamps. The same change marks the gap this decision closes from the other side — at join, a newcomer's identity is the inviter's word, exactly as it is in pairing and linking.
+
 The implementation is written in-house: the mature Rust library (keriox) is EUPL-1.2, which a statically linked embeddable SDK cannot take, and test vectors come from the Apache-2.0 reference implementation (keripy).
 
 Related: [ADR-0002](0002-mee-identity-is-globally-unique.md) (one identifier per identity — pairwise identity, if taken up, lands on this root), [ADR-0011](0011-pairing-over-raw-iroh.md) and [ADR-0012](0012-linking-over-raw-iroh.md) (the deferred proof step in the ceremonies).

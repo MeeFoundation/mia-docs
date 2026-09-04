@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-07-01
+status: accepted
+date: 2026-09-04
 ---
 
 # Restrict reads at reconciliation time (subset-RBSR)
@@ -21,4 +21,6 @@ Enforce per-claim read access by filtering what a serving node reveals during re
 
 ## More Information
 
-The realization — the egress filter, the minimal read capability it consumes, and the trade-offs — is specified in the `subset-rbsr` change. Related: [ADR-0008](0008-iroh-without-willow.md) (the ingest gate), [ADR-0007](0007-uwill.md) (UWill, the capability the read grant grows into); Invariant 2 (`../../components/pdn-node/invariants.md`).
+Inside a cell the filter has no work: the cell store is served whole to member devices, and read access there is membership rather than a per-claim capability, with gossip among the members in place of the egress filter. What keeps this decision alive is everything served outside a cell — an issuer's namespace reconciled with an audience under a grant, and an identity's own namespaces. Cells narrow where the read filter applies; unlike the capability format it enforces ([ADR-0007](0007-uwill.md)), they do not leave it without a subject.
+
+The realization is specified in [subset reconciliation](../../components/data-layer/subset-reconciliation.md) and the grant vocabulary it consumes in [read capabilities](../../components/data-layer/read-capabilities.md); the filter itself lives in `crates/pdn-store`. The trade-offs weighed while building it stay in the design of the archived `subset-rbsr` change. Related: [ADR-0008](0008-iroh-without-willow.md) (the ingest gate), [ADR-0007](0007-uwill.md) (UWill, the capability the read grant grows into); Invariant 2 (`../../components/pdn-node/invariants.md`).
