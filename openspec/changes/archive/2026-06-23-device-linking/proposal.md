@@ -15,7 +15,7 @@ The private metadata store is the bootstrap **directory** for an identity (its d
 
 | Capability (delta)         | Archive destination                                     |
 | -------------------------- | ------------------------------------------------------- |
-| `data-layer-device-linking` | `openspec/specs/components/data-layer/device-linking.md` |
+| `data-layer-device-linking` | `openspec/specs/components/mee-pdn/pdn-node/device-linking.md` |
 
 ### New Capabilities
 - `data-layer-device-linking`: the single-seed device bootstrap procedure — import the private metadata directory, self-register, and discover/import the identity's other stores through it, in order.

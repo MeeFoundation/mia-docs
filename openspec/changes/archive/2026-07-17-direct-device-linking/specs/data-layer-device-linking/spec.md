@@ -2,7 +2,7 @@
 
 ### Requirement: An identity is provisioned on its first device
 **Reason**: Provisioning is respecified in `pdn-node-device-linking` ("An identity is provisioned with its full store set on its first device"): the connections store no longer exists to be created, the data namespace joins provisioning, and the procedure lives in pdn-node with the rest of the ceremony.
-**Migration**: See `pdn-node/device-linking.md`; the seed-sufficiency clause is superseded by the linking dialogue.
+**Migration**: See `mee-pdn/pdn-node/device-linking.md`; the seed-sufficiency clause is superseded by the linking dialogue.
 
 #### Scenario: Superseded by the pdn-node ceremony
 - **WHEN** an identity is provisioned after this change
@@ -10,7 +10,7 @@
 
 ### Requirement: Linking into further identities is independent and repeatable
 **Reason**: Per-identity isolation of linking is already required by `data-layer-multi-identity` ("An identity is added to a device explicitly"), which this change rewords for the invite-based act; the ceremony side lives in `pdn-node-device-linking`.
-**Migration**: See `data-layer/multi-identity.md` and `pdn-node/device-linking.md`.
+**Migration**: See `mee-pdn/data-layer/multi-identity.md` and `mee-pdn/pdn-node/device-linking.md`.
 
 #### Scenario: Carried by multi-identity
 - **WHEN** a device links into several identities after this change

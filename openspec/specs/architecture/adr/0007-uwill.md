@@ -36,7 +36,7 @@ Due to the earlier design decision (not captured here), PDN uses [capability-bas
 
 Chosen option: **UWill**. It is the only option that addresses three Meadowcap gaps (revocation, expiry, rotation), bound to Mee identity, and reuses ecosystem-standard formats (UCAN, DID, CBOR/IPLD).
 
-Technical specification — token format, command semantics, Area encoding, chain validation rules, revocation propagation, identity resolution — lives in [components/pdn-node/uwill.md](../../components/pdn-node/uwill.md). The token types live in the `uwill` module of `pdn-layer`; enforcement runs on the read-capabilities grant vocabulary instead ([capability-gated ingest](../../components/data-layer/capability-gated-ingest.md)).
+Technical specification — token format, command semantics, Area encoding, chain validation rules, revocation propagation, identity resolution — lives in [components/mee-pdn/pdn-layer/uwill.md](../../components/mee-pdn/pdn-layer/uwill.md). The token types live in the `uwill` module of `pdn-layer`; enforcement runs on the read-capabilities grant vocabulary instead ([capability-gated ingest](../../components/mee-pdn/data-layer/capability-gated-ingest.md)).
 
 ### Consequences
 

@@ -2,7 +2,7 @@ schema: spec-driven
 
 # Shown to AI when creating any artifact of any change.
 context: |
-  PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over a forked iroh-docs) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace.
+  PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over a forked iroh-docs) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace. The main tree keeps the workspace's specs at components/mee-pdn/<crate>/<topic>.md, one directory per crate, and component-level specs (invariants) at components/mee-pdn/<topic>.md; a delta capability id is <crate>-<topic> (the crate is the longest crate name the id starts with), and on archive the spec lands at that path. The other components keep components/<component>/<topic>.md with <component>-<topic> ids.
 
   Cross-cutting practices every change is held to — read the one that applies before writing, they are short:
 

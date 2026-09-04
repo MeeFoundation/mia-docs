@@ -46,7 +46,7 @@ A linked device comes up from a single seed — the `PrivateMetadataStore` ticke
 - **Control plane** (directory + connections store): small, imported eagerly, blocking `link_device` under a liveness timeout.
 - **Data plane** (per-issuer data namespaces, potentially large): discovered the same way but imported lazily, after linking — staged, not unimplemented.
 
-The directory is complete by construction: every store an identity owns publishes its ticket into it (enforced in pdn-node; until then upheld by the caller). A device self-registers into the device set only after the directory has caught up, so the write does not race initial sync. Mechanics live in `components/data-layer/device-linking.md`.
+The directory is complete by construction: every store an identity owns publishes its ticket into it (enforced in pdn-node; until then upheld by the caller). A device self-registers into the device set only after the directory has caught up, so the write does not race initial sync. Mechanics live in `components/mee-pdn/pdn-node/device-linking.md`.
 
 ### D5. Pre-UWill access is relaxed by design
 

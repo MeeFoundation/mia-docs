@@ -23,5 +23,5 @@
 
 ## 4. Spec corrections in mia-docs
 
-- [x] 4.1 Edit `openspec/specs/components/pdn-node/invariants.md`, Invariant 1: remove the `SelfOwned` ingest-policy mechanism, leaving the store ticket as the sole enforcing mechanism (bearer today, identity-bound with UWill; the spec states the present, not the removal's history)
-- [x] 4.2 Add an open-question note to `openspec/changes/subset-rbsr/design.md`: D4 ("own-identity is fully authorized", "same-identity peer") predates multi-identity nodes and must be reread as "a peer holding one of the identities this node hosts"; its proposal's "Unaffected: ingest gate" line and the `sync_two_nodes` repurposing plan also predate this change (the test is deleted, the baseline is ungated)
+- [x] 4.1 Edit `openspec/specs/components/mee-pdn/invariants.md`, Invariant 1: remove the `SelfOwned` ingest-policy mechanism, leaving the store ticket as the sole enforcing mechanism (bearer today, identity-bound with UWill; the spec states the present, not the removal's history)
+- [x] 4.2 Add an open-question note to `openspec/changes/archive/2026-07-20-subset-rbsr/design.md`: D4 ("own-identity is fully authorized", "same-identity peer") predates multi-identity nodes and must be reread as "a peer holding one of the identities this node hosts"; its proposal's "Unaffected: ingest gate" line and the `sync_two_nodes` repurposing plan also predate this change (the test is deleted, the baseline is ungated)

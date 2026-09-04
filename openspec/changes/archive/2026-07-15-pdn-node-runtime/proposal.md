@@ -22,13 +22,13 @@ The layers exist but nothing glues them: `data-layer` provides the store set, li
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/pdn-node/uwill.md` convention.
+Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/mee-pdn/pdn-layer/uwill.md` convention.
 
 | Capability (delta)   | Archive destination                          |
 | -------------------- | -------------------------------------------- |
-| `pdn-node-core`      | `openspec/specs/components/pdn-node/core.md` |
-| `pdn-node-http-host` | `openspec/specs/components/pdn-node/http-host.md` |
-| `data-layer-data-store` | `openspec/specs/components/data-layer/data-store.md` |
+| `pdn-node-core`      | `openspec/specs/components/mee-pdn/pdn-node/core.md` |
+| `pdn-node-http-host` | `openspec/specs/components/mee-pdn/pdn-node-http/host.md` |
+| `data-layer-data-store` | `openspec/specs/components/mee-pdn/data-layer/data-store.md` |
 
 ### New Capabilities
 
@@ -37,7 +37,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 ### Modified Capabilities
 
-- `data-layer-data-store`: the data store gains entry listing — an issuer-addressed enumeration returning entry metadata (`EntryInfo`), optionally filtered by path prefix. The one `data-layer` surface addition of this change; existing `components/pdn-node/` specs (invariants, namespace-addressing, uwill) and the remaining `components/data-layer/` specs are untouched — the runtime adds no store, no addressing, and no capability semantics.
+- `data-layer-data-store`: the data store gains entry listing — an issuer-addressed enumeration returning entry metadata (`EntryInfo`), optionally filtered by path prefix. The one `data-layer` surface addition of this change; existing `components/mee-pdn/pdn-node/` specs (invariants, namespace-addressing, uwill) and the remaining `components/mee-pdn/data-layer/` specs are untouched — the runtime adds no store, no addressing, and no capability semantics.
 
 ## Impact
 

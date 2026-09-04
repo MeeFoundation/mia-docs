@@ -21,7 +21,7 @@ The same reading exists behind the runtime's test-only feature, where scenarios 
 
 ### D1. The read is the identity's own half of the pair, and the right to it is Invariant 3
 
-A connection metadata store is written only by its issuing identity's devices, and read by those devices and the counterparty's ([invariants](../../specs/components/pdn-node/invariants.md), Invariant 3). Every device of the identity therefore already has the right, and mechanically already holds the instrument: the pairing ceremony publishes the write ticket for the own-side store in the identity's directory under its own kind, so a device that replicated the directory can open that store without asking anyone.
+A connection metadata store is written only by its issuing identity's devices, and read by those devices and the counterparty's ([invariants](../../specs/components/mee-pdn/invariants.md), Invariant 3). Every device of the identity therefore already has the right, and mechanically already holds the instrument: the pairing ceremony publishes the write ticket for the own-side store in the identity's directory under its own kind, so a device that replicated the directory can open that store without asking anyone.
 
 That is the whole argument. It says nothing about what the peer knows, because the peer's knowledge does not bear on whether the issuer's own devices may read — the peer holding a read ticket to the same store explains how the peer reads these grants, not how the issuer does.
 

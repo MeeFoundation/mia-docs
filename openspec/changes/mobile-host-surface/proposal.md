@@ -44,7 +44,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 ### Modified Capabilities
 
-None. The runtime's own change is `own-grant-read`; this one exports what that adds and alters no capability of another component. One line of `components/pdn-node/http-host.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
+None. The runtime's own change is `own-grant-read`; this one exports what that adds and alters no capability of another component. One line of `components/mee-pdn/pdn-node-http/host.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
 
 ## Impact
 
@@ -52,5 +52,5 @@ None. The runtime's own change is `own-grant-read`; this one exports what that a
 - **`crates/pdn-node`**: untouched. The operation this facade exports arrives with `own-grant-read`.
 - **Tooling**: recipes for the mobile builds and the binding generation, and the two targets added to `just setup-tooling`. The container stand, its pipeline job and the demo script are unaffected — they exercise the same runtime through the other host.
 - **Tests**: the facade's surface driven in-process against 2 handles through exported calls alone, with the paired denial of an unconnected third handle in the same place; the error table asserted directly; a payload minted here parsed by the other host's decoding and the reverse. The absences are stated in the crate's docs rather than asserted, because an absence has no test that could fail.
-- **`components/data-layer/node-assembly.md`**: gains the default reconcile interval and the in-memory storage as requirements, so a mobile specification is not the only written statement of either.
+- **`components/mee-pdn/data-layer/node-assembly.md`**: gains the default reconcile interval and the in-memory storage as requirements, so a mobile specification is not the only written statement of either.
 - **The risk that outranks the rest**: the portability premise. Until one build runs on one phone and two devices pair over a real network, every task after the spike rests on an assumption.

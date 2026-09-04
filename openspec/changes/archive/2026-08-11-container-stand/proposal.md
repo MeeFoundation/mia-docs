@@ -23,7 +23,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)          | Archive destination                                     |
 | --------------------------- | ------------------------------------------------------- |
-| `pdn-node-container-stand`  | `openspec/specs/components/pdn-node/container-stand.md` |
+| `pdn-node-container-stand`  | `openspec/specs/components/mee-pdn/pdn-node-http/container-stand.md` |
 
 ### New Capabilities
 

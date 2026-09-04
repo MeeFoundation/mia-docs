@@ -5,7 +5,7 @@ The directory gains the per-connection kinds establishment publishes — how a c
 ## MODIFIED Requirements
 
 ### Requirement: Typed tickets, kind in the key
-The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names; `connections` is the kind device linking discovers (see [device-linking.md](device-linking.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand.
+The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names; `connections` is the kind device linking discovers (see [device-linking.md](../pdn-node/device-linking.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand.
 
 #### Scenario: A published ticket round-trips
 - **WHEN** a ticket is published under a kind on one device and read on another after replication

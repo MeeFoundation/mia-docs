@@ -37,7 +37,7 @@ Facts that constrain the design:
 
 Chosen option: **a dedicated linking protocol on its own ALPN**, because it is the only option that removes both reconciliation waits and the bearer QR at once, gives the linking secret the same atomic home pairing's has, and hands the newcomer the full store set with no discovery step.
 
-The shape (the ceremony is specified in [device-linking.md](../../components/pdn-node/device-linking.md)):
+The shape (the ceremony is specified in [device-linking.md](../../components/mee-pdn/pdn-node/device-linking.md)):
 
 * **The linking payload carries**: a format version, the inviting device's node address, a one-time short-lived secret, and the identity's `PdnId`. It carries **no** tickets and **no** identity proof — nothing in it grants durable access.
 * **The dialogue**: the new device dials the payload's address on the linking ALPN — separate from the pairing ALPN, because the stakes differ (a whole-directory write ticket versus per-connection read tickets) and separate protocols version their wire formats independently. It presents the format version and the secret; the inviter **atomically verifies and burns** the secret before any state change. Refusals are uniform: wrong, expired, burned, malformed, and unknown-version all get the same silent close, and a refused attempt leaves no observable state. A wrong secret burns nothing.

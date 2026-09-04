@@ -29,10 +29,10 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)                  | Archive destination                                              |
 | ----------------------------------- | ---------------------------------------------------------------- |
-| `pdn-node-core`                     | `openspec/specs/components/pdn-node/core.md`                     |
-| `pdn-node-connection-establishment` | `openspec/specs/components/pdn-node/connection-establishment.md` |
-| `pdn-node-device-linking`           | `openspec/specs/components/pdn-node/device-linking.md`           |
-| `data-layer-subset-reconciliation`  | `openspec/specs/components/data-layer/subset-reconciliation.md`  |
+| `pdn-node-core`                     | `openspec/specs/components/mee-pdn/pdn-node/core.md`                     |
+| `pdn-node-connection-establishment` | `openspec/specs/components/mee-pdn/pdn-node/connection-establishment.md` |
+| `pdn-node-device-linking`           | `openspec/specs/components/mee-pdn/pdn-node/device-linking.md`           |
+| `data-layer-subset-reconciliation`  | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation.md`  |
 
 ### New Capabilities
 

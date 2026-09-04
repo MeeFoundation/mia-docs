@@ -54,7 +54,7 @@ The data service includes listing — without enumeration a service cannot show 
 ## Risks / Trade-offs
 
 - **[Whole-store ticket sharing in the service surface]** Exposing share/import invites treating it as the sharing model. → It is the documented interim model (ADR-0008 posture); the spec requirement names it interim, and the subset-rbsr / connection-metadata changes replace the mechanism and the requirement together.
-- **[Runtime spec shadows data-layer specs]** Service-level scenarios re-tread store behavior. → The runtime spec pins delegation and isolation contracts (what the glue must preserve), not store semantics; store behavior stays specified in `components/data-layer/`.
+- **[Runtime spec shadows data-layer specs]** Service-level scenarios re-tread store behavior. → The runtime spec pins delegation and isolation contracts (what the glue must preserve), not store semantics; store behavior stays specified in `components/mee-pdn/data-layer/`.
 - **[Traits with a single implementation]** Dead seams if the second implementation never comes. → The rule is applied per service with a named second implementation (KERI, test mock); hosts test against mocks immediately, so the seam is exercised from day one.
 - **[Placeholder identity minting leaks into products]** A random `PdnId` with no key material behind it. → Confined to the identity service implementation; the trait is the replacement seam, and proof-of-control is already marked deferred in ADR-0011's dialogue.
 

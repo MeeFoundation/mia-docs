@@ -7,7 +7,7 @@ The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by app
 ## Requirements
 
 ### Requirement: The assembly accepts a supplied protocol handler
-`SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today pairing ([ADR-0011](../../architecture/adr/0011-pairing-over-raw-iroh.md)) and device linking ([ADR-0012](../../architecture/adr/0012-linking-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
+`SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today pairing ([ADR-0011](../../../architecture/adr/0011-pairing-over-raw-iroh.md)) and device linking ([ADR-0012](../../../architecture/adr/0012-linking-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
 
 #### Scenario: An extra protocol answers on its ALPN
 - **WHEN** node A spawns with a test echo handler under a test ALPN and node B dials A's address under that ALPN and sends bytes

@@ -1,6 +1,6 @@
 ## Context
 
-The runtime's services are complete and proven in-process, and the container stand proved they run across separate processes over a real transport. Both proofs are read by an engineer in a terminal, because the only host in the tree exists for the stand. Its own spec says the HTTP surface is a host over the core rather than the platform API, and that other hosts embed the same core ([http-host](../../specs/components/pdn-node/http-host.md)); its requirement is generic — product hosts embed the runtime in-process, and the runtime declares no HTTP of its own. This change builds the first host on the product side of that requirement, and nothing above it.
+The runtime's services are complete and proven in-process, and the container stand proved they run across separate processes over a real transport. Both proofs are read by an engineer in a terminal, because the only host in the tree exists for the stand. Its own spec says the HTTP surface is a host over the core rather than the platform API, and that other hosts embed the same core ([http-host](../../specs/components/mee-pdn/pdn-node-http/host.md)); its requirement is generic — product hosts embed the runtime in-process, and the runtime declares no HTTP of its own. This change builds the first host on the product side of that requirement, and nothing above it.
 
 Three properties of the runtime bound everything below, and none is a choice made here. The iroh endpoint binds with no relay and no discovery configured, so a peer is reached only at an address the endpoint publishes about itself. Replicas and payloads are held in memory, so the process is the lifetime of every identity it hosts. An identity is a placeholder value with no key material behind it.
 
@@ -51,7 +51,7 @@ The host brings the runtime up with an explicitly configured reconcile interval 
 
 What the interval actually governs: the periodic pass drives every replica the node tracks, under either synchronization strategy, so it bounds a published grant record reaching the peer's copy of the pair, a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It does not bound the grantee's read of a granted claim, which nudges its own filtered reconciliation, so repeating that read converges largely independently of the interval. Gossip is what a swarm-strategy replica gets in addition, not instead.
 
-The container stand requires that no route, environment variable, or harness call shorten the runtime's cadence ([container-stand](../../specs/components/pdn-node/container-stand.md)). That is about a test making convergence look faster than it is; a host configuring its own spawn is neither a route nor a harness, and its reason is the opposite one — a person watching, in a host that says what number it chose.
+The container stand requires that no route, environment variable, or harness call shorten the runtime's cadence ([container-stand](../../specs/components/mee-pdn/pdn-node-http/container-stand.md)). That is about a test making convergence look faster than it is; a host configuring its own spawn is neither a route nor a harness, and its reason is the opposite one — a person watching, in a host that says what number it chose.
 
 ### D6. A ceremony payload crosses in the runtime's own encoding
 

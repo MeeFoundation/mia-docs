@@ -1,6 +1,6 @@
 # mobile-common: host surface
 
-The mobile host is the second host over the runtime and the first one on the product side of the boundary [http-host](../pdn-node/http-host.md) draws: a product host embeds the runtime core in-process and reaches other nodes only over the runtime's own protocols, while the runtime carries no host dependency of its own. What this surface exposes, what it refuses to expose, how it reports a refusal, and what it says about the state underneath it are requirements, because an application built on it can only be as honest as the surface it stands on.
+The mobile host is the second host over the runtime and the first one on the product side of the boundary [http-host](../mee-pdn/pdn-node-http/host.md) draws: a product host embeds the runtime core in-process and reaches other nodes only over the runtime's own protocols, while the runtime carries no host dependency of its own. What this surface exposes, what it refuses to expose, how it reports a refusal, and what it says about the state underneath it are requirements, because an application built on it can only be as honest as the surface it stands on.
 
 Two words are used throughout with the meanings the runtime gives them, and one of the two needs care. An *identity* is what the runtime hosts: a data namespace, a directory of its own devices, and the connections it has established.
 
@@ -133,7 +133,7 @@ One grant record exists per granted issuer toward a peer, so publishing again SH
 - **THEN** the facade reports the unsupported-delegation refusal and no record is written
 
 ### Requirement: Both grant reads are passed through as the observations they are
-The runtime's grant reads report what is readable at the moment of the call and never wait ([core](../pdn-node/core.md)). The facade SHALL preserve that: it SHALL NOT wait inside either read for a grant to arrive, and SHALL NOT report a grant record whose payload has not been fetched as anything other than no grant.
+The runtime's grant reads report what is readable at the moment of the call and never wait ([core](../mee-pdn/pdn-node/core.md)). The facade SHALL preserve that: it SHALL NOT wait inside either read for a grant to arrive, and SHALL NOT report a grant record whose payload has not been fetched as anything other than no grant.
 
 A caller waiting for a grant therefore repeats the read, as it does for a claim. A facade that waited inside the call would turn a peer who granted nothing into a call that never returns.
 
@@ -215,7 +215,7 @@ Every paired denial rests on the table's distinctions ([access-control-tests](..
 - **THEN** it is reported as the unrecognized failure and never as a refusal, so an unexpected defect cannot be read as an access decision
 
 ### Requirement: An ungranted write is reported as its own refusal
-The runtime refuses a write at a claim the local grant record covers read-only, at the call and without touching the replica ([core](../pdn-node/core.md)). The facade SHALL report that refusal as a kind of its own, distinct from every other refusal and from a write the node accepted.
+The runtime refuses a write at a claim the local grant record covers read-only, at the call and without touching the replica ([core](../mee-pdn/pdn-node/core.md)). The facade SHALL report that refusal as a kind of its own, distinct from every other refusal and from a write the node accepted.
 
 The facade SHALL also state what an accepted write does and does not mean: a write into a granted namespace was admitted locally against the grant record this node has read, and the issuer's own gate decides afterwards. A claim the issuer's record does not cover is refused there and the provisional entry is retracted here, and no answer on this surface carries that verdict.
 
@@ -251,7 +251,7 @@ Every operation that crosses the network — a ceremony, a read that waits on a 
 - **THEN** the caller is free to run and the result arrives when the ceremony ends, with no thread of the caller's blocked on it
 
 ### Requirement: The host repeats what the runtime says about its state, and adds nothing
-The runtime holds replicas, payloads, hosted identities, device records, connections and its own key in memory ([node-assembly](../data-layer/node-assembly.md)), so ending the process loses every one of them. The facade SHALL state that where an embedder reads about it, SHALL NOT present any state as persisted, and SHALL NOT offer an act whose meaning depends on state outliving the process.
+The runtime holds replicas, payloads, hosted identities, device records, connections and its own key in memory ([node-assembly](../mee-pdn/data-layer/node-assembly.md)), so ending the process loses every one of them. The facade SHALL state that where an embedder reads about it, SHALL NOT present any state as persisted, and SHALL NOT offer an act whose meaning depends on state outliving the process.
 
 The fact belongs to `data-layer` and is cited here rather than asserted, so that a change to the runtime's storage does not leave a mobile specification as the only place the old behaviour is written down.
 
@@ -260,7 +260,7 @@ The fact belongs to `data-layer` and is cited here rather than asserted, so that
 - **THEN** it hosts no identity, holds no connection, and its node id differs from the one it had before
 
 ### Requirement: An identity carries no key material, and the host claims none
-The runtime mints an identity as a placeholder value with no key material behind it ([core](../pdn-node/core.md)), so nothing binds an identity to a person or an organization. The facade SHALL NOT present an identity as authenticated, verified or proven, and SHALL NOT expose an operation that would imply it.
+The runtime mints an identity as a placeholder value with no key material behind it ([core](../mee-pdn/pdn-node/core.md)), so nothing binds an identity to a person or an organization. The facade SHALL NOT present an identity as authenticated, verified or proven, and SHALL NOT expose an operation that would imply it.
 
 A connection established through the pairing ceremony is evidence that two devices ran the ceremony with the same one-time secret, and nothing more. What the person on the other side is called is what they said they were called.
 

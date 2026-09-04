@@ -10,7 +10,7 @@ The ingest-policy capability is withdrawn whole: the gate hard-codes the one-ide
 
 ### Requirement: Invariant 1 admits own bindings without store reads
 **Reason**: `SelfOwned` is the one place in the codebase that pins a node to a single identity; hosting several identities removes it. Invariant 1 retains its ticket mechanism — a replica's ticket is handed only to that identity's devices — and loses its code mechanism for the interim window.
-**Migration**: None in code; the invariants spec (`components/pdn-node/invariants.md`, Invariant 1) is edited in this change to state that enforcement rests on ticket possession until subset-rbsr and UWill.
+**Migration**: None in code; the invariants spec (`components/mee-pdn/invariants.md`, Invariant 1) is edited in this change to state that enforcement rests on ticket possession until subset-rbsr and UWill.
 
 ### Requirement: Policies compose
 **Reason**: With no policies left there is nothing to compose; `AnyOf` and the `IngestPolicy` trait are removed with the gate.

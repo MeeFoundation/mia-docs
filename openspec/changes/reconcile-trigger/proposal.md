@@ -22,7 +22,7 @@ Correctness and confidentiality do not depend on this change: reconciliation rem
 
 | Capability (delta)             | Archive destination                                         |
 | ------------------------------ | ----------------------------------------------------------- |
-| `data-layer-reconcile-trigger` | `openspec/specs/components/data-layer/reconcile-trigger.md`  |
+| `data-layer-reconcile-trigger` | `openspec/specs/components/mee-pdn/data-layer/reconcile-trigger.md`  |
 
 ### New Capabilities
 
