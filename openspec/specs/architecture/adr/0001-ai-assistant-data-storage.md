@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-05-12
 ---
 
@@ -32,12 +32,14 @@ The AI Assistant platform requires a reliable and scalable approach for storing 
 
 ## Decision Outcome
 
-No decision yet — the evaluation is in progress.
+Chosen option: [LadybugDB](https://ladybugdb.com/), based on the benchmark results below (bulk insert, nested query, and Android emulator/device tests), which showed the best combination of ingest/query performance and memory footprint among the evaluated options, including on constrained mobile hardware.
 
 ### Consequences
 
-- Good, because {positive consequence, e.g., improvement of one or more desired qualities, …}
-- Bad, because {negative consequence, e.g., compromising one or more desired qualities, …}
+- Good, because LadybugDB had the fastest bulk insert time (10,750 ms) and lowest nested query cold-start memory (276,780 KB) among all benchmarked options at the 100,000-claim dataset size, and was the only engine to complete the 500,000/1,000,000-record Android device tests without OOM or multi-minute ingest times.
+- Bad, because LadybugDB is not implemented in Rust, so the platform takes on an FFI boundary rather than a native Rust dependency.
+- Bad, because LadybugDB is a newer, more specialized project with a smaller ecosystem and fewer production references than more established graph or multi-model databases, so the team is taking on more first-mover risk.
+- Neutral, because LadybugDB enforces a strict structured property graph model with mandatory schemas (`CREATE NODE TABLE` / `CREATE REL TABLE`) and Cypher queries, requiring upfront ontology and schema design discipline rather than schema-on-read flexibility. We circumvent this with extended-EAV data model.
 
 ## Pros and Cons of the Options
 
