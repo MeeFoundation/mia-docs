@@ -1,80 +1,29 @@
 ---
-# These are optional elements. Feel free to remove any of them.
-status: {proposed | rejected | accepted | deprecated | … | superseded by ADR-0005 <0005-example.md>}
-date: {YYYY-MM-DD when the decision was last updated}
-deciders: {list everyone involved in the decision}
-consulted: {list everyone whose opinions are sought (typically subject-matter experts); and with whom there is a two-way communication}
-informed: {list everyone who is kept up-to-date on progress; and with whom there is a one-way communication}
+status: accepted
+date: 2026-09-04
 ---
-# {short title of solved problem and solution}
+# Capabilities name identities, not device keys
 
 ## Context and Problem Statement
 
-{Describe the context and problem statement, e.g., in free form using two to three sentences or in the form of an illustrative story.
- You may want to articulate the problem in form of a question and add links to collaboration boards or issue management systems.}
-
-<!-- This is an optional element. Feel free to remove. -->
-## Decision Drivers
-
-* {decision driver 1, e.g., a force, facing concern, …}
-* {decision driver 2, e.g., a force, facing concern, …}
-* … <!-- numbers of drivers can vary -->
+A capability says who may do what with a claim, and the holder can be named at two levels: the identity, or the key of the device that carries out the access. An identity has several devices, gains and loses them over its life, and every one of them needs the same access the identity was given.
 
 ## Considered Options
 
-* {title of option 1}
-* {title of option 2}
-* {title of option 3}
-* … <!-- numbers of options can vary -->
+* **Name the identity in the capability**, and resolve the connecting device to its identity when the capability is checked ← chosen
+* **Name device keys**, with the platform expanding each identity-level grant into one delegation per device and keeping the set consistent as devices come and go
 
 ## Decision Outcome
 
-Chosen option: "{title of option 1}", because
-{justification. e.g., only option, which meets k.o. criterion decision driver | which resolves force {force} | … | comes out best (see below)}.
+Chosen option: **capabilities name the identity**. `Capability.holders` is a list of `PdnId`, and a UWill token's `iss`, `aud` and `sub` are PdnId-backed. Enforcement matches: the ingest gate resolves the transport-authenticated session peer to an identity and judges it against that identity's recorded grant ([capability-gated ingest](../../components/data-layer/capability-gated-ingest.md)). Linking a device re-issues nothing.
 
-<!-- This is an optional element. Feel free to remove. -->
 ### Consequences
 
-* Good, because {positive consequence, e.g., improvement of one or more desired qualities, …}
-* Bad, because {negative consequence, e.g., compromising one or more desired qualities, …}
-* … <!-- numbers of consequences can vary -->
+* Good, because a device joins or leaves an identity without touching a single grant — there is no per-device set to expand or to keep consistent.
+* Good, because withdrawal and revocation act on one record per audience instead of a set that grows with the audience's device count.
+* Bad, because every check depends on resolving a device to its identity, so a device set that is stale or wrong weakens each grant judged through it.
+* Bad, because until identity proofs land ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)) that resolution rests on records the identity's own devices wrote, not on proof of control over the named identity.
 
-<!-- This is an optional element. Feel free to remove. -->
-## Validation
-
-{describe how the implementation of/compliance with the ADR is validated. E.g., by a review or an ArchUnit test}
-
-<!-- This is an optional element. Feel free to remove. -->
-## Pros and Cons of the Options
-
-### {title of option 1}
-
-<!-- This is an optional element. Feel free to remove. -->
-{example | description | pointer to more information | …}
-
-* Good, because {argument a}
-* Good, because {argument b}
-<!-- use "neutral" if the given argument weights neither for good nor bad -->
-* Neutral, because {argument c}
-* Bad, because {argument d}
-* … <!-- numbers of pros and cons can vary -->
-
-### {title of other option}
-
-{example | description | pointer to more information | …}
-
-* Good, because {argument a}
-* Good, because {argument b}
-* Neutral, because {argument c}
-* Bad, because {argument d}
-* …
-
-<!-- This is an optional element. Feel free to remove. -->
 ## More Information
 
-{You might want to provide additional evidence/confidence for the decision outcome here and/or
- document the team agreement on the decision and/or
- define when and how this decision should be realized and if/when it should be re-visited and/or
- how the decision is validated.
- Links to other decisions and resources might appear here as well.}
- 
+Related: [ADR-0002](0002-mee-identity-is-globally-unique.md) (the one identifier a capability names), [ADR-0007](0007-uwill.md) (UWill, the capability format built on this decision), [ADR-0008](0008-iroh-without-willow.md) (the ingest gate that enforces it).
