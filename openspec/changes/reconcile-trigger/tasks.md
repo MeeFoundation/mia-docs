@@ -20,4 +20,4 @@ Scope: the live path for capability-scoped peers — a directed, content-free tr
 
 ## 4. Docs & archive
 
-- [ ] 4.1 On archive: place `data-layer-reconcile-trigger` into `components/data-layer/`
+- [ ] 4.1 On archive: place `data-layer-reconcile-trigger` into `components/mee-pdn/data-layer/`

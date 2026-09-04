@@ -158,7 +158,7 @@ Not exercised, and named as such: a device that restarts and returns with its st
 ### Requirement: The narration states what is not shown
 The demonstration SHALL state, rather than leave to inference: that state is held in memory and does not survive the process; that an identity carries no key material, so nothing here proves who a peer is; that the reconcile cadence is a configured number rather than a property of the network; which nodes in the staging are not phones; and that withdrawing a grant closes further delivery without recalling what was already delivered.
 
-A demonstration silent on these invites the opposite assumption on each, and the assumption is what the audience carries away. The last is the one the demonstration would otherwise oversell hardest: a field vanishing from a phone looks like deletion, and the platform promises that access is gated before delivery rather than that delivered data can be retracted ([invariants](../pdn-node/invariants.md), Invariant 2).
+A demonstration silent on these invites the opposite assumption on each, and the assumption is what the audience carries away. The last is the one the demonstration would otherwise oversell hardest: a field vanishing from a phone looks like deletion, and the platform promises that access is gated before delivery rather than that delivered data can be retracted ([invariants](../mee-pdn/invariants.md), Invariant 2).
 
 #### Scenario: The absences are named
 - **WHEN** the demonstration is delivered

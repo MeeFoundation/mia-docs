@@ -19,4 +19,4 @@
 ## 4. Documentation
 
 - [x] 4.1 Audit every `Invariant 1` reference in code/docs to read as enforcement ("we run X to enforce Invariant 1"), never reliance on a convention
-- [x] 4.2 On archive: place the capability spec at `components/data-layer/device-linking.md`
+- [x] 4.2 On archive: place the capability spec at `components/mee-pdn/pdn-node/device-linking.md`

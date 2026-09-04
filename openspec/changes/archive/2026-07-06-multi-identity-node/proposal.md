@@ -22,14 +22,14 @@ A person runs several identities from the same device — Alice-at-work and Alic
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/pdn-node/uwill.md` convention.
+Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/mee-pdn/pdn-layer/uwill.md` convention.
 
 | Capability (delta)            | Archive destination                                            |
 | ----------------------------- | -------------------------------------------------------------- |
-| `data-layer-multi-identity`   | `openspec/specs/components/data-layer/multi-identity.md`        |
-| `data-layer-ingest-policies`  | removes `openspec/specs/components/data-layer/ingest-policies.md` |
-| `data-layer-connections-store`| `openspec/specs/components/data-layer/connections-store.md`     |
-| `data-layer-device-linking`   | `openspec/specs/components/data-layer/device-linking.md`        |
+| `data-layer-multi-identity`   | `openspec/specs/components/mee-pdn/data-layer/multi-identity.md`        |
+| `data-layer-ingest-policies`  | removes `openspec/specs/components/mee-pdn/data-layer/ingest-policies.md` |
+| `data-layer-connections-store`| `openspec/specs/components/mee-pdn/data-layer/connection-metadata-store.md`     |
+| `data-layer-device-linking`   | `openspec/specs/components/mee-pdn/pdn-node/device-linking.md`        |
 
 ### New Capabilities
 
@@ -46,5 +46,5 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 - **`crates/data-layer`**: `gate.rs` deleted; `registry.rs` shrinks to per-identity doc addressing (no `Binding`, no `BindingIndex`); `SyncNode::spawn()` signature changes (no policy); `lib.rs` exports shrink accordingly. The stores' `create`/`import` and `link_device` lose their `identity` parameters (dead once binding registration went); `linking.rs` gains `provision_identity` (first-device bootstrap).
 - **`crates/data-layer/tests`**: `sync_two_nodes.rs` deleted; `sync_two_devices.rs` and `device_linking.rs` updated; new `multi_identity.rs` scenario test.
 - **pdn-store fork**: untouched — the `validate_entry` / `capability_validator` seam stays, uninstalled.
-- **`mia-docs` specs**: `components/pdn-node/invariants.md` Invariant 1 enforcement mechanisms edited; `changes/subset-rbsr/design.md` gains an open-question note (D4 "same-identity peer" under multi-identity).
+- **`mia-docs` specs**: `components/mee-pdn/invariants.md` Invariant 1 enforcement mechanisms edited; `changes/archive/2026-07-20-subset-rbsr/design.md` gains an open-question note (D4 "same-identity peer" under multi-identity).
 - **Unaffected**: `pdn-types`, `pdn-layer`.

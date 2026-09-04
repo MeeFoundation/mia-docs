@@ -25,11 +25,11 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)        | Archive destination                                   |
 | ------------------------- | ----------------------------------------------------- |
-| `data-layer-node-assembly` | `openspec/specs/components/data-layer/node-assembly.md` |
+| `data-layer-node-assembly` | `openspec/specs/components/mee-pdn/data-layer/node-assembly.md` |
 
 ### New Capabilities
 
-- `data-layer-node-assembly`: the node assembly as the registration point ADR-0011 needs — letting the pairing protocol (a raw dialogue that establishes a connection between two identities) ride the node's one endpoint next to the built-in stack, without data-layer owning its semantics. Covers the spawn-time registration point keyed by ALPN, ALPN uniqueness against the built-in stack, panic-isolation of the supplied handler, and a dial handle onto the endpoint for reaching a peer and reading the node's own address. Kept protocol-agnostic (an opaque handler) because pairing's semantics live above in pdn-node, not to offer general protocol extensibility. The existing `components/data-layer/` specs describe the stores and flows riding the assembly; this one describes the assembly itself.
+- `data-layer-node-assembly`: the node assembly as the registration point ADR-0011 needs — letting the pairing protocol (a raw dialogue that establishes a connection between two identities) ride the node's one endpoint next to the built-in stack, without data-layer owning its semantics. Covers the spawn-time registration point keyed by ALPN, ALPN uniqueness against the built-in stack, panic-isolation of the supplied handler, and a dial handle onto the endpoint for reaching a peer and reading the node's own address. Kept protocol-agnostic (an opaque handler) because pairing's semantics live above in pdn-node, not to offer general protocol extensibility. The existing `components/mee-pdn/data-layer/` specs describe the stores and flows riding the assembly; this one describes the assembly itself.
 
 ### Modified Capabilities
 

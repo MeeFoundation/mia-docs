@@ -46,6 +46,6 @@
 
 ## 5. Docs sweep
 
-- [x] 5.1 `pdn-node/core.md` covered by its own delta (`specs/pdn-node-core/`): the blanket "never re-serves to third parties" is replaced by the audience-device stance, and "importing remains an explicit data-service act" by the grant-binding behaviour, in both the connections and the data requirement
+- [x] 5.1 `mee-pdn/pdn-node/core.md` covered by its own delta (`specs/pdn-node-core/`): the blanket "never re-serves to third parties" is replaced by the audience-device stance, and "importing remains an explicit data-service act" by the grant-binding behaviour, in both the connections and the data requirement
 - [x] 5.2 In-code rustdoc carrying the same removed promise: `import_namespace_granted` / `import_namespace_scoped` in data-layer, the data service trait in pdn-node, and the data-layer crate-level module doc
 - [x] 5.3 Swept the spec tree and `reconcile-trigger` at archive time: no stale "never re-serves" / whole-store / "grant book it does not hold" phrasing survives (remaining "whole store" mentions are the metadata replica, not a grant width); the three delta requirements are hand-applied to the main tree (subset-reconciliation, core, connection-metadata-store); swarm glossary truthful, "audience" predates this change and needs no new entry

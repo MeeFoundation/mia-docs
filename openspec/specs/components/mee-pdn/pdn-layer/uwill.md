@@ -1,6 +1,6 @@
 # UWill capability format
 
-Technical specification of the UWill capability token, chain validation rules, revocation mechanism, and identity resolution as implemented inside the PDN node. The architectural rationale — why UWill rather than Meadowcap or some other alternative — lives in [ADR-0007](../../architecture/adr/0007-uwill.md).
+Technical specification of the UWill capability token, chain validation rules, revocation mechanism, and identity resolution as implemented inside the PDN node. The architectural rationale — why UWill rather than Meadowcap or some other alternative — lives in [ADR-0007](../../../architecture/adr/0007-uwill.md).
 
 ## Token format
 
@@ -40,7 +40,7 @@ A UWill capability grants access to **exactly one claim**. The resource field is
 | ---------- | ------------------------------------------------------------- |
 | `claim_id` | The `ClaimId` of the claim this capability grants access to. |
 
-`ClaimId` is the 32-byte stable identifier of a [Claim](../../architecture/language/claim.md) at the PDN domain layer. Willow-level addressing (namespace, subspace, path) is *not* exposed in UWill tokens: each `ClaimId` resolves to a specific willow leaf inside the iroh-willow fork's storage, and that mapping is the implementation's concern.
+`ClaimId` is the 32-byte stable identifier of a [Claim](../../../architecture/language/claim.md) at the PDN domain layer. Willow-level addressing (namespace, subspace, path) is *not* exposed in UWill tokens: each `ClaimId` resolves to a specific willow leaf inside the iroh-willow fork's storage, and that mapping is the implementation's concern.
 
 Prefix-based scoping and other geometric regions are intentionally not supported at the UWill level. If a use case requires granting access to a set of claims, the issuer SHALL produce one UWill delegation per `ClaimId`.
 

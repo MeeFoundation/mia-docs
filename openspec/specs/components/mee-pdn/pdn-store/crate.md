@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The document sync engine under the data layer — n0's `iroh-docs`, diverged where the platform's access model needs it ([ADR-0008](../../architecture/adr/0008-iroh-without-willow.md)) — as a crate of the workspace: where it lives, how the workspace names it, and how the configurations the workspace build never compiles are checked and tested. The engine's behaviour is specified where it is consumed — the data layer's stores, reconciliation, and ingest gate — and nothing here changes it.
+The document sync engine under the data layer — n0's `iroh-docs`, diverged where the platform's access model needs it ([ADR-0008](../../../architecture/adr/0008-iroh-without-willow.md)) — as a crate of the workspace: where it lives, how the workspace names it, and how the configurations the workspace build never compiles are checked and tested. The engine's behaviour is specified where it is consumed — the data layer's stores, reconciliation, and ingest gate — and nothing here changes it.
 
 ## Requirements
 

@@ -15,7 +15,7 @@ A capability says who may do what with a claim, and the holder can be named at t
 
 ## Decision Outcome
 
-Chosen option: **capabilities name the identity**. `Capability.holders` is a list of `PdnId`, and a UWill token's `iss`, `aud` and `sub` are PdnId-backed. Enforcement matches: the ingest gate resolves the transport-authenticated session peer to an identity and judges it against that identity's recorded grant ([capability-gated ingest](../../components/data-layer/capability-gated-ingest.md)). Linking a device re-issues nothing.
+Chosen option: **capabilities name the identity**. `Capability.holders` is a list of `PdnId`, and a UWill token's `iss`, `aud` and `sub` are PdnId-backed. Enforcement matches: the ingest gate resolves the transport-authenticated session peer to an identity and judges it against that identity's recorded grant ([capability-gated ingest](../../components/mee-pdn/data-layer/capability-gated-ingest.md)). Linking a device re-issues nothing.
 
 ### Consequences
 

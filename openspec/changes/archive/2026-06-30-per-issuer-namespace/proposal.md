@@ -18,16 +18,16 @@ ADR-0009 decides the collapse: drop the pair, one namespace per issuer, granular
 
 - **Computed namespace key / dropping the mapping** — safe only once write-authority is UWill, not namespace-secret possession (design D2). Until then: random key + interim mapping.
 - **UWill itself** (ADR-0007) — this change consumes the per-claim model, it does not implement the token.
-- **Lazy data-namespace import at device linking** — the directory rail and staging are recorded in design D4; the import is a follow-up. Device-internal stores are unaffected (`components/data-layer/device-linking.md`).
+- **Lazy data-namespace import at device linking** — the directory rail and staging are recorded in design D4; the import is a follow-up. Device-internal stores are unaffected (`components/mee-pdn/pdn-node/device-linking.md`).
 - **Confidentiality** — deferred to UWill; the replica boundary is not a confidentiality tool, so one-per-issuer regresses nothing (design D3).
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/pdn-node/uwill.md` convention.
+Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/mee-pdn/pdn-layer/uwill.md` convention.
 
 | Capability (delta)              | Archive destination                                         |
 | ------------------------------- | ----------------------------------------------------------- |
-| `pdn-node-namespace-addressing` | `openspec/specs/components/pdn-node/namespace-addressing.md` |
+| `pdn-node-namespace-addressing` | `openspec/specs/components/mee-pdn/pdn-node/namespace-addressing.md` |
 
 ### New Capabilities
 
@@ -36,7 +36,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 ### Modified Capabilities
 
 <!-- none in this change: the data-layer specs that still name (about, issued_by)
-  — components/data-layer/ingest-policies.md, components/data-layer/connections-store.md —
+  — components/mee-pdn/data-layer/ingest-policies.md, components/mee-pdn/data-layer/connection-metadata-store.md —
   are updated to Binding::Data { issuer } when the code lands, since pdn-types still
   carries the pair today. Tracked in tasks.md, not as deltas here. -->
 
@@ -46,4 +46,4 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 - **`crates/data-layer`**: `Binding::Data { issuer }`; `BindingIndex` keyed by issuer; `DataLayer` trait re-keyed `&NamespaceId` → issuer `PdnId`; `SelfOwned` data arm matches on issuer. Namespace key stays random + mapping (interim).
 - **`crates/pdn-layer` / future pdn-node**: claims addressed by `ClaimId` + UWill; no namespace naming.
 - **Fork (`pdn-store`)**: not touched — addressing and binding resolution stay above the seam.
-- **Unaffected**: device-internal stores and Invariant 1 (`components/pdn-node/invariants.md`).
+- **Unaffected**: device-internal stores and Invariant 1 (`components/mee-pdn/invariants.md`).

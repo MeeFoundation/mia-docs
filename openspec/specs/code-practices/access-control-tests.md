@@ -2,7 +2,7 @@
 
 A test that only asserts an authorized party *can* access something verifies nothing about the control — a completely broken control that grants everyone everything passes it. Every test that asserts authorized access MUST, in the same place, assert that the corresponding **unauthorized** party is denied. Pick the tightest negative party for what is under test.
 
-This makes the invariants testable rather than merely asserted (`../components/pdn-node/invariants.md`): Invariant 1 (a store is held by its own identity's devices, and only those) and Invariant 2 (a node acquires a claim only if it holds a read capability for it). A positive-only test leaves both unverified.
+This makes the invariants testable rather than merely asserted (`../components/mee-pdn/invariants.md`): Invariant 1 (a store is held by its own identity's devices, and only those) and Invariant 2 (a node acquires a claim only if it holds a read capability for it). A positive-only test leaves both unverified.
 
 ## Rules
 

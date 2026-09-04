@@ -68,9 +68,9 @@ Group 1 is a gate, not a warm-up: nothing below the facade has ever been compile
 
 - [ ] 6.1 Crate docs of `pdn-mobile`: a host over the runtime, what it deliberately does not expose, its table's divergence from the HTTP host's, and that state is volatile
 - [ ] 6.2 CLAUDE.md crate row for `pdn-mobile`
-- [ ] 6.3 The one line of the tree this change makes false: `components/pdn-node/http-host.md` says other hosts embed the same core *later*, which stops being true when this one lands. Correct it in the same change
+- [ ] 6.3 The one line of the tree this change makes false: `components/mee-pdn/pdn-node-http/host.md` says other hosts embed the same core *later*, which stops being true when this one lands. Correct it in the same change
 - [ ] 6.4 Sweep the spec tree and the active changes for anything else this change invalidates — statements that the runtime has no product host, or that `pdn-node-http` is its only host
-- [ ] 6.5 Three facts of `data-layer` and `pdn-node` that this change's spec would otherwise be the only written statement of, each moved to the spec that owns it: the default reconcile interval and the in-memory storage into `components/data-layer/node-assembly.md`, which states neither. The transport posture needs no move — `container-stand.md` and ADR-0011 already state it — and the mobile spec cites all of them rather than asserting them
+- [ ] 6.5 Three facts of `data-layer` and `pdn-node` that this change's spec would otherwise be the only written statement of, each moved to the spec that owns it: the default reconcile interval and the in-memory storage into `components/mee-pdn/data-layer/node-assembly.md`, which states neither. The transport posture needs no move — `container-stand.md` and ADR-0011 already state it — and the mobile spec cites all of them rather than asserting them
 
 ## 7. Gates
 

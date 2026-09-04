@@ -23,8 +23,8 @@ computed key is deferred until UWill — design D2). No fork change.
 
 ## 4. Specs & docs
 
-- [x] 4.1 Update `components/data-layer/{ingest-policies,connections-store}.md`: `Data(NamespaceId)` → `Binding::Data { issuer }`; drop the `(about, issued_by)` wording
-- [x] 4.2 On archive: place `pdn-node-namespace-addressing` into `components/pdn-node/namespace-addressing.md`
+- [x] 4.1 Update `components/mee-pdn/data-layer/{ingest-policies,connections-store}.md`: `Data(NamespaceId)` → `Binding::Data { issuer }`; drop the `(about, issued_by)` wording
+- [x] 4.2 On archive: place `pdn-node-namespace-addressing` into `components/mee-pdn/pdn-node/namespace-addressing.md`
 
 ## 5. Validation
 

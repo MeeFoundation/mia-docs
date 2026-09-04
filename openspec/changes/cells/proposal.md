@@ -20,10 +20,10 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 
 | Capability (delta) | Archive destination |
 | --- | --- |
-| `data-layer-cell-store` | `openspec/specs/components/data-layer/cell-store.md` |
-| `pdn-node-cells` | `openspec/specs/components/pdn-node/cells.md` |
-| `data-layer-capability-gated-ingest` | `openspec/specs/components/data-layer/capability-gated-ingest.md` |
-| `data-layer-subset-reconciliation` | `openspec/specs/components/data-layer/subset-reconciliation.md` |
+| `data-layer-cell-store` | `openspec/specs/components/mee-pdn/data-layer/cell-store.md` |
+| `pdn-node-cells` | `openspec/specs/components/mee-pdn/pdn-node/cells.md` |
+| `data-layer-capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest.md` |
+| `data-layer-subset-reconciliation` | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation.md` |
 
 ### New Capabilities
 

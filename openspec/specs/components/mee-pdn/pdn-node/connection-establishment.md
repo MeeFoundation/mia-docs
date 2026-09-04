@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How two identities become [connected](../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../data-layer/private-metadata-store.md) and the exchanged [connection metadata pair](../data-layer/connection-metadata-store.md). The exchange is bearer-level for now: the KERI proof of control over a presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both peers must be online — pending invitations are future work.
+How two identities become [connected](../../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../data-layer/private-metadata-store.md) and the exchanged [connection metadata pair](../data-layer/connection-metadata-store.md). The exchange is bearer-level for now: the KERI proof of control over a presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both peers must be online — pending invitations are future work.
 
 ## Requirements
 

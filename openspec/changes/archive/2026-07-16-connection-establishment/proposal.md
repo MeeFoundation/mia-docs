@@ -30,10 +30,10 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)                     | Archive destination                                              |
 | -------------------------------------- | ---------------------------------------------------------------- |
-| `data-layer-connection-metadata-store` | `openspec/specs/components/data-layer/connection-metadata-store.md` |
-| `pdn-node-connection-establishment`    | `openspec/specs/components/pdn-node/connection-establishment.md` |
-| `pdn-node-core`                        | `openspec/specs/components/pdn-node/core.md`                     |
-| `data-layer-private-metadata-store`    | `openspec/specs/components/data-layer/private-metadata-store.md` |
+| `data-layer-connection-metadata-store` | `openspec/specs/components/mee-pdn/data-layer/connection-metadata-store.md` |
+| `pdn-node-connection-establishment`    | `openspec/specs/components/mee-pdn/pdn-node/connection-establishment.md` |
+| `pdn-node-core`                        | `openspec/specs/components/mee-pdn/pdn-node/core.md`                     |
+| `data-layer-private-metadata-store`    | `openspec/specs/components/mee-pdn/data-layer/private-metadata-store.md` |
 
 ### New Capabilities
 
@@ -47,7 +47,7 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 ### Non-capability spec edits (tasks, not deltas)
 
-- `components/pdn-node/invariants.md`: append Invariant 3 (append-only list; referenced by number).
+- `components/mee-pdn/invariants.md`: append Invariant 3 (append-only list; referenced by number).
 - `architecture/language/connection.md`: rewrite to the accepted model; link the term's first use in ADR-0011 and the two new specs; re-check the entries that link it (`relying-party.md`, ADR-0007).
 - `architecture/adr/0011-pairing-over-raw-iroh.md`: append the re-establishment Validation case; point the forward reference at the connection-metadata-store spec; strike the open questions this change resolves (secret entropy and lifetime, mid-dialogue failure handling, the handler's home). Status stays the maintainer's call.
 
@@ -58,5 +58,5 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 - **`crates/pdn-node-http`**: compile-level fallout only where its demo scaffolding referenced the removed operation — adjusted as scaffolding, not specced.
 - **Dependencies**: `postcard` (wire messages) becomes a direct `pdn-node` dependency, together with `serde` (derive) that its message types require; `rand` (the secret) already is one. `postcard` (1.1.3) is already in the tree transitively via pdn-store and is added per-crate — only the iroh stack is workspace-pinned.
 - **pdn-store fork**: planned untouched; implementation surfaced an inherited upstream liveness gap the new scenario tests exposed, fixed in the fork (see the design's discovered-during-implementation notes): content whose record traveled ahead of its bytes was re-requested only by one best-effort gossip broadcast — now every successful sync also retries the namespace's parked content against the just-synced peer. Upstream PR to iroh-docs to follow.
-- **Docs**: Invariant 3, the glossary rewrite, ADR-0011 Validation / More Information edits; a sweep of the spec tree and the active changes (subset-rbsr, reconcile-trigger) for statements this change invalidates — e.g. "recording is the current producer" in `pdn-node/core.md` and in the code docs.
+- **Docs**: Invariant 3, the glossary rewrite, ADR-0011 Validation / More Information edits; a sweep of the spec tree and the active changes (subset-rbsr, reconcile-trigger) for statements this change invalidates — e.g. "recording is the current producer" in `mee-pdn/pdn-node/core.md` and in the code docs.
 - **Tests / stress**: the change touches sync and node wiring — it ends with a counted stress pass over the new and adjacent scenario tests per the flaky-tests practice.

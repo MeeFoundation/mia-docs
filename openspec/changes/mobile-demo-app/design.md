@@ -68,7 +68,7 @@ The product-shaped properties are requirements: identities kept apart, a code th
 
 ### D9. The withdrawal act is narrated as closing delivery, not as deletion
 
-A field vanishing from a phone reads as deletion, and the platform does not promise that: a revoked capability blocks further delivery, and nothing compels a node that already received data to forget it ([invariants](../../specs/components/pdn-node/invariants.md), Invariant 2). This is the one act where the demonstration would otherwise oversell, so it is the fifth thing the narration states.
+A field vanishing from a phone reads as deletion, and the platform does not promise that: a revoked capability blocks further delivery, and nothing compels a node that already received data to forget it ([invariants](../../specs/components/mee-pdn/invariants.md), Invariant 2). This is the one act where the demonstration would otherwise oversell, so it is the fifth thing the narration states.
 
 The screen has a matching obligation in the other direction. Withdrawal unbinds the namespace, so the grantee's node stops knowing that issuer and every later read is refused rather than answered empty — and a screen that showed a fault banner at the moment a person exercised their own control would misdescribe the product exactly where it works best.
 

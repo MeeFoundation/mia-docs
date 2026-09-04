@@ -2,7 +2,7 @@
 
 The connections service reads the grants a peer published and offers no way to read the grants the identity published itself. A host can therefore show a person what others share with them and not what they share with others, which leaves the withdrawal of a grant as an act with nothing to name — and leaves the one question a person asks of a sovereignty product, "what am I sharing right now", answerable only from what a host happens to remember publishing, which is wrong on a second device and stale after a sibling withdraws.
 
-The right to the reading is [Invariant 3](invariants.md): a connection metadata store is written only by its issuing identity's devices, and read by those devices and the counterparty's. Every device of the identity already holds the instrument as well — the pairing ceremony publishes the own-side store's write ticket in the identity's directory under its own kind, so a device that replicated the directory opens that store without asking anyone. The operation exposes nothing that was not already the identity's to read.
+The right to the reading is [Invariant 3](../invariants.md): a connection metadata store is written only by its issuing identity's devices, and read by those devices and the counterparty's. Every device of the identity already holds the instrument as well — the pairing ceremony publishes the own-side store's write ticket in the identity's directory under its own kind, so a device that replicated the directory opens that store without asking anyone. The operation exposes nothing that was not already the identity's to read.
 
 ## MODIFIED Requirements
 

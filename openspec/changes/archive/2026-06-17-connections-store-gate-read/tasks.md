@@ -32,4 +32,4 @@ identity. No fork change; no gate-reads-the-store (deferred). The existing
 ## 5. Documentation
 
 - [x] 5.1 Update workspace CLAUDE.md crate table: `data-layer` now hosts the connections store + device axiom
-- [ ] 5.2 On archive: place the two capability specs into `components/data-layer/` per the proposal's mapping table, following the flat `components/pdn-node/uwill.md` convention
+- [ ] 5.2 On archive: place the two capability specs into `components/mee-pdn/data-layer/` per the proposal's mapping table, following the flat `components/mee-pdn/pdn-layer/uwill.md` convention

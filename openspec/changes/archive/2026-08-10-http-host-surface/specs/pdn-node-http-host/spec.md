@@ -56,7 +56,7 @@ The surface is a control plane over the one node serving it: every route SHALL a
 - **THEN** each request acts on the runtime of the host that serves it, the hosts exchange no HTTP requests between themselves, and the inter-node dialogue and synchronization run over the runtime's iroh connections
 
 ### Requirement: A refused operation is reported as a refusal
-The host SHALL report an operation the runtime refused with a client-error status and the runtime's error text, and SHALL NOT report it as success. A refusal SHALL be distinguishable from an absent route and from a host or transport failure. Container-level deny tests rest on this: a surface that answers alike for "the runtime refused you" and "you asked wrong" makes every paired denial vacuous ([access-control-tests](../../code-practices/access-control-tests.md)).
+The host SHALL report an operation the runtime refused with a client-error status and the runtime's error text, and SHALL NOT report it as success. A refusal SHALL be distinguishable from an absent route and from a host or transport failure. Container-level deny tests rest on this: a surface that answers alike for "the runtime refused you" and "you asked wrong" makes every paired denial vacuous ([access-control-tests](../../../code-practices/access-control-tests.md)).
 
 #### Scenario: An unhosted identity is refused, not absent
 - **WHEN** a debug request addresses an identity the runtime neither created nor linked
@@ -75,7 +75,7 @@ The host SHALL report an operation the runtime refused with a client-error statu
 - **THEN** the response is a client error and the inviting host records no second connection
 
 ### Requirement: The debug surface exposes live ceremony secrets and stays bound accordingly
-Invite and linking payloads cross the debug surface in the clear, each carrying its live one-time secret. The payloads are bearer-free as the ceremony specs require ([connection-establishment](connection-establishment.md), [device-linking](device-linking.md)) — no ticket and no identity proof, nothing that grants durable access — but until the secret is burnt or expired, whoever captures the payload can consume the invitation in the intended recipient's place. No namespace ticket crosses the surface at all. The surface carries no authentication of its own: reaching the surface is reaching the node. The host SHALL bind loopback unless a wider bind is configured explicitly, so exposing the surface beyond the local host is a deliberate act — the container harness's act, not a default.
+Invite and linking payloads cross the debug surface in the clear, each carrying its live one-time secret. The payloads are bearer-free as the ceremony specs require ([connection-establishment](../pdn-node/connection-establishment.md), [device-linking](../pdn-node/device-linking.md)) — no ticket and no identity proof, nothing that grants durable access — but until the secret is burnt or expired, whoever captures the payload can consume the invitation in the intended recipient's place. No namespace ticket crosses the surface at all. The surface carries no authentication of its own: reaching the surface is reaching the node. The host SHALL bind loopback unless a wider bind is configured explicitly, so exposing the surface beyond the local host is a deliberate act — the container harness's act, not a default.
 
 #### Scenario: Default bind is loopback
 - **WHEN** the host starts with no bind address configured

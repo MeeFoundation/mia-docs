@@ -26,12 +26,12 @@ Also still out: content-dependent UWill chain validation (needs blob payloads, n
 
 ## Capabilities
 
-Capability ids are component-prefixed (the openspec delta layout is flat: `specs/<capability>/spec.md`). Specs are component-owned: on archive they land in the component tree, following the `components/pdn-node/uwill.md` convention — not at the specs root. Nothing in this change specifies `pdn-node`-level behavior or touches pdn-store (the fork); its sole subject is the `data-layer` crate.
+Capability ids are component-prefixed (the openspec delta layout is flat: `specs/<capability>/spec.md`). Specs are component-owned: on archive they land in the component tree, following the `components/mee-pdn/pdn-layer/uwill.md` convention — not at the specs root. Nothing in this change specifies `pdn-node`-level behavior or touches pdn-store (the fork); its sole subject is the `data-layer` crate.
 
 | Capability (delta)                       | Archive destination                                            |
 | ---------------------------------------- | -------------------------------------------------------------- |
-| `data-layer-connections-store`           | `openspec/specs/components/data-layer/connections-store.md`     |
-| `data-layer-ingest-policies`             | `openspec/specs/components/data-layer/ingest-policies.md`       |
+| `data-layer-connections-store`           | `openspec/specs/components/mee-pdn/data-layer/connection-metadata-store.md`     |
+| `data-layer-ingest-policies`             | `openspec/specs/components/mee-pdn/data-layer/ingest-policies.md`       |
 
 ### New Capabilities
 - `data-layer-connections-store`: the device-replicated connections registry — storage layout, replication between an identity's devices, mutation API (connect/disconnect), and its self-gating bootstrap via the device axiom.

@@ -22,10 +22,10 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)             | Archive destination                                        |
 | ------------------------------ | ---------------------------------------------------------- |
-| `data-layer-durable-storage`   | `openspec/specs/components/data-layer/durable-storage.md`  |
-| `pdn-node-restart-recovery`    | `openspec/specs/components/pdn-node/restart-recovery.md`   |
-| `pdn-node-http-host`           | `openspec/specs/components/pdn-node/http-host.md`          |
-| `pdn-node-container-stand`     | `openspec/specs/components/pdn-node/container-stand.md`    |
+| `data-layer-durable-storage`   | `openspec/specs/components/mee-pdn/data-layer/durable-storage.md`  |
+| `pdn-node-restart-recovery`    | `openspec/specs/components/mee-pdn/pdn-node/restart-recovery.md`   |
+| `pdn-node-http-host`           | `openspec/specs/components/mee-pdn/pdn-node-http/host.md`          |
+| `pdn-node-container-stand`     | `openspec/specs/components/mee-pdn/pdn-node-http/container-stand.md`    |
 
 ### New Capabilities
 

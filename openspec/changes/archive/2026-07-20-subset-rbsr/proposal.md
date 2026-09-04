@@ -51,15 +51,15 @@ A gossip sender controls only its few direct neighbors (HyParView active view), 
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/pdn-node/uwill.md` convention.
+Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree, following the `components/mee-pdn/pdn-layer/uwill.md` convention.
 
 | Capability (delta)                     | Archive destination                                                 |
 | -------------------------------------- | ------------------------------------------------------------------- |
-| `data-layer-read-capabilities`         | `openspec/specs/components/data-layer/read-capabilities.md`         |
-| `data-layer-subset-reconciliation`     | `openspec/specs/components/data-layer/subset-reconciliation.md`     |
-| `data-layer-connection-metadata-store` | `openspec/specs/components/data-layer/connection-metadata-store.md` |
-| `pdn-node-device-linking`              | `openspec/specs/components/pdn-node/device-linking.md`              |
-| `pdn-node-core`                        | `openspec/specs/components/pdn-node/core.md`                        |
+| `data-layer-read-capabilities`         | `openspec/specs/components/mee-pdn/data-layer/read-capabilities.md`         |
+| `data-layer-subset-reconciliation`     | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation.md`     |
+| `data-layer-connection-metadata-store` | `openspec/specs/components/mee-pdn/data-layer/connection-metadata-store.md` |
+| `pdn-node-device-linking`              | `openspec/specs/components/mee-pdn/pdn-node/device-linking.md`              |
+| `pdn-node-core`                        | `openspec/specs/components/mee-pdn/pdn-node/core.md`                        |
 
 ### New Capabilities
 

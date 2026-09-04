@@ -21,7 +21,7 @@ Can we collapse to a single addressing axis — and, once collapsed, does a "nam
 
 A namespace survives because **a capability authorizes, it does not replicate**: a per-issuer set that replicates by reconciliation is irreducible on iroh-docs, so we coarsen it to one-per-issuer rather than try to remove it.
 
-This is orthogonal to the device-internal store (`PrivateMetadataStore`, the directory), which is bound by `identity` and admitted by Invariant 1 (see `../../components/pdn-node/invariants.md`): unaffected by how data namespaces are addressed.
+This is orthogonal to the device-internal store (`PrivateMetadataStore`, the directory), which is bound by `identity` and admitted by Invariant 1 (see `../../components/mee-pdn/invariants.md`): unaffected by how data namespaces are addressed.
 
 ## Consequences
 
@@ -44,6 +44,6 @@ Both layouts put every issuer's claims in the node's single physical store — i
 
 A cell, as the cells change designs it, is one shared replica held whole by every member's devices — a namespace that is not per issuer. The rejected alternative above does not argue against it: that argument is about one namespace holding every issuer's claims and serving each peer a filtered view of it, whereas a cell has bounded membership, runs no egress filter, and its members' devices are its own swarm. An identity's own data keeps the per-issuer namespace either way.
 
-The realization is specified in `../../components/pdn-node/namespace-addressing.md` (the namespace-free addressing surface). The interim namespace-key/mapping path, confidentiality, device bootstrap, and pre-UWill relaxations live in the design of the archived `per-issuer-namespace` change, not in this ADR.
+The realization is specified in `../../components/mee-pdn/pdn-node/namespace-addressing.md` (the namespace-free addressing surface). The interim namespace-key/mapping path, confidentiality, device bootstrap, and pre-UWill relaxations live in the design of the archived `per-issuer-namespace` change, not in this ADR.
 
-Related: [ADR-0007](0007-uwill.md), [ADR-0008](0008-iroh-without-willow.md); `../../components/pdn-node/invariants.md` (Invariant 1).
+Related: [ADR-0007](0007-uwill.md), [ADR-0008](0008-iroh-without-willow.md); `../../components/mee-pdn/invariants.md` (Invariant 1).

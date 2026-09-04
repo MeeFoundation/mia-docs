@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The out-of-process stand the demo runs on: every node is the [HTTP host](http-host.md) binary in its own container, driven from the test host over HTTP alone while the nodes reach each other over the [runtime core](core.md)'s own protocols. It exists to prove what an in-process suite cannot — that a node packaged as a binary comes up, that the address it publishes in a ceremony payload is one a peer on another container dials, and that a device which goes away takes its process with it.
+The out-of-process stand the demo runs on: every node is the [HTTP host](host.md) binary in its own container, driven from the test host over HTTP alone while the nodes reach each other over the [runtime core](../pdn-node/core.md)'s own protocols. It exists to prove what an in-process suite cannot — that a node packaged as a binary comes up, that the address it publishes in a ceremony payload is one a peer on another container dials, and that a device which goes away takes its process with it.
 
 ## Requirements
 

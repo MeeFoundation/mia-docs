@@ -31,8 +31,8 @@ Capability ids are component-prefixed (the delta layout is flat: `specs/<capabil
 
 | Capability (delta)   | Archive destination                               |
 | -------------------- | ------------------------------------------------- |
-| `pdn-node-device-linking` | `openspec/specs/components/pdn-node/device-linking.md` |
-| `pdn-node-http-host` | `openspec/specs/components/pdn-node/http-host.md` |
+| `pdn-node-device-linking` | `openspec/specs/components/mee-pdn/pdn-node/device-linking.md` |
+| `pdn-node-http-host` | `openspec/specs/components/mee-pdn/pdn-node-http/host.md` |
 
 ### New Capabilities
 
