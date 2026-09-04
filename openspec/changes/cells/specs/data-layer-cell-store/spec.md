@@ -107,6 +107,25 @@ A document SHALL be shared with the whole cell in exactly one of two modes: read
 - **WHEN** member A shares a document read-only and a device of member B produces an entry in it
 - **THEN** no member device persists B's entry, and A's own entry survives unchanged, while a later write by A's device is admitted everywhere
 
+### Requirement: A member's devices are announced by the member itself
+
+A member's device-list statement SHALL be admitted by the signature embedded in it, verified against the announcement key the member's join record carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
+
+#### Scenario: A new device registers itself
+
+- **WHEN** a device freshly linked into member B writes B's newest device statement into its local replica and reconciles with a device of member C
+- **THEN** C's device admits the statement, and the new device's next session is served as a member device
+
+#### Scenario: A statement under a wrong key is dropped
+
+- **WHEN** a device of member M produces a device statement for member B signed by a key that is not B's announcement key
+- **THEN** no member device persists it, and B's device set stays what B's own statements say
+
+#### Scenario: An old version displaces nothing
+
+- **WHEN** a device of B holding version 2 of B's statement writes it into a replica already holding version 3
+- **THEN** device resolution still follows version 3 on every member device
+
 ### Requirement: A cell store can be forgotten
 
 Forgetting a cell store SHALL stop reconciling its replica, leave its swarm, drop the replica, and remove the cell's registration together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures.

@@ -10,7 +10,7 @@ Scope: the cell as a platform primitive — a keyless id, one cell store replica
 - [ ] 0.4 C2 — claims and graph versions: one claim per edit with a head, or graphs as documents; history retained or head only
 - [ ] 0.5 C5 — documents under concurrency: whole value under last-writer-wins, or an operation log merged above the platform
 - [ ] 0.6 C7 — deletion on cell stores: the tombstone surface a cell needs
-- [ ] 0.7 Record the answers as design decisions D16 and following, and rewrite the affected scenarios in the specs before implementation starts
+- [ ] 0.7 Record the answers as design decisions D17 and following, and rewrite the affected scenarios in the specs before implementation starts
 
 ## 1. Vocabulary and types
 
@@ -21,8 +21,8 @@ Scope: the cell as a platform primitive — a keyless id, one cell store replica
 ## 2. data-layer: the cell store
 
 - [ ] 2.1 The cell store as a replica kind: create, import from its write ticket, forget — registered by cell id, with the unknown-cell error distinguishable from transport and storage failures
-- [ ] 2.2 Membership material per B1: member and device records, the author-key-to-member binding, and the classification of a caller as a member device — every other caller refused as for an unhosted replica, ticket holders included
-- [ ] 2.3 The authorship policy in the ingest gate: a claim from a device of its issuer, a document per its mode, everything else dropped silently; the verdict on the entry's author, never on the session peer
+- [ ] 2.2 Membership material per B1 and D16: member records; the join-time announcement-key record; device-list statements admitted on their embedded signature and resolved by highest version; the classification of a caller as a member device — every other caller refused as for an unhosted replica, ticket holders included
+- [ ] 2.3 The authorship policy in the ingest gate: a claim from a device of its issuer, a document per its mode, everything else dropped silently; the verdict on the entry's author, never on the session peer — except the membership device area, judged by the embedded announcement signature (D16)
 - [ ] 2.4 Swarm membership on create and import; tracked contacts derived from the member device records and replaced wholesale on each derivation; the download policy per D5'
 - [ ] 2.5 Removal: sessions refused and the removed member's authors dropped from the first session set up after the removal record arrives; what was delivered is retained
 
@@ -32,14 +32,14 @@ Scope: the cell as a platform primitive — a keyless id, one cell store replica
 - [ ] 3.2 The invite and join dialogue per B4: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed the store's ticket, catch-up before the join returns
 - [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error) and a document with its mode; reading and listing by cell id
 - [ ] 3.4 Remove and leave: the removal record; removal an owner-only act, its target an owner or a plain member alike; leaving forgets the store locally
-- [ ] 3.5 A member's other devices: the cell's tickets in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself into the cell's member device records
+- [ ] 3.5 A member's other devices: the cell's tickets and the announcement secret in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
 - [ ] 3.6 Restart recovery per G1: hosted cells re-hosted from durable state on a directory-configured runtime
 - [ ] 3.7 Ownership: the creator recorded as the first owner; an owner makes a member an owner; ownership taken only by another owner; owners listed beside the members
 
 ## 4. Tests
 
-- [ ] 4.1 Access-control pairs in one place each: a member device served whole beside a ticket holder that is no member refused, and a removed member refused from the next session; a claim from its issuer admitted beside another member's entry under those claims dropped; a read-write document written by another member beside a read-only one refused; a relayed entry admitted on its author's merit while the same peer's own forgery is dropped; an ownership grant by an owner taking effect beside the same act by a plain member refused; a member removed by an owner beside a plain member's removal attempt refused
-- [ ] 4.2 Operating conditions: a node hosting a member and a non-member identity side by side; a second device linked before and after the join; a restart with a write made meanwhile; the author offline and the entry reaching a third member through a second; a concurrent add and remove of one member resolving per B3; a member leaving and rejoining; a document's mode flipped read-only to read-write and back; a member made an owner, unmade, and made again
+- [ ] 4.1 Access-control pairs in one place each: a member device served whole beside a ticket holder that is no member refused, and a removed member refused from the next session; a claim from its issuer admitted beside another member's entry under those claims dropped; a read-write document written by another member beside a read-only one refused; a relayed entry admitted on its author's merit while the same peer's own forgery is dropped; an ownership grant by an owner taking effect beside the same act by a plain member refused; a member removed by an owner beside a plain member's removal attempt refused; a device statement admitted on its embedded signature whoever carries it beside a statement under a wrong key dropped
+- [ ] 4.2 Operating conditions: a node hosting a member and a non-member identity side by side; a second device linked before and after the join; a restart with a write made meanwhile; the author offline and the entry reaching a third member through a second; a concurrent add and remove of one member resolving per B3; a member leaving and rejoining; a document's mode flipped read-only to read-write and back; a member made an owner, unmade, and made again; a device linked while every other member is offline, announced through catch-up; a lagging sibling re-writing an old statement version that displaces nothing; a fan-out interrupted by a restart and healed by the pre-sync sweep
 - [ ] 4.3 Three identities with no connections sharing through one cell, and two cells with the same members keeping their entries apart
 - [ ] 4.4 Stress pass on join, removal and relay scenarios (`--stress-count`, per the flaky-tests practice); every failure diagnosed in isolation before anything is built on top
 - [ ] 4.5 Lints and the full suite (`just precommit-check`)
