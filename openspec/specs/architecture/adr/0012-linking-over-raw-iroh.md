@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-07-16
+status: accepted
+date: 2026-09-04
 ---
 # Link devices over a raw iroh dialogue: the bootstrap tickets ride the reply, not the QR
 
@@ -44,7 +44,7 @@ The shape (the ceremony is specified in [device-linking.md](../../components/pdn
 * **Inviter-side registration**: after the burn, the inviter writes the newcomer's timestamped pending-device record into its own directory replica, taking the node id from the connection's authenticated peer identity — never from a claimed field; the request carries none. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path. Pending records confer no device access and expire after 24 hours unless the newcomer confirms.
 * **Tickets in the reply**: the inviter answers — commit preceding the reply — with fresh write tickets to the directory and to the identity's data namespace, both minted from local replicas (no directory reads, so no payload wait). The newcomer imports both and waits, bounded by the caller's timeout, for the first successful directory sync session started after the import — one wait against the peer that just answered, not a retry loop; the node's periodic reconcile pass is the re-dial cadence within that budget. On any failure after the import the newcomer forgets both replicas — the data namespace unregistered from its issuer, not merely dropped — so a failed link leaves no residue.
 * **The durable record**: creation still publishes the data-namespace ticket in the directory under the `data` kind — the flat bootstrap model's record for everything outside the ceremony; the linking critical path never reads it.
-* **Deferred**: the KERI proof of control over the identity is a marked step of this dialogue, exactly as in pairing; both devices must be online; pending linking invites, device removal, and revocation are future work.
+* **What the dialogue does not establish**: the identity is asserted, not proven — as in pairing, the exchange rests on the transport peer and the one-time secret. Both devices are online for it, and the device set only grows: pending linking invites, device removal, and revocation sit outside this decision.
 
 ### Consequences
 
@@ -91,6 +91,10 @@ The linking scenario tests drive the ceremony end to end: create on one runtime,
 * Bad — the full-store-set induction breaks: a non-founder device could answer a linking invite with a directory ticket but no data ticket it is guaranteed to hold.
 
 ## More Information
+
+The dialogue holds a marked step for a proof of control over the identity, on the same terms as pairing's ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)).
+
+The cells change leans on this shape twice. Joining a cell is this ceremony applied to a cell — a one-time secret on a dedicated ALPN, verified and burned before any state changes — so the shape outlives whatever becomes of connections. And the reply grows: alongside the store tickets, a linked device receives the identity's device-announcement secret, which is what lets it publish the identity's device list into every cell the identity belongs to.
 
 Open questions, none blocking this decision: human-readable device labels in the registration (cheap to add behind the payload's format version); the QR encoding of the linking payload (a host concern); device removal and revocation (the device set only grows for now); whether linking should later present a per-relationship identifier instead of the long-lived `PdnId` — the same hoped-for KERI path as pairing's.
 
