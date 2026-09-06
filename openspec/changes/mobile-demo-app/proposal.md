@@ -29,21 +29,21 @@ The audience fixes the form. Nothing is shown that a person cannot see happening
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree.
+A capability id is the spec's path under `specs/`; the delta sits at the same path in the change and lands there on archive.
 
 | Capability (delta)            | Archive destination                                        |
 | ----------------------------- | ---------------------------------------------------------- |
-| `mobile-common-screens`       | `openspec/specs/components/mobile-common/screens.md`        |
-| `mobile-common-demo-scenario` | `openspec/specs/components/mobile-common/demo-scenario.md`  |
-| `ios-app-shell`               | `openspec/specs/components/ios-app/shell.md`                |
-| `android-app-shell`           | `openspec/specs/components/android-app/shell.md`            |
+| `components/mobile-common/screens`       | `openspec/specs/components/mobile-common/screens/spec.md`        |
+| `components/mobile-common/demo-scenario` | `openspec/specs/components/mobile-common/demo-scenario/spec.md`  |
+| `components/ios-app/shell`               | `openspec/specs/components/ios-app/shell/spec.md`                |
+| `components/android-app/shell`           | `openspec/specs/components/android-app/shell/spec.md`            |
 
 ### New Capabilities
 
-- `mobile-common-screens`: the five screens, the act chosen before a code is read, a code as an exposure with a lifetime, waiting as a state with a cause, a refusal shown as what was refused, both halves of a connection read from the node, and the absence of any control the surface does not offer.
-- `mobile-common-demo-scenario`: the acts with their paired denials, the environment they require, the operating conditions covered and uncovered, and what the narration must state as absent.
-- `ios-app-shell`: local-network and camera consent, foreground-only operation with an explicit bring-up, and the device build.
-- `android-app-shell`: the foreground service and its notification, local-network reachability at the target platform level, camera consent, and the device build.
+- `components/mobile-common/screens`: the five screens, the act chosen before a code is read, a code as an exposure with a lifetime, waiting as a state with a cause, a refusal shown as what was refused, both halves of a connection read from the node, and the absence of any control the surface does not offer.
+- `components/mobile-common/demo-scenario`: the acts with their paired denials, the environment they require, the operating conditions covered and uncovered, and what the narration must state as absent.
+- `components/ios-app/shell`: local-network and camera consent, foreground-only operation with an explicit bring-up, and the device build.
+- `components/android-app/shell`: the foreground service and its notification, local-network reachability at the target platform level, camera consent, and the device build.
 
 ### Modified Capabilities
 

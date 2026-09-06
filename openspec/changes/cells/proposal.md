@@ -20,20 +20,20 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 
 | Capability (delta) | Archive destination |
 | --- | --- |
-| `data-layer-cell-store` | `openspec/specs/components/mee-pdn/data-layer/cell-store.md` |
-| `pdn-node-cells` | `openspec/specs/components/mee-pdn/pdn-node/cells.md` |
-| `data-layer-capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest.md` |
-| `data-layer-subset-reconciliation` | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation.md` |
+| `components/mee-pdn/data-layer/cell-store` | `openspec/specs/components/mee-pdn/data-layer/cell-store/spec.md` |
+| `components/mee-pdn/pdn-node/cells` | `openspec/specs/components/mee-pdn/pdn-node/cells/spec.md` |
+| `components/mee-pdn/data-layer/capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md` |
+| `components/mee-pdn/data-layer/subset-reconciliation` | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation/spec.md` |
 
 ### New Capabilities
 
-- `data-layer-cell-store`: the cell's replica — one per cell, identified by a keyless cell id, replicated whole among the devices of its members and served to member devices only, its entries admitted by authorship (a claim from its issuer, a document per its mode), its swarm the members' devices.
-- `pdn-node-cells`: the cells service — creating a cell for a hosted identity, inviting and joining under a one-time secret, ownership (the creator the first owner, owners making and unmaking owners), reaching a member's other devices through the identity's directory, removing and leaving, writing records — claims and documents — and recovering hosted cells across a restart.
+- `components/mee-pdn/data-layer/cell-store`: the cell's replica — one per cell, identified by a keyless cell id, replicated whole among the devices of its members and served to member devices only, its entries admitted by authorship (a claim from its issuer, a document per its mode), its swarm the members' devices.
+- `components/mee-pdn/pdn-node/cells`: the cells service — creating a cell for a hosted identity, inviting and joining under a one-time secret, ownership (the creator the first owner, owners making and unmaking owners), reaching a member's other devices through the identity's directory, removing and leaving, writing records — claims and documents — and recovering hosted cells across a restart.
 
 ### Modified Capabilities
 
-- `data-layer-capability-gated-ingest`: the gate arms on cell stores too, judging by the entry's author resolved to a member rather than by the session peer.
-- `data-layer-subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell store; the import refusal for tracked non-data replicas names cell stores.
+- `components/mee-pdn/data-layer/capability-gated-ingest`: the gate arms on cell stores too, judging by the entry's author resolved to a member rather than by the session peer.
+- `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell store; the import refusal for tracked non-data replicas names cell stores.
 
 ## Impact
 

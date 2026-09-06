@@ -22,11 +22,11 @@ Correctness and confidentiality do not depend on this change: reconciliation rem
 
 | Capability (delta)             | Archive destination                                         |
 | ------------------------------ | ----------------------------------------------------------- |
-| `data-layer-reconcile-trigger` | `openspec/specs/components/mee-pdn/data-layer/reconcile-trigger.md`  |
+| `components/mee-pdn/data-layer/reconcile-trigger` | `openspec/specs/components/mee-pdn/data-layer/reconcile-trigger/spec.md`  |
 
 ### New Capabilities
 
-- `data-layer-reconcile-trigger`: the live path for capability-scoped peers — a directed, content-free trigger on a covered write, coalesced per peer, best-effort, that prompts a filtered reconciliation.
+- `components/mee-pdn/data-layer/reconcile-trigger`: the live path for capability-scoped peers — a directed, content-free trigger on a covered write, coalesced per peer, best-effort, that prompts a filtered reconciliation.
 
 ## Impact
 

@@ -1,16 +1,21 @@
 schema: spec-driven
 
-# Shown to AI when creating any artifact of any change.
+# Read by every artifact instruction and by `openspec instructions apply|archive`.
+# Project specifics live here, never in the generated skills: `openspec update`
+# overwrites those.
 context: |
-  PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over a forked iroh-docs) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace. The main tree keeps the workspace's specs at components/mee-pdn/<crate>/<topic>.md, one directory per crate, and component-level specs (invariants) at components/mee-pdn/<topic>.md; a delta capability id is <crate>-<topic> (the crate is the longest crate name the id starts with), and on archive the spec lands at that path. The other components keep components/<component>/<topic>.md with <component>-<topic> ids.
+  PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over pdn-store, our iroh-docs variant) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace, whose CLAUDE.md holds the code and docs rules every change is held to.
+
+  Main spec tree layout. A capability spec is specs/<path>/spec.md and its capability id is that <path>: the workspace's specs sit at components/mee-pdn/<crate>/<topic>/spec.md, one directory per crate, and the other components' at components/<component>/<topic>/spec.md. A delta sits in the change at the same path, changes/<name>/specs/<path>/spec.md, so `openspec validate --specs` covers the main tree and archive lands every delta where it belongs. Links inside a delta are written for its place in the main tree, not for the change directory. Documents without requirements — components/mee-pdn/invariants.md, components/mee-pdn/pdn-layer/uwill.md, the ai-assistant notes — keep the <name>.md form and are outside the tool's reach.
 
   Cross-cutting practices every change is held to — read the one that applies before writing, they are short:
 
-  - specs/code-practices/operating-conditions.md — the circumstances a design has to survive: several identities on one node, one device or several, a device linking before or during or after a process, an unstable connection, a disk that fills, capabilities granted and narrowed and widened and revoked and granted again. Walk the list while designing; back with a scenario and a test the paths where a condition changes the outcome; name the ones deliberately left out. Do not multiply every test by every condition.
+  - specs/code-practices/operating-conditions.md — the circumstances a design has to survive: several identities on one node, one device or several, a device linking before or during or after a process, an unstable connection, a disk that fills, a device that restarts, capabilities granted and narrowed and widened and revoked and granted again. Walk the list while exploring and designing; back with a scenario and a test the paths where a condition changes the outcome; name the ones deliberately left out. Do not multiply every test by every condition.
   - specs/code-practices/access-control-tests.md — an assertion of authorized access is paired, in the same place, with the tightest denial. A positive-only access test verifies nothing.
+  - specs/code-practices/product-path-arrangement.md — arrange and act steps reach a namespace the way the product reaches it; a hand-made ticket handover is admissible only as the test's subject or as the access-control negative control, named in the test's docs.
   - specs/code-practices/flaky-tests.md — a rare failure is a rare defect. Reproduce with statistics before fixing, and stress the affected scenarios after.
 
-  Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands". Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
+  Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands"; platform terms keep their English names. Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
 
 # Per-artifact rules.
 rules:
@@ -18,5 +23,37 @@ rules:
     - Walk specs/code-practices/operating-conditions.md and state which of those conditions change the outcome of this change. "None of them" is a legitimate answer and is worth writing down; a condition that does change the outcome belongs in Decisions or in Risks, not only in prose.
   specs:
     - An operating condition that changes the outcome earns its own scenario. A condition deliberately out of scope is named in the proposal, not left unmentioned — an unmentioned condition reads as one nobody considered.
+    - Verify a scenario against the running code or its test before writing it down. A plausible formulation once claimed a zero-length write degenerates into deletion, while the engine rejects it (AttemptedToInsertEmptyEntry); each scenario corresponds to a test or a checked property of pdn-store.
+    - A delta that introduces a capability carries a `## Purpose`; archive seeds the main spec with it and writes a placeholder otherwise.
   tasks:
     - Every scenario the deltas add needs a task that makes it real, and a way to tell it is not vacuous — a scenario that would pass with the mechanism removed asserts nothing.
+
+# Advisory guidance returned by `openspec instructions apply|archive`; the apply
+# and archive skills read it at run time.
+operations:
+  apply:
+    guidance:
+      - >-
+        Hold the implementation to the workspace's CLAUDE.md and to the code practices named in the project context. For the path being implemented, decide which operating conditions change the outcome; each one that does needs a scenario and a test, and each one that does not is worth saying so once.
+      - >-
+        An authorized-access assertion carries its tightest denial beside it. Arrange and act steps reach a namespace the way the product does; a hand-made ticket handover is admissible only as the test's subject or as the negative control, and the test's doc says which.
+      - >-
+        A task that adds a scenario is done only when its test would fail with the mechanism removed.
+      - >-
+        Comments follow `## Code comments` in CLAUDE.md: one to three lines; an invariant, a non-obvious why, or a pointer to the spec, ADR, or proving test — never a restatement of the spec or of the assertion beside it; present tense only. Every test has a doc comment whose first sentence says which case the scenario tests, carrying at most the paired denial and the rationale of a non-obvious arrangement.
+      - >-
+        Verify a task with the narrowest relevant check before ticking it — `just test -E 'test(<name>)'`, `just test -p <crate>`, `just check`. A change touching sync, linking, engine wiring, pdn-store, or the iroh version ends with the stress pass of specs/code-practices/flaky-tests.md before anything is built on top.
+      - >-
+        Git operations that change state — add, commit, checkout, push, rebase — are performed by a human, never by the agent.
+  archive:
+    guidance:
+      - >-
+        Run `openspec validate --all --strict` first and stop on failure. It is a parser gate for deltas and main specs, not a review: a scenario heading at the wrong level drops out silently, so check every delta's `#### Scenario:` headings by eye.
+      - >-
+        After the merge, run `openspec validate --specs --strict` and re-read every main spec the change touched. A capability the change creates keeps the tree's style: a title in words (`# Reconcile trigger`, not `# <capability id> Specification`) and a real `## Purpose`.
+      - >-
+        The merge does not sweep. When the change removes or renames a type, a test, or a mechanism, grep specs/** and every other active change for the old name. A term the specs use gets its glossary entry in specs/architecture/language/, linked from the term's first use.
+      - >-
+        An ADR with status obsolete stays a stub: never refill it, cite it as a current decision, or reuse its number. Obsoleting one includes moving or removing every ADR-NNNN citation of it in the tree.
+      - >-
+        The archive step is a filesystem move. Git operations that change state — add, commit, checkout, push, rebase — are performed by a human, never by the agent.
