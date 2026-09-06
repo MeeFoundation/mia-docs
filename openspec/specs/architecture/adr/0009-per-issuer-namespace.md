@@ -27,7 +27,7 @@ This is orthogonal to the device-internal store (`PrivateMetadataStore`, the dir
 
 - Good — removes a redundant granularity axis; UWill becomes the single authorization mechanism; aligns the namespace with the issuer identity.
 - Good — simpler addressing: one replica per issuer, not one per subject.
-- Good — pdn-node is namespace-free: a smaller, capability-only surface (`ClaimId` + UWill), with `Binding`/`BindingIndex` demoted to `data-layer` internals.
+- Good — pdn-node is namespace-free: a smaller, capability-only surface (`ClaimId` + UWill), with the issuer-to-replica registry a `data-layer` internal that surfaces only as an unknown-issuer error.
 - Bad — the capability gate (ADR-0008) becomes the sole writer authority: namespace-key possession no longer authorizes writes, so correctness leans entirely on the fork's ingest checks.
 
 ## Rejected alternative: one namespace for all issuers

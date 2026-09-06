@@ -20,9 +20,9 @@ A read capability SHALL name an issuer, an audience, and the set of claims it gr
 - **WHEN** an issuer grants an audience one claim read-only and another claim read-write
 - **THEN** one capability covers both claims, carrying write on exactly the second
 
-### Requirement: Claim identity is derived from the entry (interim)
+### Requirement: Claim identity is derived from the entry
 
-Until the domain layer mints claim identities, the `ClaimId` of an entry SHALL be derived deterministically from the issuer and the entry path via a domain-separated key-derivation hash, so the identity is stable under payload edits and computable from the entry key alone (subset-rbsr D3).
+The domain layer mints no claim identities of its own: the `ClaimId` of an entry SHALL be derived deterministically from the issuer and the entry path via a domain-separated key-derivation hash (`claim_id_of` in `data-layer`), so the identity is stable under payload edits and computable from the entry key alone.
 
 #### Scenario: Identity survives value edits
 

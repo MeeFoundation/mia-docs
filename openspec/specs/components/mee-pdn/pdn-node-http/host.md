@@ -29,11 +29,15 @@ The host SHALL expose `GET /live` returning success while the embedded runtime i
 - **THEN** `GET /live` returns HTTP 200
 
 ### Requirement: Readiness is bounded separately
-The host SHALL expose `GET /ready` as a bounded check of the runtime's coarse state lock. `GET /live` SHALL NOT wait for that lock.
+The host SHALL expose `GET /ready` as a bounded check of the runtime: its coarse state lock answers within the budget, and its replica store answers a read. The store read is the half that can say no after a full filesystem: the store then refuses every operation until the process restarts, while the in-memory bookkeeping stays intact, so a readiness drawn from the bookkeeping alone would keep reporting a node that serves nothing. `GET /live` SHALL NOT wait for either.
 
 #### Scenario: Lock contention affects readiness only
 - **WHEN** the coarse state lock remains held beyond 2 seconds
 - **THEN** `/live` returns HTTP 200 and `/ready` returns non-success within its budget
+
+#### Scenario: A store that stopped answering fails readiness
+- **WHEN** the replica store refuses its operations after the state directory filled
+- **THEN** `/ready` returns non-success while `/live` returns HTTP 200
 
 ### Requirement: Debug requests have aggregate bounds
 The host SHALL accept at most 16 concurrent requests and at most 16 MiB per entry body. It SHALL return HTTP 503 when concurrency admission is full and HTTP 413 for an oversized body. HTTP 500 responses SHALL use stable generic public text while retaining the full cause chain only in server logs.

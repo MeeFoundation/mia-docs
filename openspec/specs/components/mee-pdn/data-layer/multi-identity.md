@@ -24,9 +24,9 @@ Each identity SHALL arrive on a device through its own explicit linking act, fro
 - **WHEN** a device is linked into identity A and identity B's stores exist elsewhere
 - **THEN** identity B's stores appear on the device only after a separate linking act with a linking invite for identity B
 
-### Requirement: Interim admission is ticket possession
-Until egress filtering (subset-rbsr) lands, a node SHALL install no ingest filter: every entry syncing into a replica the node imported or created is persisted. Access to a replica is bounded by possession of its ticket and by nothing else.
+### Requirement: Admission is classified per session, and an unregistered replica is ticket-bounded
+A node SHALL classify every reconciliation session of a replica it registered — an identity's directory arms its data namespace, a connection registers its metadata pair — as [subset reconciliation](subset-reconciliation.md) and [capability-gated ingest](capability-gated-ingest.md) state. A replica the node holds without any registration — an assembly that hosts no identity — SHALL be served and admitted whole to any holder of its ticket: possession of the ticket bounds access there, and nothing else does.
 
-#### Scenario: Full replication for a ticket holder
-- **WHEN** a node imports a replica from its ticket and syncs with a peer holding that replica
+#### Scenario: Full replication between ticket holders of an unregistered replica
+- **WHEN** a node that registers no identity imports a replica from its ticket and syncs with a peer holding that replica
 - **THEN** all entries of that replica replicate and persist, with no entry dropped by an admission decision

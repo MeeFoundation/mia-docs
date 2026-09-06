@@ -18,7 +18,7 @@ A node's storage SHALL be chosen when it is spawned, by name: memory, or a direc
 - **THEN** each keeps its own state, and neither reads the other's directory
 
 ### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
-A configured directory SHALL hold everything a node needs to be itself: the replica store, the blob store, the node's author, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and renamed over, so no half-written key can exist. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
+A configured directory SHALL hold everything a node needs to be itself: the replica store, the blob store, the node's author, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
 
 #### Scenario: A fresh directory is provisioned
 - **WHEN** a node is spawned on a directory that does not exist
@@ -31,6 +31,10 @@ A configured directory SHALL hold everything a node needs to be itself: the repl
 #### Scenario: A malformed key stops the start
 - **WHEN** a node is spawned on a directory whose key file cannot be parsed
 - **THEN** the spawn fails with an error naming that file, and no new key is written
+
+#### Scenario: A leftover staging file does not block the start
+- **WHEN** a node is spawned on a directory holding a half-written key staging file and no key
+- **THEN** a key is minted, the leftover is gone, and a later start on the directory reads the committed key back
 
 ### Requirement: The node's wire identity is stable across starts
 A node spawned on a directory holding a key SHALL bind its endpoint with that key, so its node id is the one it had before. A node's device records, the tickets it minted, and the contacts its peers hold all name that id, so a node that came back under a different id would be unreachable by everything it handed out.
