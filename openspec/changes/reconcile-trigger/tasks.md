@@ -20,4 +20,4 @@ Scope: the live path for capability-scoped peers — a directed, content-free tr
 
 ## 4. Docs & archive
 
-- [ ] 4.1 On archive: place `data-layer-reconcile-trigger` into `components/mee-pdn/data-layer/`
+- [ ] 4.1 On archive: the delta lands at `components/mee-pdn/data-layer/reconcile-trigger/spec.md`; give it a title in the tree's style and a real `## Purpose`

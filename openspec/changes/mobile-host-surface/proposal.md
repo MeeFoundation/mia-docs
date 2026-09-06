@@ -32,19 +32,19 @@ It begins after `own-grant-read`, which gives the runtime the reading of an iden
 
 ## Capabilities
 
-Capability ids are component-prefixed (the delta layout is flat: `specs/<capability>/spec.md`); on archive the spec lands in the component tree.
+A capability id is the spec's path under `specs/`; the delta sits at the same path in the change and lands there on archive.
 
 | Capability (delta)           | Archive destination                                       |
 | ---------------------------- | --------------------------------------------------------- |
-| `mobile-common-host-surface` | `openspec/specs/components/mobile-common/host-surface.md`  |
+| `components/mee-pdn/pdn-mobile/host` | `openspec/specs/components/mee-pdn/pdn-mobile/host/spec.md`  |
 
 ### New Capabilities
 
-- `mobile-common-host-surface`: what the facade exposes and what it withholds, how entry bytes and paths cross it, what a read that answers nothing means, how a refusal is reported, that one handle owns one node, and what it says about volatile state and an identity without keys.
+- `components/mee-pdn/pdn-mobile/host`: what the facade exposes and what it withholds, how entry bytes and paths cross it, what a read that answers nothing means, how a refusal is reported, that one handle owns one node, and what it says about volatile state and an identity without keys.
 
 ### Modified Capabilities
 
-None. The runtime's own change is `own-grant-read`; this one exports what that adds and alters no capability of another component. One line of `components/mee-pdn/pdn-node-http/host.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
+None. The runtime's own change is `own-grant-read`; this one exports what that adds and alters no capability of another component. One line of `components/mee-pdn/pdn-node-http/host/spec.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
 
 ## Impact
 
@@ -52,5 +52,5 @@ None. The runtime's own change is `own-grant-read`; this one exports what that a
 - **`crates/pdn-node`**: untouched. The operation this facade exports arrives with `own-grant-read`.
 - **Tooling**: recipes for the mobile builds and the binding generation, and the two targets added to `just setup-tooling`. The container stand, its pipeline job and the demo script are unaffected — they exercise the same runtime through the other host.
 - **Tests**: the facade's surface driven in-process against 2 handles through exported calls alone, with the paired denial of an unconnected third handle in the same place; the error table asserted directly; a payload minted here parsed by the other host's decoding and the reverse. The absences are stated in the crate's docs rather than asserted, because an absence has no test that could fail.
-- **`components/mee-pdn/data-layer/node-assembly.md`**: gains the default reconcile interval and the in-memory storage as requirements, so a mobile specification is not the only written statement of either.
+- **`components/mee-pdn/data-layer/node-assembly/spec.md`**: gains the default reconcile interval and the in-memory storage as requirements, so a mobile specification is not the only written statement of either.
 - **The risk that outranks the rest**: the portability premise. Until one build runs on one phone and two devices pair over a real network, every task after the spike rests on an assumption.

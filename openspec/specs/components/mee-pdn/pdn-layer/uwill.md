@@ -2,7 +2,7 @@
 
 The UWill capability token: the format the `uwill` module of `pdn-layer` defines, and the chain-validation, revocation, and identity-resolution rules the format is shaped for. The architectural rationale — why UWill rather than Meadowcap or some other alternative — lives in [ADR-0007](../../../architecture/adr/0007-uwill.md).
 
-What the workspace implements of this is the types alone: `Command`, `UwillCapability`, `CapabilityCid`, and `ValidityWindow` in `crates/pdn-layer/src/uwill.rs`. Nothing issues, transports, validates, or revokes a UWill token. Access is enforced on the [read capabilities](../data-layer/read-capabilities.md) grant — the single-link precursor whose per-claim command list mirrors this format — by the egress filter ([subset reconciliation](../data-layer/subset-reconciliation.md)) and the ingest gate ([capability-gated ingest](../data-layer/capability-gated-ingest.md)). Every section below past the token format describes rules no code runs.
+What the workspace implements of this is the types alone: `Command`, `UwillCapability`, `CapabilityCid`, and `ValidityWindow` in `crates/pdn-layer/src/uwill.rs`. Nothing issues, transports, validates, or revokes a UWill token. Access is enforced on the [read capabilities](../data-layer/read-capabilities/spec.md) grant — the single-link precursor whose per-claim command list mirrors this format — by the egress filter ([subset reconciliation](../data-layer/subset-reconciliation/spec.md)) and the ingest gate ([capability-gated ingest](../data-layer/capability-gated-ingest/spec.md)). Every section below past the token format describes rules no code runs.
 
 ## Token format
 
@@ -42,7 +42,7 @@ A UWill capability grants access to **exactly one claim**. The resource field is
 | ---------- | ------------------------------------------------------------- |
 | `claim_id` | The `ClaimId` of the claim this capability grants access to. |
 
-`ClaimId` is the 32-byte stable identifier of a [Claim](../../../architecture/language/claim.md) at the PDN domain layer. Storage-level addressing (the pdn-store namespace and the entry path) is *not* exposed in UWill tokens: how a `ClaimId` maps onto an entry is the data layer's concern, and the derivation in [read capabilities](../data-layer/read-capabilities.md) computes the id from the issuer and the entry path.
+`ClaimId` is the 32-byte stable identifier of a [Claim](../../../architecture/language/claim.md) at the PDN domain layer. Storage-level addressing (the pdn-store namespace and the entry path) is *not* exposed in UWill tokens: how a `ClaimId` maps onto an entry is the data layer's concern, and the derivation in [read capabilities](../data-layer/read-capabilities/spec.md) computes the id from the issuer and the entry path.
 
 Prefix-based scoping and other geometric regions are intentionally not supported at the UWill level. If a use case requires granting access to a set of claims, the issuer SHALL produce one UWill delegation per `ClaimId`.
 
