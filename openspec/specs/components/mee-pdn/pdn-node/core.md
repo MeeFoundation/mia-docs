@@ -14,7 +14,7 @@ The runtime core SHALL be usable as a library with no host attached: a process e
 - **THEN** every operation completes without any host process or HTTP surface involved
 
 ### Requirement: Identity service creates and links identities
-The identity service SHALL create an identity on its first device — minting a placeholder `PdnId` (no key material; a KERI-backed service is the future second implementation) and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](device-linking.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
+The identity service SHALL create an identity on its first device — minting a placeholder `PdnId` (a random identifier with no key material behind it) and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](device-linking.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
 
 #### Scenario: Create on one runtime, link on another
 - **WHEN** an identity is created on runtime A and runtime B links from a linking invite minted on A
@@ -120,7 +120,7 @@ The decision that destroys the replica SHALL be grounded in the durable grant re
 
 The import bookkeeping SHALL be an optimization, not the arbiter. An issuer already resolving to the very namespace a grant names SHALL be adopted into the bookkeeping rather than re-imported: each import holds one more open handle on the replica, and the drop at the end of its life must find exactly one. An issuer resolving to nothing SHALL be re-imported even when the bookkeeping names exactly the namespace the grant carries, so a replica forgotten while the bookkeeping survived comes back on the pair's next sweep instead of being skipped forever.
 
-The runtime SHALL bound this to what it imported itself. A namespace imported by any other route SHALL never be forgotten by this mechanism, and the explicit import operation SHALL remain available for a ticket obtained out of band.
+The runtime SHALL bound this to what it imported itself. A namespace imported by any other route SHALL never be forgotten by this mechanism, and the explicit import operation SHALL remain available for a ticket obtained out of band. Nor SHALL such a namespace be displaced: while an issuer resolves to a replica an import of another route bound, a grant whose ticket names a different replica waits, and the binding follows the grant only once that import is forgotten or the grant comes to name the replica the issuer already resolves to — re-importing over it would have two owners displace each other on every sweep.
 
 Watching SHALL include the counterparty replica's payload arrivals, not only its entry arrivals: a grant's ticket travels as a payload blob, so a record whose entry has replicated is not yet a ticket that can be acted on.
 
@@ -228,7 +228,7 @@ The same union SHALL govern the device set the runtime consults to decide whose 
 - **THEN** the audience converges again, and the fresh import's contact set counts the issuer's other devices as before
 
 ### Requirement: Sync service reports the node id and the hosted identities
-The sync service SHALL report the runtime's node id (its endpoint id) and the identities the runtime hosts — exactly those created or linked on it.
+The sync service SHALL report the runtime's node id (its endpoint id) and the identities the runtime hosts — exactly those created or linked on it. It SHALL also answer a storage check from the replica store itself — the read a host's readiness probe rests on ([host](../pdn-node-http/host.md)) — because every other report here is in-memory bookkeeping, which a store that stopped answering leaves untouched.
 
 #### Scenario: Hosted identities follow create and link
 - **WHEN** a fresh runtime reports its status, then creates one identity and links another
