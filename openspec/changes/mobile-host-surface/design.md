@@ -2,14 +2,14 @@
 
 The runtime's services are complete and proven in-process, and the container stand proved they run across separate processes over a real transport. Both proofs are read by an engineer in a terminal, because the only host in the tree exists for the stand. Its own spec says the HTTP surface is a host over the core rather than the platform API, and that other hosts embed the same core ([http-host](../../specs/components/pdn-node/http-host.md)); its requirement is generic — product hosts embed the runtime in-process, and the runtime declares no HTTP of its own. This change builds the first host on the product side of that requirement, and nothing above it.
 
-Three properties of the runtime bound everything below, and none is a choice made here. The iroh endpoint binds with no relay and no discovery configured, so a peer is reached only at an address the endpoint publishes about itself. Replicas and payloads are held in memory, so the process is the lifetime of every identity it hosts. An identity is a placeholder value with no key material behind it.
+Three properties of the runtime bound everything below, and none is a choice made here. The iroh endpoint binds with no relay and no discovery configured, so a peer is reached only at an address the endpoint publishes about itself. Replicas, payloads and the node's key live in the directory named at the spawn, so a node comes back on that directory as the same node hosting what it hosted, and what a restart does not bring back is work in flight. An identity is a placeholder value with no key material behind it.
 
 ## Goals / Non-Goals
 
 **Goals**
 
 - A host a phone can run, exposing the runtime's operations and nothing beyond them.
-- A surface that cites what the runtime says about the state underneath it, so no host built on it can present either the volatility or the keyless identity as something else.
+- A surface that cites what the runtime says about the state underneath it, so no host built on it can present either the state a node keeps or the keyless identity as something else.
 - Certainty about the portability premise before anything is built on it.
 
 **Non-Goals**
@@ -75,7 +75,7 @@ This is the one place the surface breaks its own "one exported call, one service
 
 ### D9. A single entry payload is bounded, because a phone is killed for memory
 
-The runtime holds every replica in memory. On a container an unbounded entry payload is a large allocation; on a phone it is the end of the process, and with it every identity the node hosts. The facade therefore bounds one payload by a stated ceiling and refuses above it before calling the runtime, as the HTTP host bounds its own. Memory pressure is the one operating condition a phone adds that a container never had.
+A write buffers the whole payload across the binding boundary before the runtime sees it. On a container an unbounded entry payload is a large allocation; on a phone it is the end of the process. The facade therefore bounds one payload by a stated ceiling and refuses above it before calling the runtime, as the HTTP host bounds its own. Memory pressure is the one operating condition a phone adds that a container never had.
 
 ### D10. The binding artifacts are packaged and released from a repository of their own
 
@@ -89,11 +89,11 @@ Walked per [operating-conditions](../../specs/code-practices/operating-condition
 
 - **Several identities on one node** — unchanged by this surface: every call names the identity it acts for, and the runtime keeps them disjoint.
 - **One device or several** — the facade exports the own-grant read, whose observation contract exists because a sibling device reads a grant only after it replicates.
-- **A device restarts** — the process is the lifetime of everything, so a restart is a new node. Stated as a requirement rather than mitigated.
+- **A device restarts** — the node comes back on the directory named at bring-up as the same node hosting what it hosted, and what does not come back is work in flight. Cited from the runtime's own specs rather than restated as this surface's claim.
 - **A platform suspension** — the condition a phone adds to the restart case, and the one that can amend D2. The spike answers it.
 - **Memory pressure** — the second condition a phone adds; D9 bounds the input the host controls. What an unbounded inbound replica does is not bounded here and is named as out of scope.
 - **An unstable connection** — the ceremony bounds and the repeated read are the whole answer; nothing here retries on a caller's behalf.
-- **A disk that fills** — does not apply: nothing is written to one.
+- **A disk that fills** — the node writes to the directory named at bring-up, and a storage failure is reported rather than swallowed ([durable storage](../../specs/components/data-layer/durable-storage.md)). The facade adds nothing to that.
 - **Capabilities granted, narrowed, revoked, granted again** — the facade passes them through and holds no state of its own about them, so a re-grant after a withdrawal needs nothing from it. Verified at the runtime level, not here.
 
 ## Risks / Trade-offs

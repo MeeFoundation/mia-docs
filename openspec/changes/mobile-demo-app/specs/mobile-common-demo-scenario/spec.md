@@ -149,14 +149,14 @@ The demonstration SHALL state which of the platform's operating conditions it ex
 
 Exercised: several identities on one node; one identity across several devices; a device joining after connections and entries already exist; a device leaving while a peer still needs its data; a capability granted, withdrawn, and granted again over the same claim.
 
-Not exercised, and named as such: a device that restarts and returns with its state, since state does not survive a process at all; a disk that fills, since nothing is written to one; a connection that degrades rather than ends; a capability narrowed and widened rather than closed and reopened; and a process killed for memory, which a phone does and a container never did.
+Not exercised, and named as such: a device that restarts and returns with its state, which the runtime does and no act here provokes; a disk that fills, which the runtime reports rather than swallows and no act here fills; a connection that degrades rather than ends; a capability narrowed and widened rather than closed and reopened; and a process killed for memory, which a phone does and a container never did.
 
 #### Scenario: The uncovered conditions are named rather than implied
 - **WHEN** the demonstration is delivered
 - **THEN** the conditions it does not cover are stated, and no act implies coverage of one of them
 
 ### Requirement: The narration states what is not shown
-The demonstration SHALL state, rather than leave to inference: that state is held in memory and does not survive the process; that an identity carries no key material, so nothing here proves who a peer is; that the reconcile cadence is a configured number rather than a property of the network; which nodes in the staging are not phones; and that withdrawing a grant closes further delivery without recalling what was already delivered.
+The demonstration SHALL state, rather than leave to inference: that what the screens show lives in this device's storage, which holds the only copy of it; that an identity carries no key material, so nothing here proves who a peer is; that the reconcile cadence is a configured number rather than a property of the network; which nodes in the staging are not phones; and that withdrawing a grant closes further delivery without recalling what was already delivered.
 
 A demonstration silent on these invites the opposite assumption on each, and the assumption is what the audience carries away. The last is the one the demonstration would otherwise oversell hardest: a field vanishing from a phone looks like deletion, and the platform promises that access is gated before delivery rather than that delivered data can be retracted ([invariants](../pdn-node/invariants.md), Invariant 2).
 

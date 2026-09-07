@@ -72,7 +72,7 @@ The second read negative [access-control-tests](../../code-practices/access-cont
 - **THEN** the grantee reads the granted claim and the third handle obtains nothing, refused as addressing an issuer it holds nothing of
 
 ### Requirement: One handle owns one node
-One facade handle SHALL own exactly one runtime, brought up by an explicit call and stopped by an explicit call that is safe to repeat. A handle SHALL NOT offer a set of nodes, and SHALL refuse a second bring-up of its own while its node is up rather than silently replacing it. The constraint is on the handle rather than on the operating-system process, so a test binary holding two handles against two runtimes remains possible while an application holding one cannot grow a node set behind it.
+One facade handle SHALL own exactly one runtime, brought up by an explicit call that names the directory the node keeps its state in and stopped by an explicit call that is safe to repeat. The embedder names the directory because it is the one that knows its own sandbox, and the runtime's spawn requires a storage choice ([durable storage](../data-layer/durable-storage.md)). A handle SHALL NOT offer a set of nodes, and SHALL refuse a second bring-up of its own while its node is up rather than silently replacing it. The constraint is on the handle rather than on the operating-system process, so a test binary holding two handles against two runtimes remains possible while an application holding one cannot grow a node set behind it.
 
 A host that could hold several nodes invites a staging in which several devices are several runtimes inside one phone, and that staging cannot show the act it would exist for: a device that goes away takes every runtime co-located with it, so the sibling that should keep serving dies with the device that was meant to leave.
 
@@ -87,7 +87,7 @@ A host that could hold several nodes invites a staging in which several devices 
 ### Requirement: Entry payloads cross as bytes, unchanged and bounded
 An entry's payload SHALL cross the facade as raw bytes on the way in and on the way out, with no encoding, escaping or transformation between what was written and what is read. An entry path SHALL cross as the runtime's own path form, and a path the runtime rejects SHALL be reported as malformed input rather than corrected.
 
-The facade SHALL bound a single entry payload by a stated ceiling and SHALL refuse one above it before the runtime is called. The runtime holds every replica in memory and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The HTTP host bounds its own for the same reason and a smaller one is appropriate here.
+The facade SHALL bound a single entry payload by a stated ceiling and SHALL refuse one above it before the runtime is called. A write buffers the whole payload across the binding boundary and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The HTTP host bounds its own for the same reason and a smaller one is appropriate here.
 
 The bound is on what this host puts in, and SHALL NOT be applied to what a read hands back. An entry another node wrote arrives in the replica whatever its size — a host over the same runtime bounds its own writes at a size a phone would not choose — and refusing to hand such a value over would make a claim the grant permits unreadable rather than making the device safer. What a caller has instead is the length a listing reports before any payload is fetched, which is why a listing reports it.
 
@@ -182,7 +182,7 @@ The runtime distinguishes an inviter that was never reached, a dialogue that end
 - **THEN** the call reports the catch-up failure, and the node hosts no part of that identity afterwards
 
 ### Requirement: A refused operation is reported as a refusal
-The facade SHALL map failures to the platform's error type through one closed table, distinguishing at least: a write the local grant record does not permit; a grant naming an issuer the granting identity may not delegate; a ceremony the counterparty refused; an identity or issuer this node does not host; a peer this identity has no connection to; an act of this kind already committed or in flight; a counterparty a ceremony never reached; a ceremony dialogue that ran out of its bound; a catch-up that ran out of its bound; a payload whose format version this runtime does not speak; input the host itself rejected before calling the runtime; and an unrecognized failure. It SHALL NOT report a refused operation as success, and SHALL NOT expose the internal cause chain of an unrecognized failure, which the platform log retains instead.
+The facade SHALL map failures to the platform's error type through one closed table, distinguishing at least: a write the local grant record does not permit; a grant naming an issuer the granting identity may not delegate; a ceremony the counterparty refused; an identity or issuer this node does not host; a peer this identity has no connection to; an act of this kind already committed or in flight; a counterparty a ceremony never reached; a ceremony dialogue that ran out of its bound; a catch-up that ran out of its bound; a payload whose format version this runtime does not speak; a storage directory another running node already holds; input the host itself rejected before calling the runtime; and an unrecognized failure. It SHALL NOT report a refused operation as success, and SHALL NOT expose the internal cause chain of an unrecognized failure, which the platform log retains instead.
 
 The version refusal earns its own kind by being the one a person meets rather than an engineer: a code minted by an older build scans cleanly and cannot be consumed, and reporting that as an internal failure would tell someone their phone is broken when their counterparty needs an update.
 
@@ -255,13 +255,13 @@ Every operation that crosses the network — a ceremony, a read that waits on a 
 - **THEN** the caller is free to run and the result arrives when the ceremony ends, with no thread of the caller's blocked on it
 
 ### Requirement: The host repeats what the runtime says about its state, and adds nothing
-The runtime holds replicas, payloads, hosted identities, device records, connections and its own key in memory ([node-assembly](../data-layer/node-assembly.md)), so ending the process loses every one of them. The facade SHALL state that where an embedder reads about it, SHALL NOT present any state as persisted, and SHALL NOT offer an act whose meaning depends on state outliving the process.
+A node keeps its replicas, its payloads and its own key in the directory named at bring-up ([durable storage](../data-layer/durable-storage.md)), and comes back on that directory as the same node hosting what it hosted ([restart recovery](../pdn-node/restart-recovery.md)). What a restart does not bring back is work in flight — an invite minted and not consumed, a ceremony interrupted. The facade SHALL state that where an embedder reads about it, SHALL NOT present the device's storage as anything but the only copy, and SHALL NOT offer an act whose meaning depends on work in flight outliving the process.
 
-The fact belongs to `data-layer` and is cited here rather than asserted, so that a change to the runtime's storage does not leave a mobile specification as the only place the old behaviour is written down.
+The facts belong to `data-layer` and `pdn-node` and are cited here rather than asserted, so that a change to the runtime's storage does not leave a mobile specification as the only place the old behaviour is written down.
 
-#### Scenario: A restart is a new node
-- **WHEN** the application process ends and starts again
-- **THEN** it hosts no identity, holds no connection, and its node id differs from the one it had before
+#### Scenario: A restart comes back as the same node
+- **WHEN** the application process ends and starts again on the directory it named before
+- **THEN** it reports the node id it had before and hosts the identities it hosted, and an invite minted and not consumed before the stop is gone
 
 ### Requirement: An identity carries no key material, and the host claims none
 The runtime mints an identity as a placeholder value with no key material behind it ([core](../pdn-node/core.md)), so nothing binds an identity to a person or an organization. The facade SHALL NOT present an identity as authenticated, verified or proven, and SHALL NOT expose an operation that would imply it.
