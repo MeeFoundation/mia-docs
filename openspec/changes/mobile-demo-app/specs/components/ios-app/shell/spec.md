@@ -26,31 +26,45 @@ The camera is the ceremony's channel between two devices. Without it there is no
 - **WHEN** camera access is refused and the person opens the code reader
 - **THEN** the screen states that the camera is not available to the application and how to grant it
 
-### Requirement: The node is brought up by an act and lives while the application is in view
-The shell SHALL bring the node up on an explicit act of the person, not as a side effect of the application becoming active, and SHALL stop it explicitly as the application leaves the foreground. It SHALL treat the loss of the process as the loss of every identity the node hosted: nothing is presented as retained across a termination, and no act is offered whose meaning depends on it.
+### Requirement: The node is brought up and stopped by acts of the person, and a suspension is neither
+The shell SHALL bring the node up on an explicit act of the person, not as a side effect of the application becoming active, and SHALL stop it on an explicit act of the person. It SHALL NOT stop the node because the application is leaving the foreground. It SHALL present a termination as the node stopping rather than as the identities going away, and SHALL offer no act whose meaning depends on work in flight outliving the process.
 
 Bring-up is an act because the surface's own bring-up is one, and because the same sequence then reads identically on either platform — the Android shell starts a service on that act, and a script that says "bring the node up" means the same tap on both.
 
-The runtime holds replicas, payloads and its own key in memory, so a terminated process is a node that never existed. The shell does not fight the platform for background time it cannot use — a node that came back with no identities would be worse than a node the person knows they must keep in view.
+A suspension does not destroy the endpoint. Nothing of a suspended process runs, so the node serves no peer while the application is away; what it does not need on the way back is a bring-up. This is observed rather than assumed: the application was suspended for 20 minutes while a peer wrote a new value to a granted claim, and on the return the node answered and the value was there, with no act of the person in between. Stopping the node as the application left the foreground would therefore trade a node that resumes for one that has to be raised again by hand, and would end a ceremony that a person had merely switched away from.
 
-#### Scenario: Returning to a terminated application starts fresh
+What the return does need is a read, and that belongs to the screens: a suspension stops the timer the periodic read runs on and the platform does not start it again ([screens](../mobile-common/screens.md)).
+
+A terminated process is a node that stopped, not a node that never existed: what it held is in the directory it named at bring-up ([durable storage](../data-layer/durable-storage.md)), and it comes back on that directory as the same node ([restart recovery](../pdn-node/restart-recovery.md)). The shell does not fight the platform for background time it cannot use, and asks for none.
+
+#### Scenario: Returning to a terminated application finds the node stopped, not emptied
 - **WHEN** the system terminates the application and the person opens it again
-- **THEN** the application hosts no identity and says so, rather than showing an empty list in place of the identities the previous process held
+- **THEN** the screen says the node is down and offers bringing it up, and a bring-up on the same directory reports the node id it had and the identities it hosted
 
-#### Scenario: Leaving stops the node deliberately
-- **WHEN** the application is leaving the foreground
-- **THEN** the shell stops the node through the surface's own stop, rather than letting the endpoint be torn down by termination
+#### Scenario: A suspension is survived without an act of the person
+- **WHEN** the application is suspended while its node is up, a peer writes to a granted claim meanwhile, and the person returns
+- **THEN** the node answers, the value the peer wrote is readable, and no bring-up was needed for either
+
+#### Scenario: Leaving the foreground stops nothing
+- **WHEN** the application leaves the foreground with its node up
+- **THEN** the shell performs no stop, and the node is the same node on the return
 
 #### Scenario: Becoming active does not bring a node up by itself
 - **WHEN** the application becomes active with no node running
 - **THEN** no node is brought up until the person performs the act, and the screen says the node is down
 
-### Requirement: The shell builds for the device target and touches no file
-The shell SHALL link the facade built for the physical device architecture, and the node SHALL require no filesystem access: replicas and payloads are held in memory, so nothing is written to the application's container.
+### Requirement: The shell builds for the device target and keeps the node's directory the only copy
+The shell SHALL link the facade built for the physical device architecture, and SHALL name at bring-up a directory inside the application's own container, which the node writes its replicas, its payloads and its key into.
+
+The shell SHALL exclude that directory from the platform's backup, so that what the screens state — that this device holds the only copy — is a fact of the device rather than a sentence in the interface. The container is carried into the person's cloud account by default, so a node's directory leaves the device unless the shell says otherwise, and an application about data staying where its owner put it would be the one moving it.
 
 #### Scenario: The installed build runs on a device
 - **WHEN** the application is installed on a physical device and opened
-- **THEN** the node comes up and reports its node id, having created no store on disk
+- **THEN** the node comes up on a directory inside its own container and reports its node id
+
+#### Scenario: The node's directory is not carried into a backup
+- **WHEN** the node's directory exists and the device is backed up
+- **THEN** the directory is marked as excluded from backup, and no replica, payload or key of the node appears in the backup
 
 ### Requirement: The shell holds no protocol logic
 The shell SHALL forward calls to the facade and translate its errors, and SHALL make no decision the runtime makes: it retries no ceremony, caches no grant, inspects no payload, and holds no rule about what a peer may read.

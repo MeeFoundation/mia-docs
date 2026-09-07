@@ -46,7 +46,7 @@ A screen that dims mid-ceremony ends the ceremony from the person's side, and a 
 
 ### D6. The node comes up by an explicit act on both platforms, and the 2 lifetimes are stated
 
-On Android the node runs inside a foreground service with a visible notification, and it survives the person looking at something else. On iOS the node lives while the application is in view, and a termination loses every identity it hosted. The asymmetry is real and cannot be designed away: state is in memory, and only one of the two platforms offers a way to keep a process alive for this.
+On Android the node runs inside a foreground service with a visible notification, and it keeps answering peers while the person looks at something else. On iOS the node runs while the application is in view, and a termination stops it — what it held comes back on its directory, what does not come back is work in flight. The asymmetry is real and cannot be designed away: only one of the two platforms offers a way to keep a process alive for this.
 
 Bring-up is an explicit act on both, rather than a side effect of the application becoming active, so that the surface's explicit bring-up stays explicit and so the demonstration's own script is the same sequence on either device.
 
@@ -72,9 +72,9 @@ A field vanishing from a phone reads as deletion, and the platform does not prom
 
 The screen has a matching obligation in the other direction. Withdrawal unbinds the namespace, so the grantee's node stops knowing that issuer and every later read is refused rather than answered empty — and a screen that showed a fault banner at the moment a person exercised their own control would misdescribe the product exactly where it works best.
 
-### D10. Volatility is designed around, not papered over
+### D10. The only copy is stated, not papered over
 
-No act depends on state outliving a process, and the narration states that state is volatile. The alternative — a demonstration that avoids the subject and lets a viewer assume a disk — sells something that does not exist, and the assumption is what the audience would carry away.
+No act depends on a restart, and the narration states that this device's storage holds the only copy of what the screens show. The alternative — a demonstration that avoids the subject and lets a viewer assume a service keeping a copy behind the phone — sells something that does not exist, and the assumption is what the audience would carry away.
 
 ## Risks / Trade-offs
 
@@ -82,9 +82,9 @@ No act depends on state outliving a process, and the narration states that state
 
 **A network in a room may isolate its clients.** Many guest networks forbid client-to-client traffic and report nothing worth reading. A personal hotspot or a dedicated router is part of the staging, and traffic between two clients is confirmed to pass before the day.
 
-**The two shells give the same screens different node lifetimes.** Android keeps a foreground service and survives the person looking elsewhere; iOS lives while the application is in view. The asymmetry cannot be designed away — state is in memory and only one platform offers a way to hold a process for this — so the run-through names each phone's platform and the script's "device leaves" gesture is airplane mode rather than a lock.
+**The two shells give the same screens different node lifetimes.** Android keeps a foreground service and answers peers while the person looks elsewhere; iOS runs while the application is in view. The asymmetry cannot be designed away — only one platform offers a way to hold a process for this — so the run-through names each phone's platform and the script's "device leaves" gesture is airplane mode rather than a lock.
 
-**The iOS lifetime is a live hazard during the demonstration.** A notification pulled down, a lock screen, fiddling with the mirroring — any of them can end the process and take the identities with it. The mitigation is a rehearsal that includes the mirroring, and a script whose "device leaves" gesture is airplane mode rather than a lock.
+**The iOS lifetime is a live hazard during the demonstration.** A notification pulled down, a lock screen, fiddling with the mirroring — any of them can end the process, and a node that stopped mid-act answers nothing the other phone is waiting for. The mitigation is a rehearsal that includes the mirroring, and a script whose "device leaves" gesture is airplane mode rather than a lock.
 
 **Local-network consent on iOS may not be observable.** The declaration is required, but the platform raises the prompt from the traffic rather than from the declaration, and a refusal presents as silence. What the shell can actually detect is settled by `mobile-host-surface`'s spike; the requirement is phrased around detecting it, and if it cannot be detected the shell's answer is to tell the person what to check.
 

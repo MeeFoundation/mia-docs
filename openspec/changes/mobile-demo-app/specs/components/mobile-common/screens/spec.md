@@ -33,6 +33,8 @@ A claim identity the screen cannot account for SHALL be shown as a claim it cann
 ### Requirement: What I share is read from the node, on every device
 The connection screen SHALL obtain both halves — what this peer granted, and what this identity granted this peer — by reading the node, and SHALL NOT assemble the second half from what the application remembers publishing.
 
+The peer's half is a list, one capability per issuer the peer grants on behalf of, and the screen SHALL show every one of them. A screen drawing only the first would under-report what is shared with the person, which is the same failure as omitting a claim it cannot name.
+
 A grant published on one device reaches the identity's other devices by replication, so the screen on a device that did not publish it reads nothing until the record and its payload arrive. It SHALL show that as waiting, in the same way it does for a claim, rather than as sharing nothing. An application answering from memory would contradict a sibling device that had already withdrawn the grant, and would show nothing at all on a device that had joined afterwards.
 
 #### Scenario: A device that did not publish the grant still shows it
@@ -53,13 +55,15 @@ The application SHALL NOT inspect a payload, parse it, or wrap it in a format of
 - **THEN** the call is refused and the refusal is shown, with the application having made no attempt to recognize the payload itself
 
 ### Requirement: A code on screen is an exposure with a lifetime, and the screen says so
-While a code is displayed, the screen SHALL state that whoever photographs it can use it until it is used or expires, and SHALL show that the code stops working after either. A displayed code SHALL be dismissable by the person at once.
+While a code is displayed, the screen SHALL state that whoever photographs it can use it until it is used or until the lifetime the screen asked for at the mint runs out. It SHALL show that lifetime running down, SHALL stop displaying the code when it reaches its end, and SHALL be dismissable by the person at once.
 
 The payload carries a live one-time secret. Nothing in it grants durable access, which is exactly why it is safe to show to a camera and unsafe to leave on a table.
 
-#### Scenario: The code stops working once consumed
-- **WHEN** the code has been consumed by the intended device
-- **THEN** the displaying screen shows it as spent, and presenting it again is refused
+The screen SHALL NOT claim the code has been used. The facade exports no way to ask whether a minted payload has been consumed, so from the displaying side a code taken by the other device is indistinguishable from one still waiting, and a screen saying otherwise would be inventing knowledge it does not have. What it says instead is what it knows: the lifetime it chose has run out.
+
+#### Scenario: The screen shows the lifetime it asked for, and stops at its end
+- **WHEN** a code is displayed and its lifetime runs out
+- **THEN** the code is no longer drawn, the screen says the lifetime has run out, and it does not say whether the other device used it in time
 
 ### Requirement: The screen stays awake while a code is shown or a value awaited
 The application SHALL prevent the display from sleeping while a code is on screen and while a read is being repeated for a value that has not arrived.
@@ -143,11 +147,131 @@ An identity is an opaque value the runtime mints, with no key material behind it
 - **WHEN** the person names a connection and looks at it later
 - **THEN** the name is shown as their own note beside the peer's identifier, and nothing presents it as the peer's verified name
 
-### Requirement: The interface states that state does not survive the process
-Where a person would otherwise assume their data is kept, the interface SHALL state that identities, connections and entries live only while the application runs.
+### Requirement: The interface states that this device holds the only copy
+Where a person would otherwise assume a copy is kept somewhere else, the interface SHALL state that identities, connections and entries live in this device's storage and that nothing behind the screens keeps another copy.
 
-The identities screen is where the assumption forms, since it is the screen that looks like an account list. Leaving the assumption to form and then be broken is worse than the sentence that prevents it.
+The identities screen is where the assumption forms, since it is the screen that looks like an account list, and an account list implies a service holding the account. Leaving the assumption to form and then be broken by a lost phone is worse than the sentence that prevents it.
 
-#### Scenario: The identities screen says what it is
+#### Scenario: The identities screen says where what it lists lives
 - **WHEN** the identities screen is shown
-- **THEN** it states that what it lists is lost when the application stops
+- **THEN** it states that what it lists lives on this device and that no copy of it is kept elsewhere
+
+### Requirement: The screens are composed from one vocabulary of elements
+The screens SHALL be composed from a single set of elements — a scrolling screen, a card, a title, a note, a typography element every string passes through, a button carrying the variants primary, secondary, danger and link, an identifier, a refusal banner and a waiting banner — and SHALL NOT introduce a second way of saying what one of them already says.
+
+Every honesty property this capability requires is carried by one element, so it is met once rather than on each screen: a refusal is the refusal banner wherever it appears, a wait is the waiting banner that names its cause, and an identifier is grouped for comparing by eye. A screen drawing its own refusal text would be the place the closed table stopped being closed.
+
+A note SHALL carry the sentences the person needs in the interface's own voice. A value the node reported SHALL NOT be drawn as a note, because the two would then be indistinguishable.
+
+A button whose act cannot be undone SHALL be marked apart from the others.
+
+#### Scenario: A refusal looks the same on every screen
+- **WHEN** a refusal is shown on any screen
+- **THEN** it is the refusal banner, naming the kind, the sentence of the closed table, and whether the refusal came from this application or from the node
+
+#### Scenario: No screen invents an element
+- **WHEN** the screens are read
+- **THEN** every element on them belongs to this vocabulary, and nothing the node did not report is drawn as though it had
+
+### Requirement: The look and the libraries are the organization's, not this application's
+The palette, the typography and the component vocabulary SHALL be those of the organization's other mobile products, so that a person meeting 2 of them meets one organization. The application SHALL NOT invent a palette of its own, and no screen SHALL carry a color literal.
+
+What is taken is the look and the public libraries, not another product's architecture. A layered source arrangement and a shared translation catalogue answer problems this application does not have: it is bounded at 5 screens by the requirement above, and its copy is largely platform terms and sentences these requirements fix word for word, which a translation would split and collapse.
+
+#### Scenario: A color reaches a screen from the shared palette
+- **WHEN** any screen or element is read
+- **THEN** every color it draws comes from the shared palette by name, and none is written as a literal in a screen
+
+#### Scenario: The interface does not suspend while a call is outstanding
+- **WHEN** a value the screen shows is still being read
+- **THEN** the screen keeps drawing and accepting input and shows the waiting banner that names what it waits for, rather than replacing the subtree with a fallback that names nothing
+
+### Requirement: The identities screen opens on the node's own state
+The identities screen SHALL show, before anything else, whether a node is up, with the act of bringing it up and the act of stopping it, and the node id while it is up.
+
+It SHALL then list the identities this node hosts, with the act of creating one and the choice of which identity the other screens act under, and SHALL show which identity is chosen on the row itself rather than elsewhere.
+
+It SHALL carry the act of minting a code that joins another device to the chosen identity. This is the screen the act belongs to because an identity is what the code names, and the reader consumes such a code without any screen offering to mint one.
+
+No other screen SHALL offer bringing the node up. A screen acting under an identity has nowhere to act until a node is up, and it says so rather than offering the act again.
+
+#### Scenario: Nothing acts before a node is up
+- **WHEN** no node is up and any screen other than this one is opened
+- **THEN** it states that the node is down, offers no act of its own, and does not offer bringing the node up
+
+#### Scenario: A device is joined to the identity from the screen that names it
+- **WHEN** an identity is chosen and a second device is to join it
+- **THEN** the code that joins it is minted on this screen, shown as a displayed code, and consumed by the other device through the reader
+
+#### Scenario: The chosen identity is visible where it is chosen
+- **WHEN** an identity is chosen
+- **THEN** its row says that the other screens act as it, and the rows of the others say they can be chosen
+
+### Requirement: The entries screen writes a path and a value, and lists without fetching
+The entries screen SHALL show the identity it acts as, an act of writing that takes an entry path and a value, and the listing of that identity's own entries.
+
+Each row of the listing SHALL be the entry path and the length of its payload, with the act of reading that one entry. The listing reports what the node holds now without fetching payloads, so a length is what it can show and a value costs an act of its own — which the screen SHALL state where the listing is empty, rather than leaving an empty listing to be read as an identity with no data.
+
+A value read SHALL be shown beside the path it was read from, and SHALL NOT replace the listing.
+
+#### Scenario: A listing costs no payloads
+- **WHEN** the entries screen is opened
+- **THEN** it shows each entry path with the length of its payload, and no payload has been fetched
+
+#### Scenario: A written entry appears in the listing
+- **WHEN** an entry is written
+- **THEN** the listing is read again and the entry appears in it, at the path that was written
+
+### Requirement: The connections screen offers 2 ways into a connection and no third
+The connections screen SHALL offer showing an invite code and reading a code, and SHALL state that both devices have to be on one local network because a peer is reached at an address it publishes about itself with no relay behind it.
+
+It SHALL list this identity's connections, each row carrying the peer's identifier and the sentence that running the ceremony proves both devices held the same one-time secret and nothing about who the person is. A row SHALL open the connection screen for that peer.
+
+#### Scenario: A connection is reached only through its row
+- **WHEN** the connections screen is read
+- **THEN** the only way to a peer's connection screen is that peer's row, and no control offers a peer the node does not hold a connection to
+
+### Requirement: The connection screen is 4 cards in one order
+The connection screen SHALL be, in this order: the peer, what this peer shares with me, what I share with this peer, and the act of sharing claims with this peer.
+
+The order is what the person came for. They arrive to read what is shared before they change it, so the act that changes it sits below both halves and is reached after both have been read.
+
+**The peer** SHALL be the peer's identifier shown for comparing by eye against what the other person sees on their own screen, with the sentence that it is an opaque value with no key behind it and that any name given to it is the person's own note held on this device.
+
+**What this peer shares with me** SHALL carry one row per claim of the capability the peer granted: the entry path joined against the listing of the namespace received, whether the claim is writable, and either the value or a waiting banner naming the value it waits for. A claim the screen cannot name SHALL be shown as a claim it cannot name rather than omitted. A writable claim SHALL carry the act of writing a new value, with the sentence that the write is admitted against the grant record this node has read and that the issuer's own gate decides afterwards without its verdict reaching this screen. A peer that has withdrawn SHALL render as that peer no longer sharing, per the requirement on a namespace that stopped being shared.
+
+**What I share with this peer** SHALL carry one row per claim of the capability read from the node, each with its write right, and one act withdrawing the whole grant, marked as an act that cannot be undone. Below it SHALL stand the sentence that withdrawing closes further delivery and does not recall what this peer already received.
+
+**Sharing claims with this peer** SHALL offer this identity's own entry paths as a choice of several, a field for a path the listing does not carry, and 2 acts — granting read-only and granting with the right to write — with the sentence that publishing again replaces the whole grant toward this peer rather than adding to it.
+
+Neither half SHALL be drawn from what this device remembers doing, per the requirement that what I share is read from the node.
+
+#### Scenario: The halves are read before the act that changes them
+- **WHEN** the connection screen is opened
+- **THEN** what the peer shares and what is shared with the peer are both above the act of sharing, and neither is below it
+
+#### Scenario: A read-only claim offers no write
+- **WHEN** a claim the peer granted is not writable
+- **THEN** the row shows it as read-only and carries no field for writing a value
+
+#### Scenario: Publishing again replaces rather than adds
+- **WHEN** a grant is published over one path and then published over another
+- **THEN** the screen says beforehand that the whole grant toward this peer is replaced, and afterwards shows only the second path as shared
+
+### Requirement: The reader asks for the act before the camera opens
+The code reader SHALL ask which act the code is being read for — accepting an invitation to connect, or joining this device to an identity — and SHALL open the camera only after the act is chosen.
+
+A refused camera consent SHALL be reported on this screen, with the way to grant it, rather than as an empty view.
+
+#### Scenario: The camera does not open before the act is known
+- **WHEN** the reader is opened
+- **THEN** the choice of act is shown first, and no camera is running until one is chosen
+
+### Requirement: A displayed code is a modal that dismisses at once
+A code SHALL be shown as a modal carrying: the code itself, the sentence that whoever photographs it can use it in place of the device it was meant for until it is used or until its lifetime runs out, the first characters of the payload as an identifier for comparing by eye, and the act of dismissing it.
+
+The modal SHALL keep the display awake while it stands, SHALL report the code as spent once it has been used or has expired, and SHALL offer nothing but dismissal in that state.
+
+#### Scenario: A spent code says so rather than staying drawable
+- **WHEN** a displayed code is consumed by the other device
+- **THEN** the modal replaces it with the statement that it is spent and no longer works, and the code itself is gone from the screen
