@@ -139,13 +139,28 @@ The node is the single answer to every one of those questions. A screen holding 
 - **THEN** the screen reflects what the node now reads, with nothing left from what it displayed before
 
 ### Requirement: An identifier is shown for comparing, never as a name or a proof
-Where an identity or a node is shown, it SHALL be rendered so two people can compare it by eye, and SHALL NOT be labelled as a verified name, an account, or a proof of who anyone is. A name the person types for a peer SHALL be presented as their own note, held on their own device.
+Where an identity or a node is shown, it SHALL be rendered so two people can compare it by eye, and SHALL NOT be labelled as a verified name, an account, or a proof of who anyone is. A name the person types SHALL be presented as their own note, held on their own device — for a peer and for an identity of their own alike, since a person holding 2 identities tells them apart no more easily than they tell 2 peers apart.
+
+A note SHALL survive a restart of the application, SHALL reach neither the node nor any peer, and SHALL NOT replace the identifier: it stands above it, and the identifier stays visible, because the identifier is what 2 people compare and the note is what one person remembers.
 
 An identity is an opaque value the runtime mints, with no key material behind it. A screen calling it verified would be the one place in the product claiming something the platform does not do.
 
 #### Scenario: A peer is labelled by a note, not by a claim about them
 - **WHEN** the person names a connection and looks at it later
 - **THEN** the name is shown as their own note beside the peer's identifier, and nothing presents it as the peer's verified name
+
+#### Scenario: A note outlives the run that wrote it
+- **WHEN** the person names an identity or a peer, leaves the application and returns
+- **THEN** the note is shown again, the identifier is shown with it, and nothing was sent to the node or to the peer
+
+### Requirement: A screen acting under an identity says which one
+Every screen that acts under an identity SHALL show which identity that is, in the same place on each of them, and SHALL offer the way back to where the choice is made.
+
+One device holding 2 identities is the product's own claim, and a screen that acts under one of them without saying which is unreadable exactly when that claim is being made: an empty list means "nothing here" under one identity and "wrong identity" under the other, and the screen gives the person no way to tell.
+
+#### Scenario: The acting identity is visible away from the screen that chooses it
+- **WHEN** a screen other than the one where the identity is chosen is shown
+- **THEN** it names the identity it acts as, in the place every screen puts it, and that place leads back to the choice
 
 ### Requirement: The interface states that this device holds the only copy
 Where a person would otherwise assume a copy is kept somewhere else, the interface SHALL state that identities, connections and entries live in this device's storage and that nothing behind the screens keeps another copy.
