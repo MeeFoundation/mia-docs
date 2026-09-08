@@ -67,18 +67,20 @@ Convergence is the product's honest behaviour and hiding it would misrepresent t
 ### Requirement: A device joins an identity that already holds entries
 The demonstration SHALL show Alice's phone joining her existing identity through the linking ceremony, coming up already carrying the entries written on the laptop before it joined, with no further act required of the person.
 
+The phone SHALL host nothing at the moment it joins: the node is brought up and no identity is created on it, so the first identity it ever holds is one it received rather than one it made. An identity created on the phone beforehand would leave the audience unable to tell the two apart, and the claim being made is that an identity exists before the device and outlives it.
+
 It SHALL show that the joining device hosts the identity it joined and no other identity of the same person, so that a device is seen belonging to an identity rather than to a person. Alice's laptop node therefore holds a second identity of hers at the moment the linking payload is minted, so that what the phone does not receive is real.
 
 #### Scenario: A joining device comes up caught up
-- **WHEN** the phone consumes a linking payload for an identity that already holds entries
-- **THEN** it lists that identity as hosted and reads the entries written before it joined, with no further act of the person
+- **WHEN** a phone hosting no identity at all consumes a linking payload for an identity that already holds entries
+- **THEN** the first identity it lists as hosted is that one, and it reads the entries written before it joined, with no further act of the person
 
 #### Scenario: A device that joined one identity hosts that one only
 - **WHEN** the laptop node hosts 2 identities of Alice and mints a linking payload for one of them
 - **THEN** the phone hosts that identity alone, and nothing on it names the other
 
 ### Requirement: One application holds several identities, kept apart
-The demonstration SHALL show the phone hosting more than one identity — the one it joined and one it creates itself — each with a data namespace of its own and a connection list of its own. The same entry path under both identities SHALL be shown holding different values, and the connection established under one SHALL be shown absent from the other's list.
+The demonstration SHALL show the phone hosting more than one identity — the one it joined and one it creates itself afterwards, in that order — each with a data namespace of its own and a connection list of its own. The order is what keeps the 2 acts distinct: an identity made on the phone before the join would be indistinguishable, on the screen, from the one that arrived. The same entry path under both identities SHALL be shown holding different values, and the connection established under one SHALL be shown absent from the other's list.
 
 This is the act the product's privacy claim rests on: 2 lives on one device that are not 2 accounts and share nothing by default.
 
