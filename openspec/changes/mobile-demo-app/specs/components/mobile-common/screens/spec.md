@@ -193,6 +193,8 @@ It SHALL then list the identities this node hosts, with the act of creating one 
 
 It SHALL carry the act of minting a code that joins another device to the chosen identity. This is the screen the act belongs to because an identity is what the code names, and the reader consumes such a code without any screen offering to mint one.
 
+It SHALL also carry the way into the reader for the other side of that act, and SHALL offer it while the node hosts no identity at all. A device joining an identity holds nothing beforehand — that is what the act is for — so a reader reachable only from a screen that acts under an identity cannot be reached by the device that needs it, and the only remaining path is to create an identity first, which is a different thing and indistinguishable afterwards from the one that arrived.
+
 No other screen SHALL offer bringing the node up. A screen acting under an identity has nowhere to act until a node is up, and it says so rather than offering the act again.
 
 #### Scenario: Nothing acts before a node is up
@@ -202,6 +204,10 @@ No other screen SHALL offer bringing the node up. A screen acting under an ident
 #### Scenario: A device is joined to the identity from the screen that names it
 - **WHEN** an identity is chosen and a second device is to join it
 - **THEN** the code that joins it is minted on this screen, shown as a displayed code, and consumed by the other device through the reader
+
+#### Scenario: A device holding nothing can still join an identity
+- **WHEN** a node is up and hosts no identity
+- **THEN** the screen offers reading a code, and the joining act runs with no identity created on this device first
 
 #### Scenario: The chosen identity is visible where it is chosen
 - **WHEN** an identity is chosen
