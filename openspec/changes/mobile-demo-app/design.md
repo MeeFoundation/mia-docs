@@ -2,7 +2,7 @@
 
 `mobile-host-surface` gives the runtime a host a phone can run: a uniffi facade exposing the runtime's operations and nothing beyond them, including the own-grant read that `own-grant-read` adds, so a host is not forced to answer "what am I sharing" from memory. This change puts screens on that host and stages a demonstration for someone deciding whether the platform is worth building.
 
-Everything the facade states about the state underneath it holds here without restatement: replicas and payloads live only as long as the process, an identity is a placeholder value with no key material, a peer is reached only in one local network because no relay or discovery is configured, and the reconcile cadence is a number the host configures. The application is arranged around those four as they stand, not around a later version of them.
+Everything the facade states about the state underneath it holds here without restatement: the node's directory holds the only copy of its replicas, its payloads and its key, and a node brought up on that directory again is the same node; an identity is a placeholder value with no key material; a peer is reached by publishing its addresses under its node id to n0's name servers, with n0's relay carrying a session that finds no direct path; and the reconcile cadence is a number the host configures. The application is arranged around those four as they stand, not around a later version of them.
 
 ## Goals / Non-Goals
 
@@ -15,7 +15,7 @@ Everything the facade states about the state underneath it holds here without re
 **Non-Goals**
 
 - Anything in the facade or the runtime. If a screen needs a capability that is not exported, the answer is a change to `mobile-host-surface`, not a workaround here.
-- Automated coverage of the demonstration. 2 phones are not a test fixture, and pretending otherwise would be exactly the substitution this repository's practices exist to prevent.
+- Automated coverage of the demonstration. A phone in a hand is not a test fixture, and pretending otherwise would be exactly the substitution this repository's practices exist to prevent.
 - A reusable application. This is one application for one purpose, and its screens are not a product's information architecture.
 
 ## Decisions
@@ -50,17 +50,25 @@ On Android the node runs inside a foreground service with a visible notification
 
 Bring-up is an explicit act on both, rather than a side effect of the application becoming active, so that the surface's explicit bring-up stays explicit and so the demonstration's own script is the same sequence on either device.
 
-The consequence for the staging: locking a phone is not a neutral gesture. Where an act calls for a device to leave, the gesture is airplane mode with the application still in view, and the narration says which phone is which platform.
+The consequence for the staging: locking the phone is not a neutral gesture. Where an act calls for a device to leave, the gesture is airplane mode with the application still in view, and the narration says which platform the phone runs.
 
-### D7. The staging needs 4 nodes, and 2 of them are processes on the presenter's machine
+### D7. The staging is Alice on 2 devices, Bob, and an outsider — one phone and 3 processes
 
-4 roles cannot be collapsed. The granting identity's first device and the grantee are 2. A third is needed because 2 acts require a node that stays up while another goes away — the granting identity's second device joining, and that device serving the grantee once the first is gone. A fourth is needed because the outsider must hold no connection to the granting identity, and the other 3 all do.
+4 roles cannot be collapsed. Alice's laptop node is where her identity is created and her first entries are written. Her phone joins that identity and is needed twice over: as the device that comes up caught up, and as a device of an identity whose other device goes away. Bob's node holds an identity of his own and is the party a grant names. A fourth is needed because the outsider must hold no connection to Alice, and the other 3 all do.
 
-The fourth cannot be a second identity on the grantee's phone. The data service is keyed by the issuer whose namespace is read, not by the identity a screen believes it is acting under, so once that phone has bound the granting identity's replica it answers the read whichever identity is selected. Hosting an outsider beside a grantee would stage a denial that cannot fail.
+The fourth cannot be a second identity on Bob's node. The data service is keyed by the issuer whose namespace is read, not by the identity a screen believes it is acting under, so once that node has bound Alice's replica it answers the read whichever identity is selected. Hosting an outsider beside a grantee would stage a denial that cannot fail.
 
-So: 2 phones running the application, and 2 `pdn-node-http` processes on the presenter's machine in the same local network. Both processes are real nodes with real addresses, reached by the phones over the runtime's own protocols.
+So: one phone running the application, and 3 `pdn-node-http` processes on the presenter's machine. All 3 are real nodes with real addresses, reached by the phone over the runtime's own protocols.
 
-Two things about them are stated in the narration rather than hidden. A machine does not read a code off a screen, so its payload is carried by hand. And the HTTP host spawns the runtime with the default cadence and offers no way to change it, so the acts running through it are the slow ones; making that host's interval configurable is a change of its own if rehearsal shows the slowness is intolerable.
+The order of the acts follows from the cast rather than from convenience. The phone joins an identity that already holds entries, so the catch-up is visible as arrival rather than as a screen that was always full. Bob connects afterwards, so the connection record is seen reaching Alice's laptop with no act performed there — the property `a_linked_device_catches_up_from_its_sibling_while_the_issuer_is_offline` holds in `sibling_serving.rs`, where a device linked before the establishment lists the peer of an establishment it took no part in, shown here on 2 devices of one person.
+
+Two things about the processes are stated in the narration rather than hidden. A machine does not read a code off a screen, so its payload is carried by hand. And the HTTP host spawns the runtime with the default cadence and offers no way to change it, so the acts running through it are the slow ones; making that host's interval configurable is a change of its own if rehearsal shows the slowness is intolerable.
+
+### D7a. One phone means both directions of granting
+
+With one screen in the staging, a single granting direction would show either the issuer's acts or the grantee's and hide the other behind a terminal. So both are shown over the one connection: Alice grants Bob, which puts choosing a claim, publishing, withdrawing and granting again on her phone; Bob grants Alice, which puts a claim arriving, a writable claim accepting an edit, a read-only claim refusing one, and a withdrawn claim reading as no longer shared on the same phone.
+
+The alternative was to narrate a terminal as though it were a grantee's screen, which is the substitution the demonstration's own form rules out. What a counterparty node does is read from a terminal as the counterparty's behaviour, and never as what a person would see.
 
 ### D8. The demonstration's logistics live in a run-through document, not in the spec tree
 
@@ -78,13 +86,13 @@ No act depends on a restart, and the narration states that this device's storage
 
 ## Risks / Trade-offs
 
-**Two phones on one screen.** Mirroring two devices onto one machine is the fragile part of the day, rehearsed with the same devices and cables, with a camera over the table as the fallback.
+**The phone on the presenter's screen.** Mirroring the phone onto the machine that also shows the terminal is the fragile part of the day, rehearsed with the same device and cable, with a camera over the table as the fallback.
 
 **A network in a room may isolate its clients.** Many guest networks forbid client-to-client traffic and report nothing worth reading. A personal hotspot or a dedicated router is part of the staging, and traffic between two clients is confirmed to pass before the day.
 
-**The two shells give the same screens different node lifetimes.** Android keeps a foreground service and answers peers while the person looks elsewhere; iOS runs while the application is in view. The asymmetry cannot be designed away — only one platform offers a way to hold a process for this — so the run-through names each phone's platform and the script's "device leaves" gesture is airplane mode rather than a lock.
+**The two shells give the same screens different node lifetimes.** Android keeps a foreground service and answers peers while the person looks elsewhere; iOS runs while the application is in view. The asymmetry cannot be designed away — only one platform offers a way to hold a process for this — so the run-through names the platform the phone runs and the script's "device leaves" gesture is airplane mode rather than a lock.
 
-**The iOS lifetime is a live hazard during the demonstration.** A notification pulled down, a lock screen, fiddling with the mirroring — any of them can end the process, and a node that stopped mid-act answers nothing the other phone is waiting for. The mitigation is a rehearsal that includes the mirroring, and a script whose "device leaves" gesture is airplane mode rather than a lock.
+**The iOS lifetime is a live hazard during the demonstration.** A notification pulled down, a lock screen, fiddling with the mirroring — any of them can end the process, and a node that stopped mid-act answers nothing its peers are waiting for. The mitigation is a rehearsal that includes the mirroring, and a script whose "device leaves" gesture is airplane mode rather than a lock.
 
 **Local-network consent on iOS may not be observable.** The declaration is required, but the platform raises the prompt from the traffic rather than from the declaration, and a refusal presents as silence. What the shell can actually detect is settled by `mobile-host-surface`'s spike; the requirement is phrased around detecting it, and if it cannot be detected the shell's answer is to tell the person what to check.
 

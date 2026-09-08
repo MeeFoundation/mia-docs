@@ -1,6 +1,6 @@
 # Tasks: mobile-demo-app
 
-Start after `mobile-host-surface` has landed and its portability spike has passed. Until a build runs on a phone and two devices pair over a real network, nothing here has a foundation. The spike's recorded answers about the async shape of the bindings, iOS local-network consent, and the Android platform level's requirement are inputs to groups 1 and 4.
+Start after `mobile-host-surface` has landed and its portability spike has passed. Until a build runs on a phone and 2 nodes pair over a real network, nothing here has a foundation. The spike's recorded answers about the async shape of the bindings, iOS local-network consent, and the Android platform level's requirement are inputs to groups 1 and 4.
 
 ## 1. The repository and the boundary
 
@@ -35,6 +35,7 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 - [ ] 2.8 The display kept awake while a code is shown and while a value is awaited (D5)
 - [ ] 2.9 Identifiers rendered so two people can compare them by eye, a peer's name shown as the person's own note, and nothing labelled verified or proven
 - [ ] 2.10 No control anywhere offers a ticket, an import, a share, a forced synchronization or a reset — walked screen by screen, because absence is the requirement
+- [ ] 2.12 The connections screen's sentence about reaching a peer matches what the endpoint does: addresses published under a node id and a relay behind the session that finds no direct path, rather than one local network
 - [~] 2.11 The camera and the code rendering, the only platform capability the screens need beyond the facade
   - Both exercised on the device: the camera read a peer's code, and a code this phone minted was rendered well enough for another party to read it off the screen. A refused camera is still unexercised.
 
@@ -60,22 +61,26 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 
 ## 5. The demonstration
 
-- [ ] 5.1 The written run-through: the acts of the demonstration in order, each with the device it happens on, that device's platform, the refusal shown beside it, and the sentence naming what it proves
-- [ ] 5.2 The outsider's act: a fourth node, connected to neither side, shown obtaining nothing of the granting identity's data — the tightest denial of the change's own headline claim, and one no audience has seen. It is a node and not a second identity beside the grantee, because the data service answers by issuer rather than by the identity a screen is set to (D7)
-- [ ] 5.3 The 2 nodes that are not phones: `pdn-node-http` processes on the presenter's machine in the same network, one joining an identity as its second device and one playing the outsider. Both need `PDN_DEBUG=1`, since the routes the presenter drives are absent without it. What is narrated: that they are not phones, that their payload is carried by hand, and that they run at the default cadence (D7)
+- [ ] 5.1 The written run-through: the acts in order — Alice's identity created and written to on her laptop node, her phone joining it through the linking ceremony, Bob's node connecting afterwards — each with the node it happens on, the platform where that is a phone, the refusal shown beside it, and the sentence naming what it proves
+- [ ] 5.2 The outsider's act: a fourth node, holding no connection to Alice, shown obtaining nothing of her data — the tightest denial of the change's own headline claim, and one no audience has seen. It is a node and not a second identity beside the grantee, because the data service answers by issuer rather than by the identity a screen is set to (D7)
+- [ ] 5.3 The 3 nodes that are not phones: `pdn-node-http` processes on the presenter's machine — Alice's first device, where her identity is created and the linking payload is minted; Bob's, which mints the invite and holds the grants; and the outsider's. All 3 need `PDN_DEBUG=1`, since the routes the presenter drives are absent without it. What is narrated: that they are not phones, that each mints its payload and renders it as a code the phone reads, and that they run at the default cadence (D7)
 - [ ] 5.4 The re-grant act: the same claim granted again after the withdrawal, and the access reopening — the path `operating-conditions` singles out, and the difference between showing a boundary and showing a dead end
-- [ ] 5.5 The device-leaves gesture defined as airplane mode with the application in view, never a lock screen, and the reason recorded next to it: on iOS a lock can end the process and take every identity with it (D6)
-- [ ] 5.6 The 5 absences written into the narration — this device holding the only copy, an identity without keys, a configured cadence, which nodes are not phones, and that a withdrawal closes further delivery without recalling what was already delivered (D9)
-- [ ] 5.7 The operating conditions the demonstration covers and the ones it does not, written beside the acts, memory pressure among the uncovered — a phone is killed for it and a container never was
-- [ ] 5.8 Staging: the network confirmed to pass traffic between 2 of its clients, and 2 devices mirrored onto one screen with a camera over the table as the fallback (D8)
+- [ ] 5.5 The device-leaves gesture defined as airplane mode with the application in view, never a lock screen, and the reason recorded next to it: on iOS a lock can end the process and take every identity with it (D6). The device that leaves is the phone, which established the connection and published the grant, and Alice's laptop node carries the fresh value to Bob in its absence
+- [ ] 5.6 The 5 absences written into the narration — this device holding the only copy, an identity without keys, a configured cadence, which nodes are not phones and that their side of every act is a terminal rather than a screen, and that a withdrawal closes further delivery without recalling what was already delivered (D9)
+- [ ] 5.7 The operating conditions the demonstration covers and the ones it does not, written beside the acts, memory pressure among the uncovered — a phone is killed for it and a container never was. Uncovered too, and named: a withdrawal performed on a device other than the one that published the grant, and every counterparty act as it would appear on a phone, since Bob and the outsider are nodes without screens
+- [ ] 5.8 Staging: the network confirmed to pass traffic between 2 of its clients, and the phone mirrored onto the screen that also carries the terminal, with a camera over the table as the fallback (D8)
   - No node is restarted once the run-through has begun. A node keeps its id across a restart but not its address — the endpoint binds an ephemeral port and nothing configures one — so with no relay and no discovery a restarted node is unreachable to every peer it had, and the screens cannot say so: a replica holds the last value that arrived and no read reports its age. A stale screen looks exactly like a current one.
-- [ ] 5.9 A full run-through end to end, twice, on the devices and network the demonstration runs on, with every application restarted between the passes — the only way to find an act that silently depended on the previous run's state
+- [ ] 5.9 A full run-through end to end, twice, on the devices and network the demonstration runs on, with the application restarted between the passes — the only way to find an act that silently depended on the previous run's state
+- [ ] 5.10 The linking act placed before any connection exists: the phone joins an identity that already holds entries and comes up carrying them, and the laptop node holds a second identity of Alice's at that moment so that what the phone does not receive is real
+- [ ] 5.11 The connection reaching Alice's laptop node with no act performed there, shown after Bob's ceremony completes on the phone — the wait is the periodic pass, so it is narrated as waiting
+- [ ] 5.12 Both directions of granting over the one connection: Alice granting Bob, so the issuer's acts are on her phone, and Bob granting Alice, so a claim arriving, a writable claim accepting an edit, a read-only claim refusing one, and a withdrawn claim reading as no longer shared are on the same phone (D7a)
 
 ## 6. Docs and spec tree (manual, not deltas)
 
 - [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, the facade's artifacts named as a release of `pdn-sdk` rather than as something built out of `mee-pdn`, and the environment facts unchanged
 - [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs` and `pdn-sdk`
 - [ ] 6.3 Sweep the spec tree and the active changes for statements this change invalidates
+- [ ] 6.4 The run-sheet artifacts in `mee-pdn` that stage the superseded cast — `demo-script.md`, `demo-script-en.md`, `demo-commands.md`, the scripts under `demo/`, and `status.md` — rewritten onto this staging or marked superseded where they live. `demo/09-restart.sh` is the sharpest case: it restarts a node mid-run, which 5.8 forbids
 
 ## 7. Gates
 
