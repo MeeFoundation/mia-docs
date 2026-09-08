@@ -223,7 +223,7 @@ A value read SHALL be shown beside the path it was read from, and SHALL NOT repl
 - **THEN** the listing is read again and the entry appears in it, at the path that was written
 
 ### Requirement: The connections screen offers 2 ways into a connection and no third
-The connections screen SHALL offer showing an invite code and reading a code, and SHALL state that both devices have to be on one local network because a peer is reached at an address it publishes about itself with no relay behind it.
+The connections screen SHALL offer showing an invite code and reading a code, and SHALL state how a peer is reached: at an address the node publishes about itself under its node id, with a relay carrying the session when no direct path is found. It SHALL NOT tell the person that the 2 devices have to share one network, which is not what the endpoint requires.
 
 It SHALL list this identity's connections, each row carrying the peer's identifier and the sentence that running the ceremony proves both devices held the same one-time secret and nothing about who the person is. A row SHALL open the connection screen for that peer.
 
