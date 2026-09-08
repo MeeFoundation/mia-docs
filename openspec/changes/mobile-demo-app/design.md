@@ -2,7 +2,7 @@
 
 `mobile-host-surface` gives the runtime a host a phone can run: a uniffi facade exposing the runtime's operations and nothing beyond them, including the own-grant read that `own-grant-read` adds, so a host is not forced to answer "what am I sharing" from memory. This change puts screens on that host and stages a demonstration for someone deciding whether the platform is worth building.
 
-Everything the facade states about the state underneath it holds here without restatement: the node's directory holds the only copy of its replicas, its payloads and its key, and a node brought up on that directory again is the same node; an identity is a placeholder value with no key material; a peer is reached by publishing its addresses under its node id to n0's name servers, with n0's relay carrying a session that finds no direct path; and the reconcile cadence is a number the host configures. The application is arranged around those four as they stand, not around a later version of them.
+Everything the facade states about the state underneath it holds here without restatement: the node's directory holds the only copy of its replicas, its payloads and its key, and a node brought up on that directory again is the same node; an identity is a placeholder value with no key material; a peer is reached by the connectivity the spawn names, and every node of this staging names the widest — addresses published under the node id to n0's name servers, and n0's relay carrying a session that finds no direct path; and the reconcile cadence is a number the host configures. The application is arranged around those four as they stand, not around a later version of them.
 
 ## Goals / Non-Goals
 
