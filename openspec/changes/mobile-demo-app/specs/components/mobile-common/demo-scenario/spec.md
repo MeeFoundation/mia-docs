@@ -1,6 +1,6 @@
 # mobile-common: demonstration scenario
 
-The demonstration is what a person witnesses, so it is specified rather than left to a script written on the day. Each act below is one the runtime's own scenario tests already cover, and each is required to appear beside the refusal that gives it meaning: an act shown only in its allowed direction demonstrates nothing about a product whose whole subject is the boundary.
+The demonstration is what a person witnesses, so it is specified rather than left to a script written on the day. Each act below is one the runtime's own scenario tests cover, save the one named where it appears, and each is required to appear beside the refusal that gives it meaning: an act shown only in its allowed direction demonstrates nothing about a product whose whole subject is the boundary.
 
 The demonstration follows one person, Alice, across 2 devices of one identity, and one peer, Bob, on a node of his own. Alice starts on a node running on a laptop, joins her phone to that identity through the linking ceremony, and only then does Bob's node establish a connection with her. The order is part of the subject rather than a convenience of the staging: the phone joins an identity that already holds entries, and the connection Bob makes afterwards reaches Alice's laptop node, where nobody performs an act.
 
@@ -92,6 +92,8 @@ This is the act the product's privacy claim rests on: 2 lives on one device that
 The demonstration SHALL show an invite payload minted by Bob's node, rendered as a code on that machine's screen, and read by the phone's camera, ending in a connection that both sides list. No account and no party that knows who the 2 people are SHALL take part; the servers that carry the traffic are named where the staging names them, and none of them holds anything that identifies a person.
 
 The connection SHALL then be shown on Alice's laptop node, which took no part in the ceremony and where nobody performs an act, because an identity holds its connections and a device of that identity comes to hold them too.
+
+This is the one act no runtime test asserts directly. `sibling_serving.rs` and the linking scenarios hold the neighbouring properties for the same order — a device linked before the establishment receives the pair and the grant record and serves by them — and the connection list reads the same replicated directory those cross. The run-through verifies this act first, before anything is built on it.
 
 The same code SHALL then be presented a second time and be refused, with no second connection recorded on the inviting side. The refusal SHALL be shown as a refusal on the screen, not as a silent absence of effect.
 

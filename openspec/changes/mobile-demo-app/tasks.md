@@ -61,7 +61,7 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 
 ## 5. The demonstration
 
-- [ ] 5.1 The written run-through: the acts in order — Alice's identity created and written to on her laptop node, her phone joining it through the linking ceremony, Bob's node connecting afterwards — each with the node it happens on, the platform where that is a phone, the refusal shown beside it, and the sentence naming what it proves
+- [~] 5.1 The written run-through: the acts in order — Alice's identity created and written to on her laptop node, her phone joining it through the linking ceremony, Bob's node connecting afterwards — each with the node it happens on, the platform where that is a phone, the refusal shown beside it, and the sentence naming what it proves
 - [ ] 5.2 The outsider's act: a fourth node, holding no connection to Alice, shown obtaining nothing of her data — the tightest denial of the change's own headline claim, and one no audience has seen. It is a node and not a second identity beside the grantee, because the data service answers by issuer rather than by the identity a screen is set to (D7)
 - [ ] 5.3 The 3 nodes that are not phones: `pdn-node-http` processes on the presenter's machine — Alice's first device, where her identity is created and the linking payload is minted; Bob's, which mints the invite and holds the grants; and the outsider's. All 3 need `PDN_DEBUG=1`, since the routes the presenter drives are absent without it. What is narrated: that they are not phones, that each mints its payload and renders it as a code the phone reads, and that they run at the default cadence (D7)
 - [ ] 5.4 The re-grant act: the same claim granted again after the withdrawal, and the access reopening — the path `operating-conditions` singles out, and the difference between showing a boundary and showing a dead end
@@ -80,7 +80,9 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 - [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, the facade's artifacts named as a release of `pdn-sdk` rather than as something built out of `mee-pdn`, and the environment facts unchanged
 - [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs` and `pdn-sdk`
 - [ ] 6.3 Sweep the spec tree and the active changes for statements this change invalidates
-- [ ] 6.4 The run-sheet artifacts in `mee-pdn` that stage the superseded cast — `demo-script.md`, `demo-script-en.md`, `demo-commands.md`, the scripts under `demo/`, and `status.md` — rewritten onto this staging or marked superseded where they live. `demo/09-restart.sh` is the sharpest case: it restarts a node mid-run, which 5.8 forbids
+- [~] 6.4 The run-sheet artifacts in `mee-pdn` that stage the superseded cast — `demo-script.md`, `demo-script-en.md`, `demo-commands.md`, the scripts under `demo/`, and `status.md` — rewritten onto this staging or marked superseded where they live. `demo/09-restart.sh` is the sharpest case: it restarts a node mid-run, which 5.8 forbids
+  - Rewritten: `demo/` now stages 3 `pdn-node-http` nodes (Alice's laptop on 3011, Bob on 3012, Carol on 3013) and one script per act, and both run-sheets follow them. `demo-commands.md` is gone — it duplicated the scripts in prose, which is the copy that drifts. `09-restart.sh` is gone with it, and the QR decoder the pre-flight needs is vendored beside the scripts instead of living in an ignored directory.
+  - Rehearsed on the laptop half only: acts 1 and 3 to 8 were run end to end with Alice's laptop standing in for the phone, including the 409 after a withdrawal and the outsider's denial. What no rehearsal has touched is every act that needs the phone — the linking ceremony above all, which the phone has never performed.
 
 ## 7. Gates
 
