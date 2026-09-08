@@ -1,6 +1,6 @@
 # data-layer: cell store
 
-A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material. Its content lives in one dedicated pdn-store replica, the **cell store**, held whole by every device of every member: no egress filter runs inside a cell, member devices form the replica's swarm, and any member device catches up from any other. What keeps a cell honest is admission: a session is served to member devices only, and an entry is admitted by its author — a claim from the devices of the member that issued it, a document per the mode it was shared under — judged on every member device, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins cell stores; this spec covers the store itself.
+A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material. Its content lives in one dedicated pdn-store replica, the **cell store**, held whole by every device of every member: no egress filter runs inside a cell, member devices form the replica's swarm, and any member device catches up from any other. What keeps a cell honest is admission: a session is served to member devices only, and an entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins cell stores; this spec covers the store itself.
 
 ## ADDED Requirements
 
@@ -93,19 +93,48 @@ An entry that is a claim SHALL be admitted over sync only when it was authored b
 - **WHEN** a device of member C receives, from a device of member B, a claim authored by a device of A that names A as issuer
 - **THEN** C's device persists it, although the session peer is B
 
-### Requirement: A document's mode bounds who writes it
+### Requirement: A mergeable-document is edited by every member
 
-A document SHALL be shared with the whole cell in exactly one of two modes: read-only — only devices of the member that created it write it — or read-write — devices of any member write it. An entry in a read-only document authored by a device of any other member SHALL be dropped before persisting, silently, on every member device; an entry in a read-write document authored by any member's device SHALL be admitted and compete by per-key last-writer-wins across authors.
+A document SHALL be readable by every member. An operation on a mergeable-document SHALL be admitted from a device of any current member, whoever's name the document sits under, each operation carrying its writer's author signature. The one ground for dropping an operation is its author: an operation authored by a key that resolves to no current member's device SHALL be dropped before persisting, silently, on every member device — no role, no document and no time of authoring narrows admission further. Membership is judged as of the session, from the member map frozen at session setup: an operation authored by a device of a removed member SHALL be dropped from the first session set up after the removal record reaches the judging device, whichever member device carries it; everything the member wrote while a member — its own documents, its operations on other members' documents — stays after it leaves or is removed. A member that joins again SHALL be admitted again from the first session after its new membership record arrives, its new operations persisted as any member's; whether its earlier operations resolve to it is not specified. An operation that reaches a device before the membership record authorizing its author is dropped like any other and persisted from the first session after the record arrives, since reconciliation offers again what the device lacks. No document carries a sharing mode.
 
-#### Scenario: Any member writes a read-write document
+#### Scenario: Any member edits another member's mergeable-document
 
-- **WHEN** member A shares a document read-write and a device of member B writes it
-- **THEN** every member's devices converge on B's newer entry
+- **WHEN** a device of member C, no owner, appends an operation to a mergeable-document under member B's name and the members' devices reconcile
+- **THEN** every member's devices persist C's operation, its author being C's device
 
-#### Scenario: Only the creator writes a read-only document
+#### Scenario: An operation by no member's device is dropped
 
-- **WHEN** member A shares a document read-only and a device of member B produces an entry in it
-- **THEN** no member device persists B's entry, and A's own entry survives unchanged, while a later write by A's device is admitted everywhere
+- **WHEN** a device of member B carries an operation on a mergeable-document authored by a key that resolves to no member's device, and reconciles with a device of a third member
+- **THEN** no member device persists it, no rejection is signalled, and the document's own operations survive unchanged
+
+#### Scenario: A removed member's relayed operation is dropped from the next session
+
+- **WHEN** member C is removed, the removal record reaches a device of member B, and a device of member D then relays an operation authored by C's device in a session set up after that
+- **THEN** B's device drops the operation, while C's operations admitted before the removal stay — in C's own documents and in B's alike
+
+#### Scenario: A member that joins again is admitted again
+
+- **WHEN** member C was removed, a member invites C again, C's new membership record reaches a device of B, and C's device then appends an operation in a session set up after that
+- **THEN** B's device persists the operation
+
+#### Scenario: An operation ahead of its author's membership record is persisted once the record arrives
+
+- **WHEN** a device of member B receives, from a device of member E, an operation authored by a device of D while no record of D's membership has reached B's device
+- **THEN** the operation is dropped, and it is persisted from the first session after D's membership record reaches B's device, reconciliation offering it again
+
+### Requirement: A mergeable-document keeps every operation; an immutable-document is placed once by its member
+
+A mergeable-document SHALL hold each edit as its own entry under its own key, never overwritten by another edit: concurrent operations by two writers the cell admits SHALL both persist on every member device, and their merge is above the data layer. An immutable-document SHALL be one entry under one key, admitted only when authored by a device of the member under whose name it sits; an entry at that key authored by a device of any other member — an owner included — SHALL be dropped before persisting, silently, on every member device, a tombstone excepted: an owner deletes, then places its own.
+
+#### Scenario: Concurrent operations on a mergeable-document both persist
+
+- **WHEN** a device of member B and a device of member C each append an operation to a mergeable-document under B's name while disconnected, and the members' devices then reconcile
+- **THEN** every member device holds both operations
+
+#### Scenario: An immutable-document is admitted from its member and from nobody else
+
+- **WHEN** a device of member B places an immutable-document, a device of owner A then produces an entry at its key, and the members' devices reconcile
+- **THEN** every member device persists B's document and drops A's entry, B's document reading unchanged
 
 ### Requirement: A member's devices are announced by the member itself
 
