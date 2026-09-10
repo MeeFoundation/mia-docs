@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims and documents — into the cell, and recovering hosted cells across a restart. The store underneath is the data layer's [cell store](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims and documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
 
 **Cell**
 
@@ -58,7 +58,7 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 
 ### Requirement: The cells service creates a cell for a hosted identity
 
-The cells service SHALL create a cell for a hosted identity: it mints the cell id, creates the cell store, records the creating identity as the first member, and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The cells service SHALL create a cell for a hosted identity: it mints the cell id, creates the membership store and the record store, records the creating identity as the first member, and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 #### Scenario: A created cell is listed with its creator as member
 
@@ -73,11 +73,11 @@ The cells service SHALL create a cell for a hosted identity: it mints the cell i
 #### Scenario: Creating for an unhosted identity is refused
 
 - **WHEN** a cell is requested for an identity the runtime neither created nor linked
-- **THEN** the operation fails with the unknown-identity error and no cell store exists
+- **THEN** the operation fails with the unknown-identity error and no store exists for it
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the cell store's ticket. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -106,7 +106,7 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open the cell store — the announcement secret beside the tickets — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement secret beside their tickets — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
 
 #### Scenario: A linked device reaches the cell
 
@@ -144,7 +144,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' documents — stays in the cell.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' documents — stays in the cell.
 
 #### Scenario: An owner removes a member
 
@@ -212,7 +212,7 @@ The cells service SHALL write a claim into a cell as an immutable entry: it offe
 
 ### Requirement: Hosted cells survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — the cell store keeps replicating and its members' devices are served — while a memory runtime's cells end with the process.
+A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process.
 
 #### Scenario: A cell is hosted again after a restart
 
