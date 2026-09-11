@@ -33,7 +33,9 @@ The cell id is a 32-byte identifier minted at creation, in the same byte-id fami
 
 **Rejected alternatives:**
 
-- The cell as an identity with a key set (a multi-signature autonomic identifier). It buys a totally ordered membership log at the price of a group key to manage, a rotation on every membership change, and a second identity kind in the roadmap. Whether a group that speaks in its own name is needed is the separate question of organizations, which are issuers and do need keys.
+- The cell as an identity with its own key set — a multi-signature autonomic identifier.
+  - **Pros:** a totally ordered membership log.
+  - **Cons:** a group key to manage; a rotation on every membership change; a second identity kind in the KERI roadmap. A group that speaks in its own name is the organizations question, not the cell's.
 
 ### D2. No connections "each with each"
 
@@ -41,16 +43,20 @@ Membership rests on the cell: a member joins on one member's invitation and sees
 
 **Rejected alternatives:**
 
-- A cell as a fan-out of pairwise connections — n×(n−1)/2 pairing ceremonies, adding a member is work for every existing member, and no relay: a member obtains another member's content only from that member's devices, since a grantee never re-serves a third party.
+- The cell as a fan-out of pairwise connections.
+  - **Cons:** n×(n−1)/2 pairing ceremonies; adding a member is work for every existing member; no relay — content comes only from its author's devices, since a grantee never re-serves a third party.
 
 ### D3. One cell is two pdn-store replicas: the membership store and the record store
 
-A cell is served by two replicas, each addressed through the cell id. The **membership store** is the cell's authority: who is a member, with what role, on which devices. It holds, per member, one append-only sequence of **membership events** — join (the join record of D16, binding the member to its announcement key), leave, removal, made-owner, unmade-owner — each an immutable entry under its own key with the sequence number inside the signed bytes, and the member's device-list statements (D16), each version an immutable entry of its own. Nothing in the membership store is overwritten or deleted: a removal is an event, not a deletion, and the store holds no tombstones. The **record store** is what the authority governs: the records — claims and documents (D4). The classifier folds the membership store into the write admission the gate judges both stores by, walking each member's events in sequence order: a join makes it a member and a plain one, made-owner an owner, unmade-owner a plain member again, leave and removal no member, a later join a plain member again — a member that joins again joins as a newcomer does (D11); the author-to-member map comes from the join events and the device statements by highest version. By sequence, never by timestamp, so the order in which the events arrived does not matter; each event names its actor's sequence and is verified against the actor's chain at that point (D23). Standing and role are events in one sequence rather than last-writer-wins values because a member is made an owner and unmade repeatedly (D11) and leaves and rejoins (D13), and the flips must order unambiguously against each other and, later, against records (F6), without trusting the timestamp the author sets (D13). A member's sequence is a small key event log of its standing in the cell — the slot KERI fills (C11). The two shapes — the act a device writes and the event a chain holds — are defined in the cell stores spec. Not one replica for all cells, and not one replica per member inside a cell: ADR-0009's case against a shared namespace — a set that is never quiescent, and work spent on entries the filter discards — does not apply, since every member wants every entry and nothing is discarded. Each replica is the authorization unit (who may sync it), the swarm topic and the reconciliation unit, exactly the roles ADR-0009 keeps for a namespace; the two share the audience — every member device — and differ in what they are: the membership store governs, the record store is governed, as the grants in a connection metadata store govern a data store.
+A cell is served by two replicas, each addressed through the cell id. The **membership store** is the cell's authority: who is a member, with what role, on which devices. It holds, per member, one append-only sequence of **membership events** — join (the join record of D16, binding the member to its announcement key), leave, removal, made-owner, unmade-owner — each an immutable entry under its own key with the sequence number inside the signed bytes, and the member's device-list statements (D16), each version an immutable entry of its own. Nothing in the membership store is overwritten or deleted: a removal is an event, not a deletion, and the store holds no tombstones. The **record store** is what the authority governs: the records — claims and documents (D4). The classifier folds the membership store into the write admission the gate judges both stores by, walking each member's events in sequence order: a join makes it a member and a plain one, made-owner an owner, unmade-owner a plain member again, leave and removal no member, a later join a plain member again — a member that joins again joins as a newcomer does (D11); the author-to-member map comes from the join events and the device statements by highest version. By sequence, never by timestamp, so the order in which the events arrived does not matter; each event names its actor's sequence and is verified against the actor's chain at that point (D23). Standing and role are events in one sequence rather than last-writer-wins values because a member is made an owner and unmade repeatedly (D11) and leaves and rejoins (D13), and the flips must order unambiguously against each other and, later, against records (F6), without trusting the timestamp the author sets (D13). A member's sequence is a small key event log of its standing in the cell — the slot KERI fills (C11). The two shapes — the act a device writes and the event a chain holds — are defined in the cell stores spec. Not one replica for all cells, and not one replica per member inside a cell: ADR-0009's case against a shared namespace — a set that is never quiescent, and work spent on entries the filter discards — does not apply, since every member wants every entry and nothing is discarded. Each replica is the authorization unit (who may sync it), the swarm topic and the reconciliation unit, exactly the roles ADR-0009 keeps for a namespace; the two share the audience — every member device — and differ in what they are: the membership store governs, the record store is governed, as the grants in a connection metadata store govern a data store. The price is a second replica per cell — a topic, a ticket, a reconcile pass — a fixed cost per cell, measured with D1'.
 
 **Rejected alternatives:**
 
-- One replica with the membership material under a key prefix reconciled first. The store orders entries by namespace, author, key, so a key prefix is not a contiguous range but a filter across every author's partition — reconciling it is subset-rbsr, whose fingerprint under a filter (`SessionStore::get_fingerprint` in the fork's `filter.rs`) walks every entry of the replica per round: the cost of converging membership grows with the volume of records, is paid on every session of a store that is never quiescent, and sits on the critical path — before any record is judged. A cached fingerprint tree (D2') does not help a prefix, being built over the store's own order. A separate membership store reconciles by plain reconciliation over a small, almost static set, at a cost independent of the records, and keeps subset-rbsr out of the cell (D7, D19). The price is a second replica per cell — a topic, a ticket, a reconcile pass — a fixed cost per cell, measured with D1'.
-- One role log for the whole cell under a single sequence. It would order events across members, but the gate judges each record against its writer's own sequence at the point the record names (D22) and each membership event against its actor's sequence at the point the event names (D23), and neither needs an order across members; where two members' events meet — one acting on the other at the same moment — a single sequence would still leave two events at one number needing a tie-break (B10).
+- One replica, the membership material under a key prefix reconciled first.
+  - **Cons:** the store orders entries by namespace, author, key, so a key prefix is a filter across every author's partition, not a range — reconciling it is subset-rbsr, whose fingerprint (`SessionStore::get_fingerprint`) walks every entry per round, on every session, before any record is judged; a cached fingerprint tree (D2') does not help a prefix.
+- One role log for the whole cell under a single sequence.
+  - **Pros:** orders events across members.
+  - **Cons:** neither the record gate (D22) nor the membership gate (D23) needs that order; two events at one number still need a tie-break (B10).
 
 ### D4. Content is records, of two kinds: claims and documents
 
@@ -58,7 +64,8 @@ A **record** is what a member places into a cell; claims and documents are the t
 
 **Rejected alternatives:**
 
-- One kind for the claim and the immutable-document, which share a shape on the platform (D17) — placed once, deleted, replaced. They are kept two kinds because they are expected to stop sharing it: what a claim needs and what a file needs diverge as the product's UX is tested and its requirements are redefined, and one kind would then have to be split under content already placed.
+- One kind for the claim and the immutable-document, which share a shape on the platform (D17).
+  - **Cons:** the two are expected to diverge as the product's UX is tested and its requirements redefined; one kind would then be split under content already placed.
 
 ### D5. Claims are immutable and, inside a cell, shared with every member
 
@@ -70,8 +77,10 @@ A document is read by every member of the cell. A mergeable-document is edited b
 
 **Rejected alternatives:**
 
-- A sharing mode per document, read-only or read-write, flipped over the document's life. It needed an encoding of the mode that survives the flip and a rule for who flips it, and it put a second access structure beside the roles the cell already has.
-- Editing another member's mergeable-document reserved to owners. It left two plain members unable to write one note together, while the signature on every operation already keeps each edit under its writer's name, and a spoiled document is repaired by an owner's deletion (D12) as any record is.
+- A sharing mode per document — read-only or read-write — flipped over its life.
+  - **Cons:** needs an encoding that survives the flip and a rule for who flips; a second access structure beside the roles.
+- Editing another member's mergeable-document reserved to owners.
+  - **Cons:** two plain members cannot write one note together; the per-operation signature already keeps every edit under its writer's name; a spoiled document is repaired by an owner's deletion (D12).
 
 ### D7. Inside a cell, gossip replaces subset-rbsr
 
@@ -79,7 +88,9 @@ No egress filter: both stores are served whole to member devices, the membership
 
 **Rejected alternatives:**
 
-- A replica per member inside the cell with the cell as the grant audience. Data would stay with its issuer and grants would stay per claim, but every member's content would be a separate replica the reader reaches separately, grantees stay outside the swarm so a live update needs a grant republish per item, and a stream — a chat — grows the grant record with every message. Kept as an open question for "share without copying" (E3).
+- A replica per member inside the cell, the cell as the grant audience — kept open as "share without copying" (E3).
+  - **Pros:** data stays with its issuer; grants stay per claim.
+  - **Cons:** every member's content is a replica the reader reaches separately; grantees stay outside the swarm, so a live update needs a grant republish per item; a stream grows the grant record with every message.
 
 ### D8. A cell has a human-readable name that is not an identifier
 
@@ -99,7 +110,8 @@ The creator is the cell's first owner — its founding event (D23). An owner mak
 
 **Rejected alternatives:**
 
-- Equal-rank membership with no roles at all. It leaves a cell without a repair channel: records nobody may delete and states nobody may fix (D12, D14).
+- Equal-rank membership, no roles.
+  - **Cons:** no repair channel — records nobody may delete, states nobody may fix (D12, D14).
 
 ### D12. A member deletes its own records; an owner deletes any member's
 
@@ -127,9 +139,12 @@ Resolution is by the statement's version, never by entry timestamp: statements c
 
 **Rejected alternatives:**
 
-- A per-identity metadata store polled by acquaintances — every member tracking a replica per acquaintance restores the topology D2 rejects (a member's data served only by its own devices) and the cost ADR-0009 counts (a reconcile pass per tracked store), and its read tickets, once handed out, leak the device list to removed members forever.
-- A private-store contact book as the gate's authority — a binding asserted in one cell would judge entries in another, carrying the inviter's word beyond the cell where it was spoken.
-- Announcements that must be handed to a live member device — in a two-member cell the other member sleeps for weeks, and an announcement waiting for delivery survives nowhere.
+- A per-identity metadata store polled by acquaintances.
+  - **Cons:** a replica tracked per acquaintance restores the topology D2 rejects and the per-store reconcile cost ADR-0009 counts; read tickets, once handed out, leak the device list to removed members forever.
+- A private-store contact book as the gate's authority.
+  - **Cons:** a binding asserted in one cell would judge entries in another, carrying the inviter's word beyond the cell it was spoken in.
+- Announcements handed to a live member device.
+  - **Cons:** in a two-member cell the other member sleeps for weeks, and a waiting announcement survives nowhere.
 
 ### D17. A document is a mergeable-document or an immutable-document
 
@@ -137,7 +152,8 @@ A document has one of two types, chosen when it is placed. A **mergeable-documen
 
 **Rejected alternatives:**
 
-- A document type overwritten in place by the last writer. Whole-value replacement under last-writer-wins loses the edits of a note two people write at once, and an in-place overwrite by an owner leaves the member's name on content the owner wrote; deleting and placing anew keeps every record under the name of the member that placed it.
+- A document type overwritten in place by the last writer.
+  - **Cons:** loses one of two concurrent edits; an owner's overwrite leaves the member's name on the owner's content.
 
 ### D18. Replacing a claim or an immutable-document is deleting it and placing a new one
 
@@ -149,8 +165,10 @@ A session between two member devices reconciles the membership store to converge
 
 **Rejected alternatives:**
 
-- No order between the stores — a record judged under stale membership is dropped and re-offered, a session of latency per newcomer write.
-- A filter on the record store per session peer — the audience of a cell is every member device, so a filter has nothing to remove and only costs the linear fingerprint (D3).
+- No order between the stores.
+  - **Cons:** a record judged under stale membership is dropped and re-offered — a session of latency per newcomer write.
+- A capability filter on the record store per session peer.
+  - **Cons:** the audience is every member device, so the filter removes nothing and costs the linear fingerprint (D3).
 
 ### D20. Every member device holds the write ticket of both stores
 
@@ -162,7 +180,8 @@ The membership store: `member/<pdnid>/<seq>/<kind>/<aseq>` — the member's memb
 
 **Rejected alternatives:**
 
-- The writer's author key as the key prefix. Devices come and go while the member stays; a record keyed by a device would move with every linking, and the author-to-member map already bridges the two.
+- The writer's author key as the key prefix.
+  - **Cons:** devices come and go while the member stays — a record keyed by a device moves with every linking; the author-to-member map already bridges the two.
 
 ### D22. A record names the membership state it was authored under, and is judged against it
 
@@ -172,7 +191,8 @@ The reference proves that the entry is after the named event, not that it is bef
 
 **Rejected alternatives:**
 
-- The reference in the payload. The gate reads no payload — content arrives apart from the entry and may arrive later — and a tombstone has none.
+- The membership reference in the payload.
+  - **Cons:** the gate reads no payload — content arrives apart from the entry, possibly later — and a tombstone has none.
 
 ### D23. A membership event names its actor's sequence, and the store verifies from the founding event
 
@@ -182,7 +202,8 @@ What the reference proves is, as for records (D22), that the event is after the 
 
 **Rejected alternatives:**
 
-- Judging membership events as of the session. A device holding nothing has nothing to judge by, so a newcomer's first session would drop every event; and a device that catches up after an owner's demotion would drop what that owner did while an owner — the membership itself would diverge between devices.
+- Membership events judged as of the session.
+  - **Cons:** a device holding nothing has nothing to judge by, so a newcomer's first session drops every event; a device catching up after an owner's demotion drops what that owner did while an owner — memberships diverge.
 
 ### D24. Deleting a record kills its key: the store removes the content and releases the blob at once
 
@@ -190,8 +211,11 @@ A tombstone is the store's empty entry at a record's key without its trailing se
 
 **Rejected alternatives:**
 
-- Keeping the store's read-side deletion. It keeps the deleted content and its blob on disk until a collection nobody schedules, and it lets a content entry with a newer self-set timestamp resurrect a deleted record — the timestamp the design trusts nowhere else (D13).
-- A signed deletion record with a key of its own, judged at its actor's point like a record (D22): it would give a deletion a membership reference, but a deletion is an owner's repair act judged when it lands, and the empty entry is what reconciliation already knows how to carry.
+- The store's read-side deletion kept as is.
+  - **Cons:** deleted content and its blob stay on disk until a collection nobody schedules; a content entry with a newer self-set timestamp resurrects a deleted record (D13).
+- A signed deletion record with a key of its own, judged at its actor's point (D22).
+  - **Pros:** gives a deletion a membership reference.
+  - **Cons:** a deletion is a repair act judged when it lands; the empty entry is what reconciliation already carries.
 
 ## Risks / Trade-offs
 
