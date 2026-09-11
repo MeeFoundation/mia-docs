@@ -200,6 +200,11 @@ The cells service SHALL write a claim into a cell as an immutable entry: it offe
 - **WHEN** member B places a claim and an immutable-document, and owner A deletes each and places its own in their place
 - **THEN** every member reads A's records under ids different from B's, with A as their issuer and placing member, and B's records are no longer read
 
+#### Scenario: A replacement arrives in two halves
+
+- **WHEN** owner A replaces B's immutable-document, and a device of member C receives A's new record in one session and the tombstone on B's record only in a later one
+- **THEN** between the sessions C reads both records, and after the later session A's record alone, no member having acted in between
+
 #### Scenario: A member replaces its own record
 
 - **WHEN** member B, no owner, places an immutable-document, deletes it and places a new one

@@ -203,7 +203,7 @@ The membership store SHALL hold, per member, one sequence of membership events u
 
 ### Requirement: Verdicts hold their limits without an anchored log
 
-Until an anchored log carries the retrograde direction (cells F7, F8), the gate SHALL judge by the point an entry names and by the standing as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the open question that closes it and expected to flip when it does.
+Until an anchored log carries the retrograde direction (cells F7, F8), the gate SHALL judge by the point an entry names and by the standing as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the open question that closes it and expected to flip when it does, or after the decision that keeps it.
 
 #### Scenario: A demoted owner's act under its old point is admitted (F7)
 
@@ -225,7 +225,7 @@ Until an anchored log carries the retrograde direction (cells F7, F8), the gate 
 - **WHEN** owner A's device rewrote B's made-owner event at B's sequence 2 under A's own author key, and a device linked into member E catches up first from A's device and only then from a device holding the original
 - **THEN** E's new device keeps the rewrite and drops the original, while every device that held the original keeps it — two devices, two memberships
 
-#### Scenario: A deletion an owner wrote before its demotion is dropped after it (C7)
+#### Scenario: A deletion an owner wrote before its demotion is dropped after it (D24, by decision)
 
 - **WHEN** owner A's device placed a tombstone on B's record while A was an owner, A was then unmade, and the tombstone reaches a device of C after the unmade-owner event did
 - **THEN** C's device drops the tombstone and B's record is still read, until a current owner deletes it again
@@ -242,8 +242,8 @@ Until an anchored log carries the retrograde direction (cells F7, F8), the gate 
 
 #### Scenario: A dependency whose authoring device died is never resolved until re-issued (G1)
 
-- **WHEN** A's sequence 3 — the event that made A an owner — was authored by a device of B that died before spreading it, so no device holds it, and A's device then makes C an owner naming A's sequence 3
-- **THEN** every device defers C's made-owner event indefinitely, and lists C as an owner only after a current owner makes C an owner anew at a point every device holds
+- **WHEN** A's sequence 3 — the event that made A an owner — reached only A's device before B's device, which authored it, died; A's device then made C an owner naming A's sequence 3, spread that event to a device of D, and died too, so no live device holds A's sequence 3
+- **THEN** every device defers C's made-owner event indefinitely and lists it as waiting on A's sequence 3, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds
 
 ### Requirement: The membership store is reconciled before the record store
 
@@ -334,6 +334,40 @@ A mergeable-document SHALL hold each edit as its own entry under its own key, ne
 
 - **WHEN** a device of member B places an immutable-document, a device of owner A then produces an entry at its key, and the members' devices reconcile
 - **THEN** every member device persists B's document and drops A's entry, B's document reading unchanged
+
+### Requirement: Deleting a record kills its key
+
+A tombstone SHALL be the store's empty entry at a record's key without its trailing sequence, or at a mergeable-document's key above its operations. It SHALL be admitted from a device of the member under whose name the record sits or of an owner, judged as of the session, and dropped silently from any other device. Once admitted, the store SHALL remove every author's content entries under that key and release their blobs at once, SHALL insert no content under that key again whatever the entry's timestamp, and SHALL keep the tombstone entry, so that a peer holding the content and not the tombstone converges on the deletion.
+
+#### Scenario: An owner's deletion removes the record and its blob everywhere
+
+- **WHEN** owner A's device places a tombstone on B's immutable-document and the members' devices reconcile
+- **THEN** no member device reads the document, none holds its content entry or its blob, and each holds the tombstone
+
+#### Scenario: A member deletes its own record; a plain member deletes no other member's
+
+- **WHEN** member B's device places a tombstone on B's claim, and member C's device, no owner, places one on B's immutable-document, and the members' devices reconcile
+- **THEN** B's claim is gone on every member device while B's immutable-document is still read, C's tombstone dropped
+
+#### Scenario: A removed member's records are deleted by an owner, by nobody else
+
+- **WHEN** C was removed, and then a device of owner A, a device of plain member D, a device of C and a device of no member each place a tombstone on a record under C's name
+- **THEN** A's tombstone is admitted and the record gone, and the other three are dropped
+
+#### Scenario: A dead key admits no content, whatever its timestamp
+
+- **WHEN** B's immutable-document was deleted by an owner, and a device of B then offers a content entry at the same key carrying a timestamp newer than the tombstone's
+- **THEN** no member device inserts it and the document stays deleted
+
+#### Scenario: A peer that missed the tombstone converges on the deletion
+
+- **WHEN** a device of member D holds B's document and has not received the tombstone, and it reconciles with a device holding the tombstone
+- **THEN** D's device drops the document and its blob and holds the tombstone, and the device it reconciled with does not receive the document back
+
+#### Scenario: Deleting a mergeable-document kills its operations
+
+- **WHEN** owner A's device places a tombstone at B's mergeable-document's key, and a device of C then offers an operation under it
+- **THEN** every member device removes the document's operations and inserts no more under it
 
 ### Requirement: A member's devices are announced by the member itself
 
