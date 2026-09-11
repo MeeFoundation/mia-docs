@@ -1,6 +1,49 @@
 # data-layer: cell stores
 
-A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material. It lives in two dedicated pdn-store replicas, both held whole by every device of every member: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the membership the session brought, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
+A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material. It lives in two dedicated pdn-store replicas, both held whole by every device of every member: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's standing at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
+
+The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, the actor's own sequence at the time of acting (`actor_seq`) and the position in the subject's chain (`subject_seq`) sit in the key (cells D21, D23).
+
+```rust
+/// One entry a device writes into the membership store.
+enum MembershipAct {
+    /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; the root.
+    Found       { announcement_key: PublicKey },
+    /// Records a newcomer's join after its one-time secret was verified and burned. Any member.
+    Join        { subject: PdnId, subject_seq: Seq, actor_seq: Seq, announcement_key: PublicKey, subject_signature: Signature },
+    /// The member itself; subject = actor.
+    Leave       { subject_seq: Seq, actor_seq: Seq },
+    /// An owner.
+    Remove      { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    /// An owner.
+    MakeOwner   { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    /// An owner.
+    UnmakeOwner { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    /// The member's devices, one entry per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
+    AnnounceDevices { version: u64, devices: Vec<AuthorId>, signature: Signature },
+}
+
+/// A member's chain: `member/<pdnid>/<seq>/<kind>/<aseq>`, walked in `seq` order. `by` is the actor, `by_seq` the actor's own sequence then.
+enum MembershipEvent {
+    Founded     { seq: Seq, announcement_key: PublicKey },                          // by the member itself; the creator's seq 1 only
+    Joined      { seq: Seq, by: PdnId, by_seq: Seq, announcement_key: PublicKey },  // by any member
+    Left        { seq: Seq, by_seq: Seq },                                          // by the member itself
+    Removed     { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner
+    MadeOwner   { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner
+    UnmadeOwner { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner
+}
+
+/// Folding a chain up to a sequence: Founded and Joined make a plain member, MadeOwner an owner, UnmadeOwner a plain member,
+/// Left and Removed no member; a transition the state does not allow (MadeOwner of no member, Joined of a member) is ignored.
+struct Standing { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<AuthorId> }
+
+/// The gate's check of one event, from the write admission alone:
+///   Founded            → subject is the creator and seq == 1
+///   Joined             → standing(by, by_seq).member
+///   Left               → by == subject
+///   Removed | MadeOwner | UnmadeOwner → standing(by, by_seq).owner
+/// and for every kind: no entry under member/<subject>/<seq>/ by this author yet; by's chain held up to by_seq, else deferred.
+```
 
 ## ADDED Requirements
 
@@ -91,7 +134,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>` — join, leave, removal, made-owner, unmade-owner — with the sequence number inside the signed bytes, and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. A join event SHALL be admitted from a device of any current member, a leave event only from a device of the member itself, a removal, made-owner or unmade-owner event only from a device of an owner; an event from any other author SHALL be dropped silently on every member device. Every entry SHALL be written once: an entry at a key the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's standing and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, made-owner an owner, unmade-owner a plain member, leave and removal no member, a later join a plain member again.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, removed, made-owner, unmade-owner — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting, and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there, a removed, made-owner or unmade-owner event when the actor was an owner there, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — needs nothing and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once the chain arrives, or dropped and offered again by the next session. Every entry SHALL be written once: an entry under a subject sequence the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's standing and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, made-owner an owner, unmade-owner a plain member, leave and removal no member, a later join a plain member again.
 
 #### Scenario: A role flip resolves by sequence whatever the arrival order
 
@@ -108,10 +151,99 @@ The membership store SHALL hold, per member, one sequence of membership events u
 - **WHEN** B, an owner, writes a leave event (sequence 5) from its own device, and a member later invites B again, writing a join event (sequence 6)
 - **THEN** every member device lists B as no member after sequence 5 and as a plain member — no owner — after sequence 6
 
+#### Scenario: A device holding nothing verifies the store from the founding event
+
+- **WHEN** newcomer D's device, holding no membership store, sessions with the inviter's device, which holds the creator's founding event and every event since
+- **THEN** D's device converges on the same membership as the inviter in that session, every event verified against its actor's chain, whatever order the events arrived in
+
+#### Scenario: What an owner did while an owner stands after its demotion
+
+- **WHEN** owner A made C an owner naming A's sequence 3, A was then unmade at A's sequence 4, and a device linked into member B after that catches up
+- **THEN** B's new device lists C as an owner
+
+#### Scenario: An event naming an actor point without the standing is dropped
+
+- **WHEN** A was unmade at A's sequence 4 and a device of member E relays a made-owner event for F authored by A's device naming A's sequence 4
+- **THEN** no member device persists it and F is listed as a plain member
+
+#### Scenario: Nobody leaves for another member
+
+- **WHEN** a device of member D produces a left event in B's chain
+- **THEN** no member device persists it and B is still listed as a member
+
+#### Scenario: There is one founding event
+
+- **WHEN** a device of owner C produces a founded event in C's own chain, or a second one in the creator's
+- **THEN** no member device persists it and the owners are listed unchanged
+
+#### Scenario: A made-owner event for no member changes nothing
+
+- **WHEN** owner A produces a made-owner event in the chain of an identity that never joined
+- **THEN** every member device holds the entry as written and lists that identity as no member and no owner
+
+#### Scenario: Two owners' concurrent events at one point both persist
+
+- **WHEN** owners A and C, disconnected from each other, each write an event in B's chain at B's sequence 5 — A a made-owner, C a removed — and the members' devices then reconcile
+- **THEN** every member device holds both entries, and every member device lists B's standing the same (the rule is cells B10)
+
+#### Scenario: An event by no member's device is dropped
+
+- **WHEN** a device of member D relays an event in B's chain authored by a key that resolves to no member's device
+- **THEN** no member device persists it and B's chain is read unchanged
+
+#### Scenario: An event ahead of its actor's point is admitted when the point arrives
+
+- **WHEN** a device of member D receives a made-owner event for C authored by A's device naming A's sequence 3 while holding A's chain only up to sequence 2, and A's sequence 3 arrives in a later session
+- **THEN** the event is deferred, not persisted, in the first session, and persisted in the session that brings A's sequence 3
+
 #### Scenario: A rewritten event is dropped
 
 - **WHEN** owner A's device writes B's made-owner event at sequence 2, and later produces a different entry at the same key
 - **THEN** every member device keeps the first entry and drops the second
+
+### Requirement: Verdicts hold their limits without an anchored log
+
+Until an anchored log carries the retrograde direction (cells F7, F8), the gate SHALL judge by the point an entry names and by the standing as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the open question that closes it and expected to flip when it does.
+
+#### Scenario: A demoted owner's act under its old point is admitted (F7)
+
+- **WHEN** owner A was unmade at A's sequence 4, and a device of plain member E relays a made-owner event for A itself, authored by A's device after the demotion and naming A's sequence 3
+- **THEN** every member device persists it and lists A as an owner again
+
+#### Scenario: A removed owner rejoins and re-promotes itself through a relaying member (F7)
+
+- **WHEN** A, an owner at A's sequence 3, was removed at A's sequence 5, and a device of plain member E relays a joined event for A at A's sequence 6 and a made-owner event for A at A's sequence 7, both authored by A's device and naming A's sequence 3
+- **THEN** every member device lists A as an owner — a plain member and a former owner together did what the rules reserve to an owner
+
+#### Scenario: A departed member's new record under its old sequence is admitted (F7)
+
+- **WHEN** C was removed at C's sequence 2, and a device of member D relays an operation C's device authored after the removal, naming C's sequence 1
+- **THEN** every member device persists it
+
+#### Scenario: A rewrite that reaches a device first stays there (F8)
+
+- **WHEN** owner A's device rewrote B's made-owner event at B's sequence 2 under A's own author key, and a device linked into member E catches up first from A's device and only then from a device holding the original
+- **THEN** E's new device keeps the rewrite and drops the original, while every device that held the original keeps it — two devices, two memberships
+
+#### Scenario: A deletion an owner wrote before its demotion is dropped after it (C7)
+
+- **WHEN** owner A's device placed a tombstone on B's record while A was an owner, A was then unmade, and the tombstone reaches a device of C after the unmade-owner event did
+- **THEN** C's device drops the tombstone and B's record is still read, until a current owner deletes it again
+
+#### Scenario: A newcomer is refused a session until its join event arrives (D19)
+
+- **WHEN** D joined through member E, D's join event has not reached a device of A, and D's device requests a session from A's device
+- **THEN** the session is refused as for an unhosted store, and served once the join event reaches A's device
+
+#### Scenario: A device statement ahead of its join is dropped in that session (D19)
+
+- **WHEN** in one session a device of A receives B's device statement before the join event carrying B's announcement key
+- **THEN** the statement is dropped in that session and admitted in the next
+
+#### Scenario: A dependency whose authoring device died is never resolved until re-issued (G1)
+
+- **WHEN** A's sequence 3 — the event that made A an owner — was authored by a device of B that died before spreading it, so no device holds it, and A's device then makes C an owner naming A's sequence 3
+- **THEN** every device defers C's made-owner event indefinitely, and lists C as an owner only after a current owner makes C an owner anew at a point every device holds
 
 ### Requirement: The membership store is reconciled before the record store
 
@@ -122,23 +254,23 @@ A session between two member devices SHALL reconcile the membership store to con
 - **WHEN** newcomer D's join event and D's first claim are both unknown to a device of B, and B's device sessions with a device holding both
 - **THEN** B's device persists D's claim in that session
 
-#### Scenario: A removal is applied before the record store is judged
+#### Scenario: A role change is applied before a deletion is judged
 
-- **WHEN** C's removal event and a later operation authored by C's device are both unknown to a device of B, and B's device sessions with a device holding both
-- **THEN** B's device drops C's operation in that session, C's earlier operations staying
+- **WHEN** A's unmade-owner event and a tombstone A's device then placed on B's record are both unknown to a device of member C, and C's device sessions with a device holding both
+- **THEN** C's device drops the tombstone in that session, and B's record is still read
 
 ### Requirement: The record store's key names the member, the kind and the type
 
-A record SHALL sit under the name of the member that placed it, the key carrying the kind and a document's type: `by/<pdnid>/claim/<id>` for a claim, `by/<pdnid>/doc/immutable/<id>` for an immutable-document, `by/<pdnid>/doc/mergeable/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's author key followed by the writer's own sequence. `<pdnid>` SHALL be the member's identity, never a device. A tombstone SHALL be the store's empty entry at a record's key, or at a mergeable-document's key above its operations.
+A record SHALL sit under the name of the member that placed it, the key carrying the kind, a document's type and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/doc/immutable/<id>/<mseq>` for an immutable-document, `by/<pdnid>/doc/mergeable/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's author key, the writer's membership sequence and the writer's own operation sequence. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without the trailing sequence, and a tombstone SHALL be the store's empty entry at that key — above the content entry, above a mergeable-document's operations.
 
 #### Scenario: A record sits under the name of the member that placed it
 
 - **WHEN** member B places a claim, an immutable-document and a mergeable-document with one operation, from two of B's devices
-- **THEN** their keys are `by/<B>/claim/<id>`, `by/<B>/doc/immutable/<id>` and `by/<B>/doc/mergeable/<id>/<op>`, the same `<B>` from either device, and a listing under B's prefix returns exactly them
+- **THEN** their keys are `by/<B>/claim/<id>/<mseq>`, `by/<B>/doc/immutable/<id>/<mseq>` and `by/<B>/doc/mergeable/<id>/<op>`, the same `<B>` and the same `<mseq>` from either device, and a listing under B's prefix returns exactly them
 
 ### Requirement: A claim is written only by its issuer
 
-An entry that is a claim SHALL be admitted over sync only when it was authored by a device of the member the claim names as its issuer. A claim entry authored by a device of any other member SHALL be dropped before persisting, on every member device, silently — the verdict is on the entry's author, not on the session peer that carried it, so an entry relayed by a third member keeps the verdict its author earns.
+An entry that is a claim SHALL be admitted over sync only when it was authored by a device of the member the claim names as its issuer, that member standing as a member at the sequence the claim's key names. A claim entry authored by a device of any other member SHALL be dropped before persisting, on every member device, silently — the verdict is on the entry's author, not on the session peer that carried it, so an entry relayed by a third member keeps the verdict its author earns.
 
 #### Scenario: The issuer's own claim is admitted
 
@@ -157,7 +289,7 @@ An entry that is a claim SHALL be admitted over sync only when it was authored b
 
 ### Requirement: A mergeable-document is edited by every member
 
-A document SHALL be readable by every member. An operation on a mergeable-document SHALL be admitted from a device of any current member, whoever's name the document sits under, each operation carrying its writer's author signature. The one ground for dropping an operation is its author: an operation authored by a key that resolves to no current member's device SHALL be dropped before persisting, silently, on every member device — no role, no document and no time of authoring narrows admission further. Membership is judged as of the session, from the member map frozen at session setup: an operation authored by a device of a removed member SHALL be dropped from the first session set up after the removal event reaches the judging device, whichever member device carries it; everything the member wrote while a member — its own documents, its operations on other members' documents — stays after it leaves or is removed. A member that joins again SHALL be admitted again from the first session after its new join event arrives, its new operations persisted as any member's; whether its earlier operations resolve to it is not specified. An operation that reaches a device before the join event authorizing its author is dropped like any other and persisted from the first session after the record arrives, since reconciliation offers again what the device lacks. No document carries a sharing mode.
+A document SHALL be readable by every member. An operation on a mergeable-document SHALL be admitted from a device of any member, whoever's name the document sits under, each operation carrying its writer's author signature and naming, in its key, the writer's membership sequence at the time of writing. The one ground for dropping an operation is its writer's standing at that sequence: an operation whose author resolves to no member's device, or to a member that did not stand as a member at the named sequence of its own events, SHALL be dropped before persisting, silently, on every member device — no role, no document and no time of authoring narrows admission further; an operation naming a sequence the device does not yet hold SHALL be dropped and persisted from the first session after the events arrive, since reconciliation offers again what the device lacks. An operation is judged the same on every device whenever it arrives: everything a member wrote while a member — its own documents, its operations on other members' documents — SHALL be admitted after it leaves or is removed, on a device that catches up later included, and SHALL resolve to that member after it joins again, its new operations naming its new sequence. No document carries a sharing mode.
 
 #### Scenario: Any member edits another member's mergeable-document
 
@@ -169,15 +301,20 @@ A document SHALL be readable by every member. An operation on a mergeable-docume
 - **WHEN** a device of member B carries an operation on a mergeable-document authored by a key that resolves to no member's device, and reconciles with a device of a third member
 - **THEN** no member device persists it, no rejection is signalled, and the document's own operations survive unchanged
 
-#### Scenario: A removed member's relayed operation is dropped from the next session
+#### Scenario: A departed member's earlier operation reaches a device that catches up later
 
-- **WHEN** member C is removed, the removal event reaches a device of member B, and a device of member D then relays an operation authored by C's device in a session set up after that
-- **THEN** B's device drops the operation, while C's operations admitted before the removal stay — in C's own documents and in B's alike
+- **WHEN** member C, a member from sequence 1, appended an operation naming sequence 1, C was then removed at sequence 2, and a device linked into member B after the removal catches up from a device of member D
+- **THEN** B's new device persists C's operation, in C's own documents and in B's alike
 
-#### Scenario: A member that joins again is admitted again
+#### Scenario: An operation naming a sequence at which its writer was no member is dropped
 
-- **WHEN** member C was removed, a member invites C again, C's new join event reaches a device of B, and C's device then appends an operation in a session set up after that
-- **THEN** B's device persists the operation
+- **WHEN** C was removed at sequence 2 and a device of member D relays an operation authored by C's device naming sequence 2
+- **THEN** no member device persists it, no rejection is signalled, and C's operations naming sequence 1 stay
+
+#### Scenario: A member that joins again writes under its new sequence
+
+- **WHEN** member C was removed at sequence 2, a member invites C again at sequence 3, and C's device then appends an operation naming sequence 3
+- **THEN** every member device persists the operation, and C's earlier operations, naming sequence 1, still resolve to C
 
 #### Scenario: An operation ahead of its author's join event is persisted once the event arrives
 
