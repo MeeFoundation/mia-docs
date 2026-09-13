@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims and documents — into the cell, and recovering hosted cells across a restart. The store underneath is the data layer's [cell store](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
 
 **Cell**
 
@@ -15,31 +15,31 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Remove member from cell       | yes        | no          |
 | Remove owner-member from cell | yes        | no          |
 
-**Immutable document** — attachments, for example a PDF file.
+**Immutable-document** — attachments, for example a PDF file.
 
-|                                                          | Cell owner | Cell member |
-| -------------------------------------------------------- | ---------- | ----------- |
-| Read own document                                        | yes        | yes         |
-| Read another member's document                           | yes        | yes         |
-| Create own document                                      | yes        | yes         |
-| Create a document as if it is authored by another member | no         | no          |
-| Update own document                                      | no         | no          |
-| Update another member's document                         | no         | no          |
-| Delete own document                                      | yes        | yes         |
-| Delete another member's document                         | yes        | no          |
+|                                                                     | Cell owner | Cell member |
+| ------------------------------------------------------------------- | ---------- | ----------- |
+| Read own immutable-document                                         | yes        | yes         |
+| Read another member's immutable-document                            | yes        | yes         |
+| Create own immutable-document                                       | yes        | yes         |
+| Create an immutable-document as if it is authored by another member | no         | no          |
+| Update own immutable-document                                       | no         | no          |
+| Update another member's immutable-document                          | no         | no          |
+| Delete own immutable-document                                       | yes        | yes         |
+| Delete another member's immutable-document                          | yes        | no          |
 
-**Mergeable document** — for example a note.
+**Mergeable-document** — for example a note.
 
-|                                                                 | Cell owner | Cell member |
-| --------------------------------------------------------------- | ---------- | ----------- |
-| Read own document                                               | yes        | yes         |
-| Read another member's document                                  | yes        | yes         |
-| Create own document                                             | yes        | yes         |
-| Create a document as if it is authored by another member        | no         | no          |
-| Edit own document                                               | yes        | yes         |
-| Edit another member's document (preserving per-edit authorship) | yes        | yes         |
-| Delete own document                                             | yes        | yes         |
-| Delete another member's document                                | yes        | no          |
+|                                                                           | Cell owner | Cell member |
+| ------------------------------------------------------------------------- | ---------- | ----------- |
+| Read own mergeable-document                                               | yes        | yes         |
+| Read another member's mergeable-document                                  | yes        | yes         |
+| Create own mergeable-document                                             | yes        | yes         |
+| Create a mergeable-document as if it is authored by another member        | no         | no          |
+| Edit own mergeable-document                                               | yes        | yes         |
+| Edit another member's mergeable-document (preserving per-edit authorship) | yes        | yes         |
+| Delete own mergeable-document                                             | yes        | yes         |
+| Delete another member's mergeable-document                                | yes        | no          |
 
 **Claim**
 
@@ -58,7 +58,7 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 
 ### Requirement: The cells service creates a cell for a hosted identity
 
-The cells service SHALL create a cell for a hosted identity: it mints the cell id, creates the cell store, records the creating identity as the first member, and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 #### Scenario: A created cell is listed with its creator as member
 
@@ -73,11 +73,11 @@ The cells service SHALL create a cell for a hosted identity: it mints the cell i
 #### Scenario: Creating for an unhosted identity is refused
 
 - **WHEN** a cell is requested for an identity the runtime neither created nor linked
-- **THEN** the operation fails with the unknown-identity error and no cell store exists
+- **THEN** the operation fails with the unknown-identity error and no store exists for it
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the cell store's ticket. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -106,7 +106,7 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open the cell store — the announcement secret beside the tickets — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement secret beside their tickets — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
 
 #### Scenario: A linked device reaches the cell
 
@@ -144,7 +144,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal record replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell store's admission rule. A member that leaves SHALL forget the cell store on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' documents — stays in the cell.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 #### Scenario: An owner removes a member
 
@@ -168,7 +168,7 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 
 ### Requirement: A claim and an immutable-document are placed once; a mergeable-document is edited by every member
 
-The cells service SHALL write a claim into a cell as an immutable entry: it offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. A document SHALL be placed with its type — mergeable-document or immutable-document — under the placing identity's name and read back by every member. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. A claim or an immutable-document is replaced by deleting it and placing a new one: the deletion SHALL be available to the identity under whose name the record sits and to any owner, and refused to any other member with a typed error; the new record sits under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
+The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. A claim or an immutable-document is replaced by deleting it and placing a new one: the deletion SHALL be available to the identity under whose name the record sits and to any owner, and refused to any other member with a typed error; the new record sits under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
 
 #### Scenario: A claim round-trips unchanged
 
@@ -200,10 +200,15 @@ The cells service SHALL write a claim into a cell as an immutable entry: it offe
 - **WHEN** member B places a claim and an immutable-document, and owner A deletes each and places its own in their place
 - **THEN** every member reads A's records under ids different from B's, with A as their issuer and placing member, and B's records are no longer read
 
+#### Scenario: A replacement arrives in two halves
+
+- **WHEN** owner A replaces B's immutable-document, and a device of member C receives A's new record in one session and the tombstone on B's record only in a later one
+- **THEN** between the sessions C reads both records, and after the later session A's record alone, no member having acted in between
+
 #### Scenario: A member replaces its own record
 
 - **WHEN** member B, no owner, places an immutable-document, deletes it and places a new one
-- **THEN** every member reads the new document under a new id, and the old one is no longer read
+- **THEN** every member reads the new immutable-document under a new id, and the old one is no longer read
 
 #### Scenario: A plain member deletes no other member's record
 
@@ -212,7 +217,7 @@ The cells service SHALL write a claim into a cell as an immutable entry: it offe
 
 ### Requirement: Hosted cells survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — the cell store keeps replicating and its members' devices are served — while a memory runtime's cells end with the process.
+A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process.
 
 #### Scenario: A cell is hosted again after a restart
 
