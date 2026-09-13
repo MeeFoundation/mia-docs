@@ -29,7 +29,7 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 - [ ] 3.2 The invite and join dialogue per D26: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed both stores' write tickets, catch-up before the join returns
 - [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error), a mergeable-document (edited by any member, each operation under its writer's signature) and an immutable-document (anyone's update of one refused with a typed error before anything is written), and the replacement of a claim or an immutable-document: the old record deleted (D24) by its member or an owner, the new one under the replacer's name with a new id (D18); reading and listing by cell id
 - [ ] 3.4 Remove and leave: the removal event; removal an owner-only act, its target an owner or a plain member alike; leaving forgets both stores locally
-- [ ] 3.5 A member's other devices: the cell's tickets and the announcement secret in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
+- [ ] 3.5 A member's other devices: the cell's write tickets in the identity's directory under `cell/<cell-id-hex>/membership` and `cell/<cell-id-hex>/records`, the announcement key pair at `announcement-key`, minted with the identity (private metadata store delta), the cell opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
 - [ ] 3.6 Restart recovery per G1: hosted cells re-hosted from durable state on a directory-configured runtime
 - [ ] 3.7 Ownership: the creator recorded as the first owner; an owner makes a member an owner; ownership taken only by another owner; owners listed beside the members
 
@@ -50,4 +50,4 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 ## 5. Docs and archive
 
 - [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and multi-identity's "later groups and organizations", and point them at cells
-- [ ] 5.2 On archive: place the two new specs and the two deltas at their destinations; `openspec validate --all --strict`
+- [ ] 5.2 On archive: place the two new specs and the three deltas at their destinations; `openspec validate --all --strict`

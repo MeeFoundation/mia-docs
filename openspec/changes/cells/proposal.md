@@ -25,6 +25,7 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 | `components/mee-pdn/pdn-node/cells`                     | `openspec/specs/components/mee-pdn/pdn-node/cells/spec.md`                     |
 | `components/mee-pdn/data-layer/capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md` |
 | `components/mee-pdn/data-layer/subset-reconciliation`   | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation/spec.md`   |
+| `components/mee-pdn/data-layer/private-metadata-store`  | `openspec/specs/components/mee-pdn/data-layer/private-metadata-store/spec.md`  |
 
 ### New Capabilities
 
@@ -35,6 +36,7 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 
 - `components/mee-pdn/data-layer/capability-gated-ingest`: the gate arms on a cell's two stores too, judging by the entry's author resolved to a member rather than by the session peer.
 - `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell's stores; the import refusal for tracked non-data replicas names them.
+- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds and holds the identity's announcement key pair at a fixed path, minted with the identity.
 
 ## Impact
 

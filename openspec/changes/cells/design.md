@@ -135,7 +135,7 @@ A record's authorship is cryptographic — the author signature on its entries �
 
 ### D16. A member's devices are announced by the member itself, under its announcement key
 
-Each identity holds a device-announcement key pair. The secret lives in its private metadata store and reaches every new device at linking, beside the store tickets. The cell holds two things about a member's devices: a join-time record binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter, its root the inviter's word exactly as B7 states, and for the creator the founding event (D25) — and the member's device-list statements: the member's devices with their author keys, a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
+Each identity holds a device-announcement key pair, minted with the identity. The secret lives in its private metadata store at a fixed path and reaches every new device at linking, beside the store tickets; the cell's own write tickets sit there under per-cell kinds, which the identity's other devices open on demand (private metadata store spec). The cell holds two things about a member's devices: a join-time record binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter, its root the inviter's word exactly as B7 states, and for the creator the founding event (D25) — and the member's device-list statements: the member's devices with their author keys, a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
 
 A statement is self-contained proof, so who writes it into the store does not matter: the gate judges an entry in the membership device area by the embedded signature against the announcement key from the join record, never by the entry's author. A freshly linked device therefore registers itself — it holds the write ticket and the announcement secret, writes the newest statement into its local replica of every cell the identity is a member of, and ordinary sync spreads it through the identity's own devices and through any member, with no waiting on anyone being online. Before syncing a cell replica, each of the identity's devices compares the replica's newest statement version against the private metadata store's and writes the newer one in — the sweep that heals an interrupted fan-out, a cell joined after a linking, and a device linked before the join.
 
@@ -149,6 +149,8 @@ Resolution is by the statement's version, never by entry timestamp: statements c
   - **Cons:** a binding asserted in one cell would judge entries in another, carrying the inviter's word beyond the cell it was spoken in.
 - Announcements handed to a live member device.
   - **Cons:** in a two-member cell the other member sleeps for weeks, and a waiting announcement survives nowhere.
+- The announcement key pair minted lazily, when the identity first creates or joins a cell.
+  - **Cons:** two devices of the identity doing so while disconnected mint two key pairs, and the identity's cells then disagree on which key signs its device statements; at identity creation there is one device, so there is no race.
 
 ### D17. A mergeable-document keeps concurrent edits; an immutable-document is placed once
 
@@ -284,7 +286,7 @@ Any member's device mints an invite — a QR code or an invite link carrying the
 
 ## Migration Plan
 
-Additive: no existing store, ticket, grant or record changes shape, and a runtime without cells behaves as before. Rollback is forgetting cell stores; nothing else depends on them.
+Additive: no existing store, ticket, grant or record changes shape — the directory gains the cell kinds and the announcement key pair — and a runtime without cells behaves as before. Rollback is forgetting cell stores; nothing else depends on them. No migration: the platform has no real users, so an identity created before this change, which holds no announcement key pair, is not carried over.
 
 ## Open Questions
 
@@ -292,7 +294,6 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### B. Membership
 
-- B5. A member's other devices: the cell's tickets and the announcement secret in the member's directory under a cell kind, opened on demand as connection-metadata pairs are; the opened device registers itself per D16. Open: the shape of that directory kind.
 - B6. Organizations as members: an identity hosted on an organization's node — anything the platform treats differently.
 - B7. Proof at join: the newcomer's `PdnId` is the inviter's word. KERI's proof step — challenge-response, exchange of key event logs — is the same slot as in pairing and linking.
 - B8. A cell with 0 members: representable at all — a store nobody holds — or is the minimum 1.
