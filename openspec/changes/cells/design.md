@@ -309,6 +309,36 @@ Cells are built in parallel with what exists. Connections, grants, subset-rbsr a
 - The cell as an audience of grants on personal namespaces — "share without copying".
   - **Cons:** ties the new primitive to the machinery it may replace, and carries a grant's per-claim bookkeeping into every cell.
 
+### D31. The debug surface covers the cells service whole
+
+The HTTP host serves every operation of the cells service under `/debug/`, one route each, each delegating to one call and adding no orchestration — the rules the host already keeps for identity, connections and data. A cell the calling identity is no member of is a client error other than 404, a refusal by role is a client error, and an absent record is 404. No route writes a raw entry, hands over a store ticket or forces reconciliation, so what a modified node does — a forged entry, an entry outside the key layout, a rewritten event, the cases D29 accepts — is exercised in the data layer's own tests, and the container stand exercises what the product path reaches: a three-member cell with its paired denials, a removal and a restart.
+
+The routes take this shape; the host spec leaves paths free to change:
+
+| Route | Operation |
+|---|---|
+| `POST /debug/identities/{id}/cells` | `create` |
+| `GET /debug/identities/{id}/cells` | `list` |
+| `GET …/cells/{cell}/members` | `members` |
+| `PUT …/cells/{cell}/name` | `rename` |
+| `POST …/cells/{cell}/invites` | `invite` |
+| `POST /debug/identities/{id}/cells/join` | `join` |
+| `POST …/cells/{cell}/acts` | `act` |
+| `POST …/cells/{cell}/records` | `put_record` |
+| `GET …/cells/{cell}/records` | `list_records` |
+| `GET …/records/{member}/{kind}/{id}` | `read` |
+| `POST …/records/{member}/{kind}/{id}/ops` | `append_op` |
+| `GET …/records/{member}/{kind}/{id}/ops` | `read_ops` |
+| `DELETE …/records/{member}/{kind}/{id}` | `delete` |
+| `GET …/cells/{cell}/unknown` | `list_unknown` |
+
+**Rejected alternatives:**
+
+- A subset of the cell operations for the demo.
+  - **Cons:** a scenario the surface cannot drive is tested across containers nowhere, and the host spec already asks the surface to cover the runtime's operations.
+- A route that writes raw entries, to exercise forgeries over HTTP.
+  - **Cons:** a path the runtime's own callers lack, against the host's rule; forgeries belong to the data layer's tests, where the gate is reached directly.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
@@ -393,4 +423,3 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 ### G. Operations
 
 - G2. Observability: metrics for cell sessions, drops at the gate, swarm size; and the deferred membership events with the point each waits on, listed per cell — the only way anyone learns that an act has to be made anew by a current owner (D23, cell stores spec).
-- G3. The HTTP host and the container stand: which cell operations the demo surface exposes.

@@ -44,7 +44,12 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
   - wrongly admitted without KERI (D29): a demoted owner's made-owner event naming the point at which it was still an owner, relayed by a plain member; a removed owner rejoining and re-promoting itself the same way — plain member plus former owner equals owner; a departed member's new record-store entry naming its old membership sequence; an author's rewrite of its own event reaching a device that never held the original, which then refuses the original — two devices, two memberships
   - wrongly refused without anchoring (D19, D23) or by decision (D24): a deletion an owner wrote while an owner, arriving after its demotion — the tombstone carries no point; a session refused to a newcomer whose join event has not yet reached the serving device, healed when it arrives; a device statement arriving in the session before the join that carries its key, healed next session; an event whose dependency never arrives because the device that authored it died before spreading it — permanent until an owner re-issues the act at a new point
 
-## 5. Docs and archive
+## 5. pdn-node-http: cells on the debug surface and the stand
 
-- [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
-- [ ] 5.2 On archive: place the two new specs and the three deltas at their destinations; `openspec validate --all --strict`
+- [ ] 5.1 Debug routes for every operation of the cells service per D31, one call each: a cell the identity is no member of a client error other than 404, a refusal by role a client error, an absent record 404; no route writing a raw entry, handing over a store ticket or forcing reconciliation
+- [ ] 5.2 The stand's cell scenario per the container-stand delta: invitations by the creator and by an invited member with the consumed secret refused; a record and an edit reaching every member; a plain member's owner-only acts refused beside the creator's deletion of its own claim; a removed member no longer receiving once the remaining members read a later record; a restart that brings the cell back, and one that keeps a left cell left
+
+## 6. Docs and archive
+
+- [ ] 6.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
+- [ ] 6.2 On archive: place the two new specs and the five deltas at their destinations; `openspec validate --all --strict`
