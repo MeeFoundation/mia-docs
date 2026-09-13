@@ -419,7 +419,3 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 - F3. Each store's topic id equals its namespace id, known to removed members forever: content-free announcements leak activity; a cell that must shed a member entirely moves to a new store.
 - F4. Equivocation among members: with n parties the pairwise "first seen wins" of the KERI roadmap is not enough; duplicity detection moves earlier in that roadmap. A member rewriting its own past event is the same problem inside the membership store (D29).
 - F5. Linkability: one `PdnId` across cells; per-cell pairwise identities (the KERI roadmap's later step).
-
-### G. Operations
-
-- G2. Observability: metrics for cell sessions, drops at the gate, swarm size; and the deferred membership events with the point each waits on, listed per cell — the only way anyone learns that an act has to be made anew by a current owner (D23, cell stores spec).

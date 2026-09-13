@@ -275,7 +275,7 @@ Until KERI's anchored log carries the retrograde direction (cells D29), the gate
 #### Scenario: A dependency whose authoring device died is never resolved until re-issued (D23)
 
 - **WHEN** A's sequence 3 — the event that made A an owner — reached only A's device before B's device, which authored it, died; A's device then made C an owner naming A's sequence 3, spread that event to a device of D, and died too, so no live device holds A's sequence 3
-- **THEN** every device defers C's made-owner event indefinitely and lists it as waiting on A's sequence 3, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds
+- **THEN** every device defers C's made-owner event indefinitely and lists C as a plain member meanwhile, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds
 
 ### Requirement: The membership store is reconciled before the record store
 
