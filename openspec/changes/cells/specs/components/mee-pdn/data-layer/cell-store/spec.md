@@ -8,8 +8,7 @@ The membership store is two shapes: what a device writes — an act — and what
 /// One entry a device writes into the membership store.
 enum MembershipAct {
     /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; the root.
-    /// cell id = blake3::derive_key("pdn/cell-id/v1", subject ‖ announcement_key ‖ nonce)[..16];
-    /// `signature` by the announcement key over "pdn/cell-founding/v1" ‖ subject ‖ announcement_key ‖ nonce.
+    /// Derives the cell id and is checked against it by the steps below.
     Found       { nonce: [u8; 16], announcement_key: PublicKey, signature: Signature },
     /// Records a newcomer's join after its one-time secret was verified and burned. Any member.
     Join        { subject: PdnId, subject_seq: Seq, actor_seq: Seq, announcement_key: PublicKey, subject_signature: Signature },
@@ -41,12 +40,31 @@ enum MembershipEvent {
 struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<AuthorId> }
 
 /// The gate's check of one event, from the write admission alone:
-///   Founded            → seq == 1, derive_key("pdn/cell-id/v1", subject ‖ announcement_key ‖ nonce)[..16] == cell id,
-///                        signature over "pdn/cell-founding/v1" ‖ subject ‖ announcement_key ‖ nonce verifies under announcement_key
+///   Founded            → seq == 1 and the receiving steps below pass
 ///   Joined             → state(by, by_seq).member
 ///   Left               → by == subject
 ///   Removed | MadeOwner | UnmadeOwner → state(by, by_seq).owner
 /// and for every kind: no entry under member/<subject>/<seq>/ by this author yet; by's chain held up to by_seq, else deferred.
+```
+
+The cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
+
+```text
+Creating a cell, on the creator's device:
+1. nonce      = 16 random bytes
+2. cell_id    = BLAKE3 derive_key(context "pdn/cell-id/v1",
+                                  pdn_id[32] ‖ announcement_pubkey[32] ‖ nonce[16]), first 16 bytes
+                text form: 32 lowercase hex characters
+3. signature  = Ed25519 sign(announcement_secret,
+                             "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce)
+4. write the founding event at member/<pdn_id>/1/founded/…:
+   { nonce, announcement_pubkey, signature }   — pdn_id is the key's <pdnid>; cell_id is not stored
+5. cell_id goes to the identity's directory, the invite, links in notes
+
+Receiving a founding event, on every member device (reconciliation, a fresh device's first session included):
+1. recompute cell_id from the event's pdn_id, announcement_pubkey, nonce → must equal the cell id the device holds
+2. verify signature under announcement_pubkey over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce
+3. either check fails → drop the event, whatever order it arrived in
 ```
 
 ## ADDED Requirements
@@ -72,12 +90,12 @@ A cell SHALL be served by exactly two pdn-store replicas — its membership stor
 
 ### Requirement: The cell id carries no key material
 
-A cell SHALL be identified by a 16-byte cell id, written as text as 32 lowercase hexadecimal characters, derived at creation: the first 16 bytes of BLAKE3 in key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key and a 16-byte random nonce; the three are carried in the founding event with a signature by the announcement key over the prefix `pdn/cell-founding/v1` followed by the three. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
+A cell SHALL be identified by a 16-byte cell id, derived on the creator's device and checked on every member device that receives the founding event, by the cell id steps above. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
 
 #### Scenario: The cell id is derived from the founding event
 
 - **WHEN** an identity creates a cell
-- **THEN** the first 16 bytes of BLAKE3 under the context `pdn/cell-id/v1` over the founding event's `PdnId`, announcement key and nonce equal the cell id, and the event's signature over `pdn/cell-founding/v1` followed by those fields verifies under that announcement key
+- **THEN** recomputing the cell id from the founding event's `PdnId`, announcement key and nonce gives the cell id, and the event's signature verifies under that announcement key, both by the cell id steps above
 
 #### Scenario: The cell id is not a namespace id
 
