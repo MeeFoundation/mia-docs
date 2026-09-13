@@ -54,6 +54,54 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Delete own claim                                   | yes        | yes         |
 | Delete another member's claim                      | yes        | no          |
 
+The service's surface — the operations the requirements below constrain:
+
+```rust
+/// The cells service of a runtime. `identity` is the hosted identity acting; a call on a cell the identity is no member of
+/// fails with the unknown-cell error, and a refusal by role is a typed error that writes nothing.
+trait CellsService {
+    /// Derives the cell id, creates both stores, writes the signed founding event; the identity is the first owner.
+    async fn create(&self, identity: PdnId, name: &str) -> Result<CellId>;
+    /// The cells the identity is a member of, with their names.
+    async fn list(&self, identity: PdnId) -> Result<Vec<CellInfo>>;
+    /// The current members, each with its role.
+    async fn members(&self, identity: PdnId, cell: CellId) -> Result<Vec<Member>>;
+    /// Renames the cell for every member. An owner.
+    async fn rename(&self, identity: PdnId, cell: CellId, name: &str) -> Result<()>;
+
+    /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member.
+    async fn invite(&self, identity: PdnId, cell: CellId, lifetime: Option<Duration>) -> Result<CellInvite>;
+    /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
+    async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
+    /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
+    /// `Leave` also forgets both stores on the identity's devices.
+    async fn act(&self, identity: PdnId, cell: CellId, act: CellAct) -> Result<()>;
+
+    /// Places a record under the identity's own name at a fresh id: a claim's or an immutable-document's one entry,
+    /// or a mergeable-document's first operation.
+    async fn put_record(&self, identity: PdnId, cell: CellId, kind: RecordKind, payload: &[u8]) -> Result<RecordRef>;
+    /// Appends an operation to an existing mergeable-document, whoever's name it sits under. Any member.
+    async fn append_op(&self, identity: PdnId, cell: CellId, record: RecordRef, op: &[u8]) -> Result<()>;
+    /// Places the tombstone of a record of any kind. The member under whose name it sits, or an owner.
+    /// Replacing a claim or an immutable-document is `delete`, then `put_record`.
+    async fn delete(&self, identity: PdnId, cell: CellId, record: RecordRef) -> Result<()>;
+
+    /// A claim's or an immutable-document's payload; `None` for a record the cell does not hold.
+    async fn read(&self, identity: PdnId, cell: CellId, record: RecordRef) -> Result<Option<Vec<u8>>>;
+    /// A mergeable-document's operations, each with its writer.
+    async fn read_ops(&self, identity: PdnId, cell: CellId, record: RecordRef) -> Result<Vec<Operation>>;
+    /// Every record the cell holds.
+    async fn list_records(&self, identity: PdnId, cell: CellId) -> Result<Vec<RecordRef>>;
+    /// Entries outside the key layout, each with its author (cells D27).
+    async fn list_unknown(&self, identity: PdnId, cell: CellId) -> Result<Vec<UnknownEntry>>;
+}
+
+/// Founding, joining and device announcements are written by `create`, `join` and the device sweep, never through `act`.
+enum CellAct { MakeOwner(PdnId), UnmakeOwner(PdnId), Remove(PdnId), Leave }
+struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
+enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
+```
+
 ## ADDED Requirements
 
 ### Requirement: The cells service creates a cell for a hosted identity
@@ -106,7 +154,7 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement secret beside their tickets — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
 
 #### Scenario: A linked device reaches the cell
 
@@ -142,6 +190,20 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 - **WHEN** owner A takes owner B's ownership away and the record reaches the members' devices
 - **THEN** B is listed among the members and not among the owners
 
+### Requirement: An owner renames the cell for every member
+
+Renaming a cell SHALL be available only to an owner's device, and the new name SHALL become the name every member lists. A rename by a member that is no owner SHALL be refused with a typed error and change no state.
+
+#### Scenario: An owner renames the cell
+
+- **WHEN** owner A renames the cell "Family" to "Walkers" and the rename reaches a device of member C
+- **THEN** C lists the cell under "Walkers", its cell id unchanged
+
+#### Scenario: A plain member's rename is refused
+
+- **WHEN** member C, no owner, attempts to rename the cell
+- **THEN** the attempt is refused with a typed error and every member lists the cell under its name unchanged
+
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
 Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
@@ -168,7 +230,7 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 
 ### Requirement: A claim and an immutable-document are placed once; a mergeable-document is edited by every member
 
-The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. A claim or an immutable-document is replaced by deleting it and placing a new one: the deletion SHALL be available to the identity under whose name the record sits and to any owner, and refused to any other member with a typed error; the new record sits under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
+The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. Deleting a record of any kind SHALL be available to the identity under whose name it sits and to any owner, and refused to any other member with a typed error. A claim or an immutable-document is replaced by deleting it and placing a new one, the new record under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
 
 #### Scenario: A claim round-trips unchanged
 
@@ -209,6 +271,11 @@ The cells service SHALL place a record as one of three kinds — claim, mergeabl
 
 - **WHEN** member B, no owner, places an immutable-document, deletes it and places a new one
 - **THEN** every member reads the new immutable-document under a new id, and the old one is no longer read
+
+#### Scenario: A member deletes its own mergeable-document; a plain member deletes no other member's
+
+- **WHEN** member C, no owner, attempts to delete B's mergeable-document, and B then deletes it from B's own device
+- **THEN** C's attempt is refused with a typed error and every member still reads the document, and after B's deletion no member reads it
 
 #### Scenario: A plain member deletes no other member's record
 

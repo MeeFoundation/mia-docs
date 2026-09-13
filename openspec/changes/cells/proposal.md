@@ -2,7 +2,7 @@
 
 ## Why
 
-Sharing on PDN is pairwise: a connection between two identities, and per-claim grants over it, each claim staying in its issuer's namespace and reaching the audience through filtered reconciliation from the issuer's own devices. The product's data model ([mia-ontologies](https://github.com/MeeFoundation/mia-ontologies)) is built on **cells** — private collaboration spaces of 0..n members whose content stays alive for every member, with the relationship between two people modelled as a cell of two — and a group has nothing to stand on today: a newcomer cannot get in without pairing with every member, nobody relays an author's content while the author is offline, and there is no space several people write into. This change adds the cell as a platform primitive. It records the decisions the team has taken and lists, deliberately and at length, the questions still open, so that the product's data model and the platform meet on one definition before either side builds on the other.
+Several people need one space they all write into: its content stays with every member whether or not its author is online, and a newcomer enters it on one member's invitation. This change adds that space as a platform primitive — the **cell**, a private space of 0..n members, the relationship between two people being a cell of two — and records the decisions the team has taken.
 
 ## What Changes
 
@@ -14,9 +14,8 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 - **Three invariants.** What may be done to a record does not depend on whether the member that placed it is a current member or a removed one. Every state a cell can reach is repairable by its owners, so no situation forces recreating the cell — a new store, re-invited members, re-uploaded content. And authorship is forged by no one: every entry carries its writer's signature, so an edit of another member's mergeable-document reads as the editor's act, never as the member's.
 - **Replacing a claim or an immutable-document is deleting it and placing a new one.** Neither is updated in place by anyone. A member replaces its own record because it is its own; an owner replaces any member's record because it is an owner. The old record is deleted and the new one sits under the replacer's name — a new record with a new id, so a member's file replaced by an owner becomes the owner's file — and references to the old record stay on the old record. That such references break is accepted. A mergeable-document is edited in place, and its id stays.
 - **A human-readable name that is not an address.** A cell carries a name — a string that can repeat, including among one identity's cells; an owner renames it. Several cells with the same members are ordinary.
-- **Nothing existing changes.** Connections, grants, per-issuer namespaces and their egress filter keep their requirements. How they relate to cells — whether a connection is a cell of two, whether grants gain the cell as an audience — is an open question this change names and does not answer.
+- **Nothing existing changes its behaviour.** Connections, grants, per-issuer namespaces and their egress filter keep their requirements. The store beneath them drops prefix deletion — an entry affects only its own key — and every existing delete already addresses one key, except the directory's pruning of an issuer's retraction markers, which deletes them one by one. How they relate to cells — whether a connection is a cell of two, whether grants gain the cell as an audience — is an open question this change names and does not answer.
 - **Chat is a later change.** A cell will carry a chat; this change does not build it, and it is not expected to sit on the store's reconciliation — a stream of messages is a sync shape of its own.
-- **Open questions are recorded, not resolved.** The design lists them, grouped and with their options; the ones that block implementation are the first task group, and implementation does not start before they are answered.
 
 ## Capabilities
 
@@ -26,6 +25,7 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 | `components/mee-pdn/pdn-node/cells`                     | `openspec/specs/components/mee-pdn/pdn-node/cells/spec.md`                     |
 | `components/mee-pdn/data-layer/capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md` |
 | `components/mee-pdn/data-layer/subset-reconciliation`   | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation/spec.md`   |
+| `components/mee-pdn/data-layer/private-metadata-store`  | `openspec/specs/components/mee-pdn/data-layer/private-metadata-store/spec.md`  |
 
 ### New Capabilities
 
@@ -35,15 +35,16 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 ### Modified Capabilities
 
 - `components/mee-pdn/data-layer/capability-gated-ingest`: the gate arms on a cell's two stores too, judging by the entry's author resolved to a member rather than by the session peer.
-- `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell's stores; the import refusal for tracked non-data replicas names them.
+- `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell's stores; the import refusal for tracked non-data replicas names them; a delete is an empty entry at one key, the store keeping no prefix deletion.
+- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds and holds the identity's announcement key pair at a fixed path, minted with the identity.
 
 ## Impact
 
 - **`crates/pdn-types`**: a `CellId` byte identifier.
-- **`crates/data-layer`**: the membership store and the record store as replica kinds beside the directory, the data store and the connection metadata store — creation, import from their tickets, forgetting, the session order between them; classification of member devices; the authorship policy in the ingest gate; swarm membership on import; contact derivation from member device records; a download policy for payloads.
+- **`crates/data-layer`**: the membership store and the record store as replica kinds beside the directory, the data store and the connection metadata store — creation, import from their tickets, forgetting, the session order between them; classification of member devices; the authorship policy in the ingest gate; swarm membership on import; contact derivation from member device records; a download policy for payloads; the record store's deletion of a whole record and its refusal of content for a deleted one (D24); entries outside the key layout kept, used by nothing and listed (D27).
 - **`crates/pdn-node`**: the cells service; the join dialogue on its own ALPN; the ownership surface; the directory kinds that carry a cell to a member's other devices; restart recovery of hosted cells; the join and removal paths under the flaky-test discipline.
-- **`crates/pdn-layer`**: the vocabulary — the record and its three kinds, claim, mergeable-document and immutable-document, their envelope, the mapping onto mia-ontologies' graphs and cell DataBooks.
-- **`crates/pdn-store`**: one change — deletion kills a key: an admitted empty entry removes every author's content under its prefix and releases the blobs at once, and a dead prefix admits no content again (D24); the swarm, the content-free topic and the ingest hook are used as they are. The linear-scan range fingerprint (`get_fingerprint` in `store/fs.rs`) is a cost the record store makes visible; it is among the open questions, not in this change.
-- **Specs**: a glossary entry `architecture/language/cell.md`; the three record kinds reconciled with mia-ontologies' graph, note, files and DataBook; a sweep of specs that describe connections as the only sharing path.
+- **`crates/pdn-layer`**: the vocabulary — the record and its three kinds, claim, mergeable-document and immutable-document and their envelope.
+- **`crates/pdn-store`**: one change — no entry affects another key: prefix deletion leaves the store, and the store gains the two primitives the record store's deletion builds on, removing every author's entries at one key with their blobs and looking one key up at ingest (D24); the swarm, the content-free topic and the ingest hook are used as they are. The linear-scan range fingerprint (`get_fingerprint` in `store/fs.rs`) is a cost the record store makes visible; it is among the open questions, not in this change.
+- **Specs**: a glossary entry `architecture/language/cell.md`; a sweep of specs that describe connections as the only sharing path.
 - **Depends on**: ADR-0011 and ADR-0012 for the shape of the join dialogue; multi-identity hosting; the classifier's device resolution. Nothing pending.
 

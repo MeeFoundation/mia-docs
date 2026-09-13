@@ -1,22 +1,12 @@
 # Tasks: cells
 
-Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, records — claims, mergeable-documents and immutable-documents — as content. Nothing existing changes shape. Group 0 is the gate: the design's blocking open questions are answered and recorded before any implementation task starts.
-
-## 0. Decisions before implementation (design, Open Questions marked blocking)
-
-- [x] 0.1 A1 and A2 — answered by D25: the cell id derived from the creator's `PdnId`, announcement key and a random nonce, 16 bytes, the founding event checked against it
-- [x] 0.2 B1 — answered by D3 and D21: the membership store, its records and their writers
-- [ ] 0.3 B4 — the join path: a dedicated ALPN dialogue, an invite record over an existing channel, or both
-- [ ] 0.4 C2 — claims and graph versions: one claim per edit with a head, or graphs as mergeable-documents; history retained or head only
-- [x] 0.5 C5 — answered by D17: a mergeable-document keeps its operations, an immutable-document is never edited
-- [x] 0.6 C7 — answered by D24: a tombstone kills its key, content and blobs go at once, the tombstone stays for reconciliation
-- [ ] 0.7 Record the answers as design decisions D25 and following, and rewrite the affected scenarios in the specs before implementation starts
+Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, records — claims, mergeable-documents and immutable-documents — as content. Nothing existing changes shape.
 
 ## 1. Vocabulary and types
 
 - [ ] 1.1 `CellId` in `pdn-types`, 16 bytes, from a `define_byte_id_16!` beside the existing macro renamed `define_byte_id_32!`; its derivation per D25
-- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, and the owner role; the platform's record kinds mapped onto mia-ontologies' graph, note, files and DataBook (C1), linked from the specs' first use
-- [ ] 1.3 `pdn-layer`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — and the key layout of both stores per D21 (C2 may add a version segment under a claim)
+- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, and the owner role, linked from the specs' first use
+- [ ] 1.3 `pdn-layer`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — and the key layout of both stores per D21
 
 ## 2. data-layer: the cell's stores
 
@@ -25,16 +15,17 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 - [ ] 2.3 The authorship policy in the ingest gate: a claim or an immutable-document from a device of the member under whose name it sits, a mergeable-document's operation from a device of any member, a tombstone from a device of the record's member or of an owner, everything else dropped silently; the verdict on the entry's author and its membership state at the membership sequence the key names (D22), never on the session peer, an entry naming a sequence the device lacks deferred — except the membership device area, judged by the embedded announcement signature (D16)
 - [ ] 2.4 Swarm membership of both stores on create and import; tracked contacts derived from the member device records and replaced wholesale on each derivation; the download policy per D5' on the record store
 - [ ] 2.5 Removal and rejoin per D22: sessions refused from the first session after the removal event arrives; entries naming a sequence at which the member was no longer a member dropped; entries from while a member admitted on every device whenever they arrive — a device linked after the removal included; a member that joins again writes under its new sequence and its earlier entries resolve to it; an entry naming a sequence the device lacks dropped and persisted from the next session (D19 orders the session)
-- [ ] 2.7 `pdn-store`: deletion per D24 — an admitted empty entry removes every author's content entries under its prefix and unlinks their blobs, `would_insert` refuses content under a tombstoned prefix whatever its timestamp, the tombstone entry kept; the store's tests for both, and the stress pass of the flaky-tests practice, since the fork changes
+- [ ] 2.7 `pdn-store`: no prefix semantics per D24 — `put` and `would_insert` touch only an entry's own key, `delete_prefix` gives way to a delete at one key, the directory's `prune_retractions` deletes its markers one key at a time; the two primitives the record store builds on — every author's entries at one key removed with their blobs, one key looked up at ingest; the store's tests rewritten for both, and the stress pass of the flaky-tests practice, since the fork changes
+- [ ] 2.8 The record store's deletion per D24 — a tombstone at a record's key removes every author's content entries of that record with their blobs, and content of a deleted record is refused at ingest whatever its timestamp — and entries outside the key layout per D27, kept from member devices, read by nothing, listed with their authors
 - [ ] 2.6 Session order per D19: the membership store reconciled to convergence, the write admission folded, then the record store; plain reconciliation on both, no capability filter — proven by a newcomer's first record and a removed member's later one being judged in the session that brings their membership
 
 ## 3. pdn-node: the cells service
 
 - [ ] 3.1 `create`, deriving the cell id and writing the signed founding event per D25; `list`, `members`; the name carried with the cell and never used as an address; `rename` by an owner, refused to a plain member with a typed error
-- [ ] 3.2 The invite and join dialogue per B4: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed both stores' write tickets, catch-up before the join returns
+- [ ] 3.2 The invite and join dialogue per D26: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed both stores' write tickets, catch-up before the join returns
 - [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error), a mergeable-document (edited by any member, each operation under its writer's signature) and an immutable-document (anyone's update of one refused with a typed error before anything is written), and the replacement of a claim or an immutable-document: the old record deleted (D24) by its member or an owner, the new one under the replacer's name with a new id (D18); reading and listing by cell id
 - [ ] 3.4 Remove and leave: the removal event; removal an owner-only act, its target an owner or a plain member alike; leaving forgets both stores locally
-- [ ] 3.5 A member's other devices: the cell's tickets and the announcement secret in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
+- [ ] 3.5 A member's other devices: the cell's write tickets in the identity's directory under `cell/<cell-id-hex>/membership` and `cell/<cell-id-hex>/records`, the announcement key pair at `announcement-key`, minted with the identity (private metadata store delta), the cell opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
 - [ ] 3.6 Restart recovery per G1: hosted cells re-hosted from durable state on a directory-configured runtime
 - [ ] 3.7 Ownership: the creator recorded as the first owner; an owner makes a member an owner; ownership taken only by another owner; owners listed beside the members
 
@@ -45,7 +36,8 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 - [ ] 4.3 Three identities with no connections sharing through one cell, and two cells with the same members keeping their entries apart
 - [ ] 4.4 Stress pass on join, removal and relay scenarios (`--stress-count`, per the flaky-tests practice); every failure diagnosed in isolation before anything is built on top
 - [ ] 4.5 Lints and the full suite (`just precommit-check`)
-- [ ] 4.7 Deletion per D24, access pairs in one place each: an owner's tombstone removing a record, its content and its blob on every device beside a plain member's dropped; a member deleting its own beside another member's refused; a removed member's record deleted by an owner beside a plain member, the removed member itself and an outsider dropped; a content entry with a newer timestamp refused under a dead key; a peer that missed the tombstone converging on the deletion; a mergeable-document's operations gone with it
+- [ ] 4.7 Deletion per D24, access pairs in one place each: an owner's tombstone removing a record, its content and its blob on every device beside a plain member's dropped; a member deleting its own beside another member's refused; a removed member's record deleted by an owner beside a plain member, the removed member itself and an outsider dropped; a content entry with a newer timestamp refused for a deleted record; a peer that missed the tombstone converging on the deletion; a mergeable-document's operations gone with it; an empty entry at `by/<B>/` deleting nothing, and a non-empty entry at a mergeable-document's key erasing none of its operations
+- [ ] 4.8 Entries outside the key layout per D27: an entry from a member's device held on every member device, listed with its author and changing no record, a later session finding no difference, beside the same entry authored by no member's device dropped
 - [ ] 4.6 Membership-store verdicts in four classes (each a scenario in the cell stores spec), each test named after its class and, for the last two, after the open question it pins — those are characterization tests of what the gate does without an anchored log, expected to flip when the question closes:
   - rightly admitted: the founding event deriving the cell id; a join by a plain member; a made-owner by an owner naming its own point; a made-owner by an owner who was later unmade, on a device linked after the demotion; a leave by the member itself; a rejoin by any member, landing as a plain member; a newcomer's device converging from nothing in one session, events in any order; a device statement admitted whoever relays it; two owners' concurrent events at one subject sequence both persisted, the fold resolving them the same on every device (B10)
   - rightly refused: a made-owner or a removal by a plain member; a left event by anyone but the subject; a founding event that does not derive the cell id, whatever order it arrives in — a freshly linked device served one first included; an event by a key no member's statement lists; a device statement under the wrong announcement key; an author's rewrite of its own event at a held sequence on a device holding the original; a removed member's device requesting a session; an event naming an actor point the device does not hold — deferred, then admitted when the point arrives
@@ -54,5 +46,5 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 
 ## 5. Docs and archive
 
-- [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and multi-identity's "later groups and organizations", and point them at cells
-- [ ] 5.2 On archive: place the two new specs and the two deltas at their destinations; `openspec validate --all --strict`
+- [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
+- [ ] 5.2 On archive: place the two new specs and the three deltas at their destinations; `openspec validate --all --strict`
