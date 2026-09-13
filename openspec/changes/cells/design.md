@@ -90,7 +90,7 @@ No egress filter: both stores are served whole to member devices, the membership
 
 **Rejected alternatives:**
 
-- A replica per member inside the cell, the cell as the grant audience — kept open as "share without copying" (E3).
+- A replica per member inside the cell, the cell as the grant audience — "share without copying".
   - **Pros:** data stays with its issuer; grants stay per claim.
   - **Cons:** every member's content is a replica the reader reaches separately; grantees stay outside the swarm, so a live update needs a grant republish per item; a stream grows the grant record with every message.
 
@@ -298,6 +298,17 @@ A record's membership reference (D22) and a membership event's actor reference (
 - Hash-linked membership sequences built ahead of KERI.
   - **Cons:** detecting one actor contradicting itself is KERI's duplicity handling, taken with its key event log rather than built twice; concurrent events at one sequence are ordinary and stay with B10 either way.
 
+### D30. Cells stand beside connections, grants and per-issuer namespaces, and touch none of them
+
+Cells are built in parallel with what exists. Connections, grants, subset-rbsr and per-issuer namespaces keep working as they do, and nothing in a cell rests on them: a cell's stores carry no grant, a grant names no cell as its audience, and cell content never flows into a personal namespace or out of one through a grant. A two-member cell and a connection coexist, one a copy into a common space and the other a grant on one's own data. Once cells prove themselves in practice — the mobile application's integration included — connections go entirely, with the machinery that serves only them; until then both stay.
+
+**Rejected alternatives:**
+
+- Connections as two-member cells now.
+  - **Cons:** replaces a working path with one not yet tried in the product, before the mobile application runs on it.
+- The cell as an audience of grants on personal namespaces — "share without copying".
+  - **Cons:** ties the new primitive to the machinery it may replace, and carries a grant's per-claim bookkeeping into every cell.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
@@ -371,12 +382,6 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 - D5'. The download policy default for record stores: records everywhere, payloads on demand.
 - D6'. Clocks: chat ordering by writer timestamps under the fork's 10-minute future window.
 - D7'. Storage: a quota per cell on a device; a disk that fills mid-sync.
-
-### E. Relation to what exists
-
-- E1. Connections: they stay, they become two-member cells, or both coexist. A two-member cell and a connection differ: a copy into a common space versus a grant on one's own data.
-- E2. Grants, subset-rbsr and per-issuer namespaces go unused by a product that keeps everything in cells and shares by copying. Kept for other consumers — the SDK — or not.
-- E3. The cell as an audience of grants on personal namespaces — "share without copying" — if ever needed.
 
 ### F. Security
 
