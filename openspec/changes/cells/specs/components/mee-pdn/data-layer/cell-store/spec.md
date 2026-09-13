@@ -72,7 +72,7 @@ A cell SHALL be served by exactly two pdn-store replicas — its membership stor
 
 ### Requirement: The cell id carries no key material
 
-A cell SHALL be identified by a 16-byte cell id derived at creation: the first 16 bytes of BLAKE3 in key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key and a 16-byte random nonce; the three are carried in the founding event with a signature by the announcement key over the prefix `pdn/cell-founding/v1` followed by the three. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
+A cell SHALL be identified by a 16-byte cell id, written as text as 32 lowercase hexadecimal characters, derived at creation: the first 16 bytes of BLAKE3 in key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key and a 16-byte random nonce; the three are carried in the founding event with a signature by the announcement key over the prefix `pdn/cell-founding/v1` followed by the three. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
 
 #### Scenario: The cell id is derived from the founding event
 
