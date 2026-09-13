@@ -82,7 +82,7 @@ A cell SHALL be identified by a 32-byte cell id minted at creation. The id SHALL
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and authority to write inside the cell is judged by the ingest gate per entry, never by ticket mode — a member's write ticket widens nothing the gate refuses. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and authority to write inside the cell is judged by the ingest gate per entry, never by ticket mode — a member's write ticket widens nothing the gate refuses. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author.
 
 #### Scenario: A write reaches a member through another member
 
@@ -259,14 +259,14 @@ A session between two member devices SHALL reconcile the membership store to con
 - **WHEN** A's unmade-owner event and a tombstone A's device then placed on B's record are both unknown to a device of member C, and C's device sessions with a device holding both
 - **THEN** C's device drops the tombstone in that session, and B's record is still read
 
-### Requirement: The record store's key names the member, the kind and the type
+### Requirement: The record store's key names the member and the kind
 
-A record SHALL sit under the name of the member that placed it, the key carrying the kind, a document's type and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/doc/immutable/<id>/<mseq>` for an immutable-document, `by/<pdnid>/doc/mergeable/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's author key, the writer's membership sequence and the writer's own operation sequence. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without the trailing sequence, and a tombstone SHALL be the store's empty entry at that key — above the content entry, above a mergeable-document's operations.
+A record SHALL sit under the name of the member that placed it, the key carrying the record's kind and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/immutable-document/<id>/<mseq>` for an immutable-document, `by/<pdnid>/mergeable-document/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's author key, the writer's membership sequence and the writer's own operation sequence. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without the trailing sequence, and a tombstone SHALL be the store's empty entry at that key — above the content entry, above a mergeable-document's operations.
 
 #### Scenario: A record sits under the name of the member that placed it
 
 - **WHEN** member B places a claim, an immutable-document and a mergeable-document with one operation, from two of B's devices
-- **THEN** their keys are `by/<B>/claim/<id>/<mseq>`, `by/<B>/doc/immutable/<id>/<mseq>` and `by/<B>/doc/mergeable/<id>/<op>`, the same `<B>` and the same `<mseq>` from either device, and a listing under B's prefix returns exactly them
+- **THEN** their keys are `by/<B>/claim/<id>/<mseq>`, `by/<B>/immutable-document/<id>/<mseq>` and `by/<B>/mergeable-document/<id>/<op>`, the same `<B>` and the same `<mseq>` from either device, and a listing under B's prefix returns exactly them
 
 ### Requirement: A claim is written only by its issuer
 
@@ -289,7 +289,7 @@ An entry that is a claim SHALL be admitted over sync only when it was authored b
 
 ### Requirement: A mergeable-document is edited by every member
 
-A document SHALL be readable by every member. An operation on a mergeable-document SHALL be admitted from a device of any member, whoever's name the document sits under, each operation carrying its writer's author signature and naming, in its key, the writer's membership sequence at the time of writing. The one ground for dropping an operation is its writer's membership state at that sequence: an operation whose author resolves to no member's device, or to a member that was not a member at the named sequence of its own events, SHALL be dropped before persisting, silently, on every member device — no role, no document and no time of authoring narrows admission further; an operation naming a sequence the device does not yet hold SHALL be dropped and persisted from the first session after the events arrive, since reconciliation offers again what the device lacks. An operation is judged the same on every device whenever it arrives: everything a member wrote while a member — its own documents, its operations on other members' documents — SHALL be admitted after it leaves or is removed, on a device that catches up later included, and SHALL resolve to that member after it joins again, its new operations naming its new sequence. No document carries a sharing mode.
+An operation on a mergeable-document SHALL be admitted from a device of any member, whoever's name the mergeable-document sits under, each operation carrying its writer's author signature and naming, in its key, the writer's membership sequence at the time of writing. The one ground for dropping an operation is its writer's membership state at that sequence: an operation whose author resolves to no member's device, or to a member that was not a member at the named sequence of its own events, SHALL be dropped before persisting, silently, on every member device — no role, no mergeable-document and no time of authoring narrows admission further; an operation naming a sequence the device does not yet hold SHALL be dropped and persisted from the first session after the events arrive, since reconciliation offers again what the device lacks. An operation is judged the same on every device whenever it arrives: everything a member wrote while a member — its operations on its own mergeable-documents and on other members' — SHALL be admitted after it leaves or is removed, on a device that catches up later included, and SHALL resolve to that member after it joins again, its new operations naming its new sequence. No record carries a sharing mode.
 
 #### Scenario: Any member edits another member's mergeable-document
 
@@ -299,12 +299,12 @@ A document SHALL be readable by every member. An operation on a mergeable-docume
 #### Scenario: An operation by no member's device is dropped
 
 - **WHEN** a device of member B carries an operation on a mergeable-document authored by a key that resolves to no member's device, and reconciles with a device of a third member
-- **THEN** no member device persists it, no rejection is signalled, and the document's own operations survive unchanged
+- **THEN** no member device persists it, no rejection is signalled, and the mergeable-document's own operations survive unchanged
 
 #### Scenario: A departed member's earlier operation reaches a device that catches up later
 
 - **WHEN** member C, a member from sequence 1, appended an operation naming sequence 1, C was then removed at sequence 2, and a device linked into member B after the removal catches up from a device of member D
-- **THEN** B's new device persists C's operation, in C's own documents and in B's alike
+- **THEN** B's new device persists C's operation, in C's own mergeable-documents and in B's alike
 
 #### Scenario: An operation naming a sequence at which its writer was no member is dropped
 
@@ -333,7 +333,7 @@ A mergeable-document SHALL hold each edit as its own entry under its own key, ne
 #### Scenario: An immutable-document is admitted from its member and from nobody else
 
 - **WHEN** a device of member B places an immutable-document, a device of owner A then produces an entry at its key, and the members' devices reconcile
-- **THEN** every member device persists B's document and drops A's entry, B's document reading unchanged
+- **THEN** every member device persists B's immutable-document and drops A's entry, B's immutable-document reading unchanged
 
 ### Requirement: Deleting a record kills its key
 
@@ -342,7 +342,7 @@ A tombstone SHALL be the store's empty entry at a record's key without its trail
 #### Scenario: An owner's deletion removes the record and its blob everywhere
 
 - **WHEN** owner A's device places a tombstone on B's immutable-document and the members' devices reconcile
-- **THEN** no member device reads the document, none holds its content entry or its blob, and each holds the tombstone
+- **THEN** no member device reads the immutable-document, none holds its content entry or its blob, and each holds the tombstone
 
 #### Scenario: A member deletes its own record; a plain member deletes no other member's
 
@@ -357,17 +357,17 @@ A tombstone SHALL be the store's empty entry at a record's key without its trail
 #### Scenario: A dead key admits no content, whatever its timestamp
 
 - **WHEN** B's immutable-document was deleted by an owner, and a device of B then offers a content entry at the same key carrying a timestamp newer than the tombstone's
-- **THEN** no member device inserts it and the document stays deleted
+- **THEN** no member device inserts it and the immutable-document stays deleted
 
 #### Scenario: A peer that missed the tombstone converges on the deletion
 
-- **WHEN** a device of member D holds B's document and has not received the tombstone, and it reconciles with a device holding the tombstone
-- **THEN** D's device drops the document and its blob and holds the tombstone, and the device it reconciled with does not receive the document back
+- **WHEN** a device of member D holds B's immutable-document and has not received the tombstone, and it reconciles with a device holding the tombstone
+- **THEN** D's device drops the immutable-document and its blob and holds the tombstone, and the device it reconciled with does not receive the immutable-document back
 
 #### Scenario: Deleting a mergeable-document kills its operations
 
 - **WHEN** owner A's device places a tombstone at B's mergeable-document's key, and a device of C then offers an operation under it
-- **THEN** every member device removes the document's operations and inserts no more under it
+- **THEN** every member device removes the mergeable-document's operations and inserts no more under it
 
 ### Requirement: A member's devices are announced by the member itself
 

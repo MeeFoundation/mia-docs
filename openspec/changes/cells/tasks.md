@@ -1,13 +1,13 @@
 # Tasks: cells
 
-Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, claims and documents — mergeable-documents and immutable-documents — as content. Nothing existing changes shape. Group 0 is the gate: the design's blocking open questions are answered and recorded before any implementation task starts.
+Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, records — claims, mergeable-documents and immutable-documents — as content. Nothing existing changes shape. Group 0 is the gate: the design's blocking open questions are answered and recorded before any implementation task starts.
 
 ## 0. Decisions before implementation (design, Open Questions marked blocking)
 
 - [ ] 0.1 A1 — the form of the cell id: random bytes or the hash of a founding record; and A2, its form at the app boundary
 - [x] 0.2 B1 — answered by D3 and D21: the membership store, its records and their writers
 - [ ] 0.3 B4 — the join path: a dedicated ALPN dialogue, an invite record over an existing channel, or both
-- [ ] 0.4 C2 — claims and graph versions: one claim per edit with a head, or graphs as documents; history retained or head only
+- [ ] 0.4 C2 — claims and graph versions: one claim per edit with a head, or graphs as mergeable-documents; history retained or head only
 - [x] 0.5 C5 — answered by D17: a mergeable-document keeps its operations, an immutable-document is never edited
 - [x] 0.6 C7 — answered by D24: a tombstone kills its key, content and blobs go at once, the tombstone stays for reconciliation
 - [ ] 0.7 Record the answers as design decisions D25 and following, and rewrite the affected scenarios in the specs before implementation starts
@@ -15,8 +15,8 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 ## 1. Vocabulary and types
 
 - [ ] 1.1 `CellId` in `pdn-types`, in the byte-id family of `PdnId`
-- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its two kinds, the two document types, and the owner role; the platform's claim and document mapped onto mia-ontologies' graph and DataBook (C1), linked from the specs' first use
-- [ ] 1.3 `pdn-layer`: the record kinds — claim, document with its type, mergeable-document or immutable-document (D17) — and the key layout of both stores per D21 (C2 may add a version segment under a claim)
+- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, and the owner role; the platform's record kinds mapped onto mia-ontologies' graph, note, files and DataBook (C1), linked from the specs' first use
+- [ ] 1.3 `pdn-layer`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — and the key layout of both stores per D21 (C2 may add a version segment under a claim)
 
 ## 2. data-layer: the cell's stores
 
@@ -32,7 +32,7 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 
 - [ ] 3.1 `create`, `list`, `members`, the name carried with the cell and never used as an address; `rename` by an owner, refused to a plain member with a typed error
 - [ ] 3.2 The invite and join dialogue per B4: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, the newcomer recorded as a plain member and handed both stores' write tickets, catch-up before the join returns
-- [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error) and a document with its type — a mergeable-document edited by any member, each operation under its writer's signature; anyone's update of an immutable-document refused with a typed error before anything is written — and the replacement of a claim or an immutable-document: the old record deleted (D24) by its member or an owner, the new one under the replacer's name with a new id (D18); reading and listing by cell id
+- [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error), a mergeable-document (edited by any member, each operation under its writer's signature) and an immutable-document (anyone's update of one refused with a typed error before anything is written), and the replacement of a claim or an immutable-document: the old record deleted (D24) by its member or an owner, the new one under the replacer's name with a new id (D18); reading and listing by cell id
 - [ ] 3.4 Remove and leave: the removal event; removal an owner-only act, its target an owner or a plain member alike; leaving forgets both stores locally
 - [ ] 3.5 A member's other devices: the cell's tickets and the announcement secret in the identity's directory under a cell kind, opened on demand by the armer's sweep, the opening device registering itself per D16; the pre-sync sweep that writes the newest device statement into every held cell replica whose version lags
 - [ ] 3.6 Restart recovery per G1: hosted cells re-hosted from durable state on a directory-configured runtime

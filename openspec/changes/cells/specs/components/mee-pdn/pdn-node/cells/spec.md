@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims and documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
 
 **Cell**
 
@@ -15,31 +15,31 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Remove member from cell       | yes        | no          |
 | Remove owner-member from cell | yes        | no          |
 
-**Immutable document** — attachments, for example a PDF file.
+**Immutable-document** — attachments, for example a PDF file.
 
-|                                                          | Cell owner | Cell member |
-| -------------------------------------------------------- | ---------- | ----------- |
-| Read own document                                        | yes        | yes         |
-| Read another member's document                           | yes        | yes         |
-| Create own document                                      | yes        | yes         |
-| Create a document as if it is authored by another member | no         | no          |
-| Update own document                                      | no         | no          |
-| Update another member's document                         | no         | no          |
-| Delete own document                                      | yes        | yes         |
-| Delete another member's document                         | yes        | no          |
+|                                                                     | Cell owner | Cell member |
+| ------------------------------------------------------------------- | ---------- | ----------- |
+| Read own immutable-document                                         | yes        | yes         |
+| Read another member's immutable-document                            | yes        | yes         |
+| Create own immutable-document                                       | yes        | yes         |
+| Create an immutable-document as if it is authored by another member | no         | no          |
+| Update own immutable-document                                       | no         | no          |
+| Update another member's immutable-document                          | no         | no          |
+| Delete own immutable-document                                       | yes        | yes         |
+| Delete another member's immutable-document                          | yes        | no          |
 
-**Mergeable document** — for example a note.
+**Mergeable-document** — for example a note.
 
-|                                                                 | Cell owner | Cell member |
-| --------------------------------------------------------------- | ---------- | ----------- |
-| Read own document                                               | yes        | yes         |
-| Read another member's document                                  | yes        | yes         |
-| Create own document                                             | yes        | yes         |
-| Create a document as if it is authored by another member        | no         | no          |
-| Edit own document                                               | yes        | yes         |
-| Edit another member's document (preserving per-edit authorship) | yes        | yes         |
-| Delete own document                                             | yes        | yes         |
-| Delete another member's document                                | yes        | no          |
+|                                                                           | Cell owner | Cell member |
+| ------------------------------------------------------------------------- | ---------- | ----------- |
+| Read own mergeable-document                                               | yes        | yes         |
+| Read another member's mergeable-document                                  | yes        | yes         |
+| Create own mergeable-document                                             | yes        | yes         |
+| Create a mergeable-document as if it is authored by another member        | no         | no          |
+| Edit own mergeable-document                                               | yes        | yes         |
+| Edit another member's mergeable-document (preserving per-edit authorship) | yes        | yes         |
+| Delete own mergeable-document                                             | yes        | yes         |
+| Delete another member's mergeable-document                                | yes        | no          |
 
 **Claim**
 
@@ -144,7 +144,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' documents — stays in the cell.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 #### Scenario: An owner removes a member
 
@@ -168,7 +168,7 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 
 ### Requirement: A claim and an immutable-document are placed once; a mergeable-document is edited by every member
 
-The cells service SHALL write a claim into a cell as an immutable entry: it offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. A document SHALL be placed with its type — mergeable-document or immutable-document — under the placing identity's name and read back by every member. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. A claim or an immutable-document is replaced by deleting it and placing a new one: the deletion SHALL be available to the identity under whose name the record sits and to any owner, and refused to any other member with a typed error; the new record sits under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
+The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. A claim or an immutable-document is replaced by deleting it and placing a new one: the deletion SHALL be available to the identity under whose name the record sits and to any owner, and refused to any other member with a typed error; the new record sits under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
 
 #### Scenario: A claim round-trips unchanged
 
@@ -208,7 +208,7 @@ The cells service SHALL write a claim into a cell as an immutable entry: it offe
 #### Scenario: A member replaces its own record
 
 - **WHEN** member B, no owner, places an immutable-document, deletes it and places a new one
-- **THEN** every member reads the new document under a new id, and the old one is no longer read
+- **THEN** every member reads the new immutable-document under a new id, and the old one is no longer read
 
 #### Scenario: A plain member deletes no other member's record
 
