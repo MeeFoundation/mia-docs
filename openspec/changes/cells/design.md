@@ -252,6 +252,18 @@ At creation the creator's device draws a 16-byte random nonce and derives the ce
   - **Pros:** a creator cannot prepare two founding events under one id.
   - **Cons:** substitution by another member is out of reach at 16 bytes already; the creator sits inside the trust boundary (F1).
 
+### D26. A newcomer joins through a one-time-secret dialogue with a member device
+
+Any member's device mints an invite — a QR code or an invite link carrying the inviting device's address, a one-time short-lived secret and the cell id, no ticket. The newcomer's device dials the inviting device on a dedicated ALPN and presents the secret; the inviting device verifies and burns it before any state changes, receives the newcomer's signed join record (D16), writes the joined event and hands over both stores' write tickets — the shape of the linking dialogue (ADR-0012). Both devices are online at once and reach each other through iroh relays, which the stack takes on in a change of its own: two devices on different networks without a relay and without DNS do not reliably reach each other. Whoever presents a live secret first joins under the `PdnId` it names; proving it is the invited identity is KERI's proof step in the same dialogue (B7), and until then that gap is accepted. Inviting a party that is offline is pending-invite machinery with polling, which ADR-0011 leaves possible and a later change builds.
+
+**Rejected alternatives:**
+
+- An invite record carried over an existing channel with the newcomer — a connection or a common cell — the stores' tickets inside an Invariant-3 store as data tickets travel.
+  - **Pros:** no simultaneous presence; addressed to the newcomer's identity, so there is no secret to intercept.
+  - **Cons:** reaches only a party already connected or sharing a cell, so a first contact needs the dialogue anyway; the join completes only when a member device next sees the newcomer's answer.
+- Both paths.
+  - **Cons:** two join paths to build, test and keep in step, where pending invites give the dialogue the same reach to an offline party.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (F1).
@@ -263,9 +275,9 @@ At creation the creator's device draws a 16-byte random nonce and derives the ce
 - [Dates in entries are self-asserted] → written and shown, never judged (D3, D22, D23); order is the sequence, and "provably before" is F7.
 - [The membership store only grows] → events are never deleted; a member's sequence is a handful of events over a cell's life, and the store stays tiny beside the records (D3).
 - [Storage per device grows with every cell] → records replicate everywhere; payloads can follow a download policy (D5').
-- [Reachability] → the stack is relay-free; in a 100-member cell most device pairs sit behind NATs; the swarm needs one reachable neighbour per device (D3').
+- [Reachability] → the stack is relay-free today, and two devices on different networks without a relay and without DNS do not reliably reach each other — a join fails and a swarm fragments; iroh relays come in a change of their own (D3', D26).
 - [Concurrent editing loses edits] → a mergeable-document keeps every operation under its own key and merges them above the data layer (D17); an immutable-document is never edited, and two members replacing one at once leave two new records under two names, visible to everyone and resolved by people (D18).
-- [The join is bearer-level] → the invitation carries no bearer material and the secret burns, but the newcomer's identity is asserted, not proven; KERI's proof step slots into the same dialogue (B7).
+- [The join is bearer-level] → the invitation carries no ticket and the secret burns on first use, but whoever presents it first joins under the `PdnId` it names — asserted, not proven; accepted until KERI's proof step slots into the same dialogue (B7, D26).
 - [An owner deletes another member's records] → accepted as the repair channel (D12, D14); the deletion is the owner's own signed act and forges nothing (D15), and a hostile owner sits inside the trust boundary already (F1).
 - [Any member edits any mergeable-document] → accepted: every member is trusted with the whole cell already (F1), each operation carries its writer's signature (D15), and a spoiled mergeable-document is repaired by further operations or by an owner's deletion (D12).
 - [A replaced record breaks references to the old one] → accepted (D18); the deletion and the new record are two signed acts of the replacer (D15).
@@ -280,7 +292,6 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### B. Membership
 
-- B4 (**blocking**). Join path: a one-time-secret dialogue on a dedicated ALPN, linking-shaped (ADR-0012), carried as a QR code or an invite link; or an invite record carried over an existing channel with the newcomer — a connection or a common cell — where the stores' tickets travel inside an Invariant-3 store as data tickets do; or both. An invite link for someone without the app.
 - B5. A member's other devices: the cell's tickets and the announcement secret in the member's directory under a cell kind, opened on demand as connection-metadata pairs are; the opened device registers itself per D16. Open: the shape of that directory kind.
 - B6. Organizations as members: an identity hosted on an organization's node — anything the platform treats differently.
 - B7. Proof at join: the newcomer's `PdnId` is the inviter's word. KERI's proof step — challenge-response, exchange of key event logs — is the same slot as in pairing and linking.
@@ -307,7 +318,7 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 - D1'. One-member cells: a pair of replicas from birth — D3 read literally, hundreds of pairs per device for a full personal tree, each replica its own swarm and its own reconcile pass — or key prefixes in the identity's own namespace promoted to a replica at the second member, which is a data move and raises C10. Leaning: from birth; measure.
 - D2'. The linear-scan range fingerprint in the fork: when to replace it with a cached fingerprint tree; with two stores per cell the tree serves each store over its own order (D3).
-- D3'. Reachability: iroh relays or hole punching; always-on member devices as de-facto hubs.
+- D3'. Reachability: answered for devices by iroh relays, in a change of their own (D26). Open: always-on member devices as de-facto hubs.
 - D4'. Swarm and cadence parameters for 200 nodes: active and passive view sizes, the reconcile interval, churn of mobile devices.
 - D5'. The download policy default for record stores: records everywhere, payloads on demand.
 - D6'. Clocks: chat ordering by writer timestamps under the fork's 10-minute future window.

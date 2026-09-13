@@ -2,7 +2,7 @@
 
 ## Why
 
-Sharing on PDN is pairwise: a connection between two identities, and per-claim grants over it, each claim staying in its issuer's namespace and reaching the audience through filtered reconciliation from the issuer's own devices. The product's data model ([mia-ontologies](https://github.com/MeeFoundation/mia-ontologies)) is built on **cells** — private collaboration spaces of 0..n members whose content stays alive for every member, with the relationship between two people modelled as a cell of two — and a group has nothing to stand on today: a newcomer cannot get in without pairing with every member, nobody relays an author's content while the author is offline, and there is no space several people write into. This change adds the cell as a platform primitive. It records the decisions the team has taken and lists, deliberately and at length, the questions still open, so that the product's data model and the platform meet on one definition before either side builds on the other.
+Sharing on PDN is pairwise: a connection between two identities, and per-claim grants over it, each claim staying in its issuer's namespace and reaching the audience through filtered reconciliation from the issuer's own devices. The product's data model ([mia-ontologies](https://github.com/MeeFoundation/mia-ontologies)) is built on **cells** — private collaboration spaces of 0..n members whose content stays alive for every member, with the relationship between two people modelled as a cell of two — and a group has nothing to stand on today: a newcomer cannot get in without pairing with every member, nobody relays an author's content while the author is offline, and there is no space several people write into. This change adds the cell as a platform primitive. It records the decisions the team has taken, so that the product's data model and the platform meet on one definition before either side builds on the other.
 
 ## What Changes
 
@@ -16,7 +16,6 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 - **A human-readable name that is not an address.** A cell carries a name — a string that can repeat, including among one identity's cells; an owner renames it. Several cells with the same members are ordinary.
 - **Nothing existing changes.** Connections, grants, per-issuer namespaces and their egress filter keep their requirements. How they relate to cells — whether a connection is a cell of two, whether grants gain the cell as an audience — is an open question this change names and does not answer.
 - **Chat is a later change.** A cell will carry a chat; this change does not build it, and it is not expected to sit on the store's reconciliation — a stream of messages is a sync shape of its own.
-- **Open questions are recorded, not resolved.** The design lists them, grouped and with their options; the ones that block implementation are the first task group, and implementation does not start before they are answered.
 
 ## Capabilities
 
