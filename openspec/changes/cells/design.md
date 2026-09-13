@@ -2,17 +2,15 @@
 
 ## Context
 
-A PDN node hosts identities. Each identity has a private-metadata directory (its devices, its tickets, its connections records), a data namespace, and, per connection, a directional connection metadata store carrying grants. Sharing means a grant: the claim stays in its issuer's namespace and reaches the audience through capability-filtered reconciliation with the issuer's devices or the audience's own siblings, never through a third party. That model is pairwise by construction.
+A cell is a space its members share: sharing a cell gives every member a complete live copy of its content, the relationship with one other person is a two-member cell, and a cell is expected to stay well under 100 members.
 
-The product's data model — mia-ontologies, the Cellula app — organizes everything as cells: a folder holding one cell DataBook, a markdown note, files and a chat, nested in a per-user tree. Structured content lives in graphs (`g:SCGraph`), each with a subject and a claimant. A cell has a creator with no privileges, one or more members, a shared name and an origin category; sharing a cell gives every member a complete live copy; the relationship with one other person is a bare two-member cell. The app's authors expect cells to stay "well under 100" members.
-
-This design records the decisions taken for the platform side of cells and the questions left open. It works from the team's working note on cells, from a reading of mia-ontologies, and from the team's decisions on roles, record kinds and the cell's two stores.
+This design records the decisions taken for the platform side of cells and the questions left open. It works from the team's working note on cells and from the team's decisions on roles, record kinds and the cell's two stores.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- A shared space for 0..n members with one definition on both sides — the platform and the product's data model.
+- A shared space for 0..n members.
 - Everything a member writes reaches every member, from any member, with the author's authorship enforced on every honest device.
 - Reuse: the swarm, the content-free topic, the ingest hook, the linking-shaped dialogue, multi-identity hosting, the directory as the carrier to a member's other devices. One change in pdn-store: deletion kills a key (D24).
 - Every unanswered question written down, with its options.
@@ -64,7 +62,7 @@ A cell is served by two replicas, each addressed through the cell id. The **memb
 
 ### D4. A record is a claim, a mergeable-document or an immutable-document
 
-A **record** is what a member places into a cell, of one of three kinds chosen when it is placed. A **claim** is an assertion by an issuer about a subject — in mia-ontologies a graph with a claimant and a subject, such as a `persona:DriversLicenseDocument`. A **mergeable-document** is content the members edit — in mia-ontologies the cell's note. An **immutable-document** is content placed once — in mia-ontologies the cell's files. Every member reads every record: inside a cell there is no narrower audience, and "share with Carol and Dave but not Bob" is a different cell (D9). A claim and an immutable-document differ in what the record is — an assertion or content — and an immutable-document and a mergeable-document in mutability (D17); no two kinds differ in payload format: payloads stay opaque below pdn-layer, and a record's kind picks how its entries are laid out and who writes them, not what they contain. Membership events and device statements are the cell's bookkeeping, not records in this sense.
+A **record** is what a member places into a cell, of one of three kinds chosen when it is placed. A **claim** is an assertion by an issuer about a subject — a driver's license, a parent's statement of a child's blood type. A **mergeable-document** is content the members edit — a note. An **immutable-document** is content placed once — a file. Every member reads every record: inside a cell there is no narrower audience, and "share with Carol and Dave but not Bob" is a different cell (D9). A claim and an immutable-document differ in what the record is — an assertion or content — and an immutable-document and a mergeable-document in mutability (D17); no two kinds differ in payload format: payloads stay opaque below pdn-layer, and a record's kind picks how its entries are laid out and who writes them, not what they contain. Membership events and device statements are the cell's bookkeeping, not records in this sense.
 
 **Rejected alternatives:**
 
@@ -106,7 +104,7 @@ The member set does not identify a cell.
 
 ### D10. The platform knows no ontology
 
-Below pdn-layer a cell entry is a key and opaque bytes. The platform reads from the key what it enforces: the cell, the member under whose name the record sits and the record's kind. Subject, template, SHACL shapes, categories and the DataBook's fields are the application's, carried inside payloads or derived from them. This is the existing layering — the data layer treats tokens and payloads as opaque, the domain lives in pdn-layer — applied to cells.
+Below pdn-layer a cell entry is a key and opaque bytes. The platform reads from the key what it enforces: the cell, the member under whose name the record sits and the record's kind. What a payload says and what the application derives from it are the application's. This is the existing layering — the data layer treats tokens and payloads as opaque, the domain lives in pdn-layer — applied to cells.
 
 ### D11. A cell has owners
 
@@ -240,7 +238,7 @@ At creation the creator's device draws a 16-byte random nonce and derives the ce
 **Rejected alternatives:**
 
 - A random cell id, such as a UUID v4.
-  - **Pros:** embeds nothing; the form mia-ontologies asks for.
+  - **Pros:** embeds nothing.
   - **Cons:** a device holding nothing takes the root from whoever serves its first session — a member's freshly linked device that catches up first from a modified member device is handed an invented founder, drops the real founding event as a second one on arrival, and stays in the invented cell for good, deleting records on the invented owner's tombstones (D24).
 - A random cell id beside a founding event signed by the creator.
   - **Cons:** anyone signs a founding event naming the same id under their own key, and the id names no key to tell the two apart.
@@ -290,11 +288,10 @@ Additive: no existing store, ticket, grant or record changes shape — the direc
 
 ## Open Questions
 
-Grouped; each names its options and, where the team leans somewhere, the leaning — none is decided; a question answered since its posing says so and points at the decision. The ones marked **blocking** are answered before implementation starts (tasks 0.x).
+Grouped; each names its options and, where the team leans somewhere, the leaning — none is decided; a question answered since its posing says so and points at the decision.
 
 ### B. Membership
 
-- B9. Whether joining requires a claim by the newcomer about itself, as mia-ontologies' `c:members` baseline does (one graph per member), or that is the app's business.
 - B10. Ownership at the edges — four cases, each needing a rule every device reaches from the events alone, in any arrival order, never from timestamps (D3, D23). (1) Two owners' events at one point of one subject — a made-owner and a removed at B's sequence 5: (a) narrowing wins — among the events at one point the most restrictive state takes effect, removed over unmade-owner over left over made-owner over joined, so a concurrent removal and promotion leave B removed and a re-invite undoes it if it was wrong — fail-closed, the gate's own habit, and no author's key decides; (b) the lower author key wins — deterministic, meaning-free, luck of the key; (c) both stand and the fold applies them in author-key order — (b) in another form, since made-owner after removed is a transition of no member and is ignored; (d) the fork stands unresolved and B's state is the conservative one until a later event supersedes both — but a later event names its actor's point, not a branch of B's chain, so nothing ever picks a branch. Leaning: (a). (2) The last owner leaving, a one-owner cell with other members: (a) refused with a typed error until the owner makes another member an owner — explicit, and a one-member cell's owner leaves by forgetting, the cell ending with it (D14 has no subject left to protect); (b) allowed, the member with the lowest join sequence becoming an owner by rule — repairability kept, ownership appearing without an owner's hand, against D11. Leaning: (a). (3) Mutual demotion — owners A and C unmake each other at once: two events on two subjects, each valid at its actor's named point, no collision at one number, and the owner set empties. A per-member fold cannot see a cell-wide count; the rule has to be a fold-time guard over all chains — an unmade-owner that would leave the cell with no owner is ignored, and when two would jointly do so the one whose actor has the lower key stands — or a member that cannot be unmade, the creator as a root owner, which D11 rejects. Leaning: the guard. (4) The same event twice at one point from two owners — two made-owners of B at 5 — the same transition, applied once. Concurrent add and remove of one member is case (1).
 - B11. Answered by D14: no operation deletes a cell for every member; a cell ends by its members leaving.
 - B12. A member removed while its devices were offline learns nothing of it. Honest devices refuse its sessions as for an unhosted store and hand it no removal event (cell stores spec), and once no member is left there is nobody even to refuse; either way its device shows a cell whose members seem offline, and it keeps writing entries nobody receives. Options: serve a removed member's device its own removal event before refusing — the cell's existence is no secret to it; or leave it to the application, which shows a cell unsynced for long as stale.
@@ -302,17 +299,13 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### C. Content
 
-- C1. Vocabulary: the platform's claim is mia-ontologies' graph (`g:SCGraph` — subject, claimant, template, triples); mia-ontologies' "claim" is a triple inside one. Fix the mapping in the glossary; decide whether the spec tree keeps "claim" for the graph.
-- C2 (**blocking**). Immutable claims and editable graphs: mia-ontologies' graphs are edited by their claimant — Bob updates his contact card. Either a claim is one version of a graph — a new claim per edit, with a head the app follows — or claims are immutable and graphs are mergeable-documents. If versions: history retained (the version in the key, append-only) or head only (one key, last-writer-wins among the claimant's own writes).
 - C3. Answered: a cell will carry a chat, and this change does not build it. A chat — an append-only stream of messages, each written by its author, read by every member — is expected not to sit on the store's reconciliation, which serves a set that converges, but on a sync shape of its own; it comes as a change of its own, and nothing here forecloses it.
 - C5. Answered by D17: a mergeable-document keeps its operations, an immutable-document is never edited. Open above the platform: which CRDT serves markdown and which the rich-text JSON tree, whether pdn-layer or the application runs the merge, and the operation encoding. To confirm: that a record never changes kind — a file does not become a merged text, and a payload that changes representation is a new record; and that a member replacing its own record gets a new id rather than reusing the old path, since a reused path would keep the id and make the replacement an update in all but name.
 - C6. Files: attachments as blobs; lazy payloads through the fork's download policy; size limits; a rename or move as a new key plus a tombstone.
 - C7. Answered by D24: a tombstone is the store's empty entry, admitted from the record's member or an owner as of the session; it kills the key — every author's content under it removed, blobs released at once, nothing inserted under it again — and stays as the set element reconciliation compares. Every replacement (D18) is a deletion first. The access pairs its tests hold, in one place each: a tombstone under a removed member's name — from an owner admitted and the record gone, beside the same from a plain member, from the removed member itself and from an outsider dropped; a tombstone under a current member's name — from that member and from an owner admitted, beside the same from a plain member dropped, the write ticket widening nothing (D20).
-- C8. The cell DataBook as a view: which fields are cell-level records — `title`, `origin`, `creator`, `shape`, rarely written, last-writer-wins acceptable — and which are derived at read time — `members`, `memberCount`. A single record written by every member loses additions under last-writer-wins.
-- C9. Identifiers inside shared content: `:Self` never enters the store — mia-ontologies keeps it local; members are named by `PdnId`; a non-member — a parent without the app, a pet, a doctor — needs a cell-scoped id every member agrees on, minted by whoever introduces it and mapped to local names on each device.
+- C8. The cell's name (D8): a cell-level entry outside every member's `by/<pdnid>/` prefix, written by owners — its key, the store it sits in, and how two owners' concurrent renames resolve.
 - C10. Record identity: derived from the cell id, the member under whose name the record sits and the path inside the cell without the trailing membership sequence (D21) — the form D18 assumes, a record replaced under another name being another id — or from the replica and the key as in data stores. It matters if a one-member cell is ever promoted from a personal namespace (D1').
 - C11. Signed claims: `PdnIdentityProof` on a claim by its issuer — KERI.
-- C12. The claimant field inside a graph's metadata is never trusted on its own; the author member comes from the key and the gate.
 
 ### D. Sync and scale
 
@@ -326,12 +319,9 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### E. Relation to what exists
 
-- E1 (**blocking** for the product, not for the platform). Connections: they stay, they become two-member cells — mia-ontologies models the relationship with one person as a bare two-member cell — or both coexist. A two-member cell and a connection differ: a copy into a common space versus a grant on one's own data.
-- E2. Grants, subset-rbsr and per-issuer namespaces are not used by a product that keeps everything in cells and shares by copying — mia-ontologies: "the app copies from the Dr. Jane Starostina cell". Kept for other consumers — the SDK — or not.
+- E1. Connections: they stay, they become two-member cells, or both coexist. A two-member cell and a connection differ: a copy into a common space versus a grant on one's own data.
+- E2. Grants, subset-rbsr and per-issuer namespaces go unused by a product that keeps everything in cells and shares by copying. Kept for other consumers — the SDK — or not.
 - E3. The cell as an audience of grants on personal namespaces — "share without copying" — if ever needed.
-- E4. Tree position: personal state — in the directory or in the identity's data namespace; `origin` as the filing hint on receipt.
-- E5. Answered by D8: one shared name, renamed by owners, and no per-member name on the platform. Open for the product: a bare two-member cell is shown under the other person's name in mia-ontologies — that label is the application's own, derived from membership, not a name the cell carries.
-- E6. Source of truth for the app: the record store, with the filesystem materialized from it, or the filesystem with a watcher.
 
 ### F. Security
 

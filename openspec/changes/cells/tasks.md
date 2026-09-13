@@ -1,17 +1,12 @@
 # Tasks: cells
 
-Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, records — claims, mergeable-documents and immutable-documents — as content. Nothing existing changes shape. Group 0 is the gate: the design's blocking open questions are answered and recorded before any implementation task starts.
-
-## 0. Decisions before implementation (design, Open Questions marked blocking)
-
-- [ ] 0.4 C2 — claims and graph versions: one claim per edit with a head, or graphs as mergeable-documents; history retained or head only
-- [ ] 0.7 Record the answers as design decisions D25 and following, and rewrite the affected scenarios in the specs before implementation starts
+Scope: the cell as a platform primitive — a keyless id, two stores per cell — the membership store and the record store — replicated whole among member devices, the membership store first, authorship-judged admission, membership with owners joined under a one-time secret, records — claims, mergeable-documents and immutable-documents — as content. Nothing existing changes shape.
 
 ## 1. Vocabulary and types
 
 - [ ] 1.1 `CellId` in `pdn-types`, 16 bytes, from a `define_byte_id_16!` beside the existing macro renamed `define_byte_id_32!`; its derivation per D25
-- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, and the owner role; the platform's record kinds mapped onto mia-ontologies' graph, note, files and DataBook (C1), linked from the specs' first use
-- [ ] 1.3 `pdn-layer`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — and the key layout of both stores per D21 (C2 may add a version segment under a claim)
+- [ ] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, and the owner role, linked from the specs' first use
+- [ ] 1.3 `pdn-layer`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — and the key layout of both stores per D21
 
 ## 2. data-layer: the cell's stores
 

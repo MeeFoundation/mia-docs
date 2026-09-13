@@ -2,7 +2,7 @@
 
 ## Why
 
-Sharing on PDN is pairwise: a connection between two identities, and per-claim grants over it, each claim staying in its issuer's namespace and reaching the audience through filtered reconciliation from the issuer's own devices. The product's data model ([mia-ontologies](https://github.com/MeeFoundation/mia-ontologies)) is built on **cells** — private collaboration spaces of 0..n members whose content stays alive for every member, with the relationship between two people modelled as a cell of two — and a group has nothing to stand on today: a newcomer cannot get in without pairing with every member, nobody relays an author's content while the author is offline, and there is no space several people write into. This change adds the cell as a platform primitive. It records the decisions the team has taken, so that the product's data model and the platform meet on one definition before either side builds on the other.
+Several people need one space they all write into: its content stays with every member whether or not its author is online, and a newcomer enters it on one member's invitation. This change adds that space as a platform primitive — the **cell**, a private space of 0..n members, the relationship between two people being a cell of two — and records the decisions the team has taken.
 
 ## What Changes
 
@@ -43,8 +43,8 @@ Sharing on PDN is pairwise: a connection between two identities, and per-claim g
 - **`crates/pdn-types`**: a `CellId` byte identifier.
 - **`crates/data-layer`**: the membership store and the record store as replica kinds beside the directory, the data store and the connection metadata store — creation, import from their tickets, forgetting, the session order between them; classification of member devices; the authorship policy in the ingest gate; swarm membership on import; contact derivation from member device records; a download policy for payloads.
 - **`crates/pdn-node`**: the cells service; the join dialogue on its own ALPN; the ownership surface; the directory kinds that carry a cell to a member's other devices; restart recovery of hosted cells; the join and removal paths under the flaky-test discipline.
-- **`crates/pdn-layer`**: the vocabulary — the record and its three kinds, claim, mergeable-document and immutable-document, their envelope, the mapping onto mia-ontologies' graphs and cell DataBooks.
+- **`crates/pdn-layer`**: the vocabulary — the record and its three kinds, claim, mergeable-document and immutable-document and their envelope.
 - **`crates/pdn-store`**: one change — deletion kills a key: an admitted empty entry removes every author's content under its prefix and releases the blobs at once, and a dead prefix admits no content again (D24); the swarm, the content-free topic and the ingest hook are used as they are. The linear-scan range fingerprint (`get_fingerprint` in `store/fs.rs`) is a cost the record store makes visible; it is among the open questions, not in this change.
-- **Specs**: a glossary entry `architecture/language/cell.md`; the three record kinds reconciled with mia-ontologies' graph, note, files and DataBook; a sweep of specs that describe connections as the only sharing path.
+- **Specs**: a glossary entry `architecture/language/cell.md`; a sweep of specs that describe connections as the only sharing path.
 - **Depends on**: ADR-0011 and ADR-0012 for the shape of the join dialogue; multi-identity hosting; the classifier's device resolution. Nothing pending.
 
