@@ -49,5 +49,5 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 
 ## 5. Docs and archive
 
-- [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and multi-identity's "later groups and organizations", and point them at cells
+- [ ] 5.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
 - [ ] 5.2 On archive: place the two new specs and the three deltas at their destinations; `openspec validate --all --strict`

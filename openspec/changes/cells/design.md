@@ -35,7 +35,7 @@ The cell id is a 16-byte identifier derived at creation from the creator's annou
 
 - The cell as an identity with its own key set — a multi-signature autonomic identifier.
   - **Pros:** a totally ordered membership log.
-  - **Cons:** a group key to manage; a rotation on every membership change; a second identity kind in the KERI roadmap. A group that speaks in its own name is the organizations question, not the cell's.
+  - **Cons:** a group key to manage; a rotation on every membership change; a second identity kind in the KERI roadmap.
 
 ### D2. No connections "each with each"
 
@@ -294,7 +294,6 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### B. Membership
 
-- B6. Organizations as members: an identity hosted on an organization's node — anything the platform treats differently.
 - B7. Proof at join: the newcomer's `PdnId` is the inviter's word. KERI's proof step — challenge-response, exchange of key event logs — is the same slot as in pairing and linking.
 - B8. A cell with 0 members: representable at all — a store nobody holds — or is the minimum 1.
 - B9. Whether joining requires a claim by the newcomer about itself, as mia-ontologies' `c:members` baseline does (one graph per member), or that is the app's business.
@@ -328,7 +327,7 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 ### E. Relation to what exists
 
 - E1 (**blocking** for the product, not for the platform). Connections: they stay, they become two-member cells — mia-ontologies models the relationship with one person as a bare two-member cell — or both coexist. A two-member cell and a connection differ: a copy into a common space versus a grant on one's own data.
-- E2. Grants, subset-rbsr and per-issuer namespaces are not used by a product that keeps everything in cells and shares by copying — mia-ontologies: "the app copies from the Dr. Jane Starostina cell". Kept for other consumers — organization nodes, the SDK — or not.
+- E2. Grants, subset-rbsr and per-issuer namespaces are not used by a product that keeps everything in cells and shares by copying — mia-ontologies: "the app copies from the Dr. Jane Starostina cell". Kept for other consumers — the SDK — or not.
 - E3. The cell as an audience of grants on personal namespaces — "share without copying" — if ever needed.
 - E4. Tree position: personal state — in the directory or in the identity's data namespace; `origin` as the filing hint on receipt.
 - E5. Answered by D8: one shared name, renamed by owners, and no per-member name on the platform. Open for the product: a bare two-member cell is shown under the other person's name in mia-ontologies — that label is the application's own, derived from membership, not a name the cell carries.
