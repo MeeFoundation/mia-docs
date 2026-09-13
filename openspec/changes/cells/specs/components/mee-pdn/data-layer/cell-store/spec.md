@@ -1,6 +1,6 @@
 # data-layer: cell stores
 
-A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material. It lives in two dedicated pdn-store replicas, both held whole by every device of every member: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
+A cell is a space shared by 0..n members — identities, of persons or organizations — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store replicas, both held whole by every device of every member: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
 
 The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, the actor's own sequence at the time of acting (`actor_seq`) and the position in the subject's chain (`subject_seq`) sit in the key (cells D21, D23).
 
@@ -8,7 +8,9 @@ The membership store is two shapes: what a device writes — an act — and what
 /// One entry a device writes into the membership store.
 enum MembershipAct {
     /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; the root.
-    Found       { announcement_key: PublicKey },
+    /// cell id = blake3::derive_key("pdn/cell-id/v1", subject ‖ announcement_key ‖ nonce)[..16];
+    /// `signature` by the announcement key over "pdn/cell-founding/v1" ‖ subject ‖ announcement_key ‖ nonce.
+    Found       { nonce: [u8; 16], announcement_key: PublicKey, signature: Signature },
     /// Records a newcomer's join after its one-time secret was verified and burned. Any member.
     Join        { subject: PdnId, subject_seq: Seq, actor_seq: Seq, announcement_key: PublicKey, subject_signature: Signature },
     /// The member itself; subject = actor.
@@ -20,12 +22,13 @@ enum MembershipAct {
     /// An owner.
     UnmakeOwner { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
     /// The member's devices, one entry per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
+    /// `signature` by the announcement key over "pdn/cell-devices/v1" ‖ version ‖ devices.
     AnnounceDevices { version: u64, devices: Vec<AuthorId>, signature: Signature },
 }
 
 /// A member's chain: `member/<pdnid>/<seq>/<kind>/<aseq>`, walked in `seq` order. `by` is the actor, `by_seq` the actor's own sequence then.
 enum MembershipEvent {
-    Founded     { seq: Seq, announcement_key: PublicKey },                          // by the member itself; the creator's seq 1 only
+    Founded     { seq: Seq, nonce: [u8; 16], announcement_key: PublicKey },         // by the member itself; the creator's seq 1 only
     Joined      { seq: Seq, by: PdnId, by_seq: Seq, announcement_key: PublicKey },  // by any member
     Left        { seq: Seq, by_seq: Seq },                                          // by the member itself
     Removed     { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner
@@ -38,7 +41,8 @@ enum MembershipEvent {
 struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<AuthorId> }
 
 /// The gate's check of one event, from the write admission alone:
-///   Founded            → subject is the creator and seq == 1
+///   Founded            → seq == 1, derive_key("pdn/cell-id/v1", subject ‖ announcement_key ‖ nonce)[..16] == cell id,
+///                        signature over "pdn/cell-founding/v1" ‖ subject ‖ announcement_key ‖ nonce verifies under announcement_key
 ///   Joined             → state(by, by_seq).member
 ///   Left               → by == subject
 ///   Removed | MadeOwner | UnmadeOwner → state(by, by_seq).owner
@@ -68,7 +72,12 @@ A cell SHALL be served by exactly two pdn-store replicas — its membership stor
 
 ### Requirement: The cell id carries no key material
 
-A cell SHALL be identified by a 32-byte cell id minted at creation. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
+A cell SHALL be identified by a 16-byte cell id derived at creation: the first 16 bytes of BLAKE3 in key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key and a 16-byte random nonce; the three are carried in the founding event with a signature by the announcement key over the prefix `pdn/cell-founding/v1` followed by the three. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
+
+#### Scenario: The cell id is derived from the founding event
+
+- **WHEN** an identity creates a cell
+- **THEN** the first 16 bytes of BLAKE3 under the context `pdn/cell-id/v1` over the founding event's `PdnId`, announcement key and nonce equal the cell id, and the event's signature over `pdn/cell-founding/v1` followed by those fields verifies under that announcement key
 
 #### Scenario: The cell id is not a namespace id
 
@@ -134,7 +143,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, removed, made-owner, unmade-owner — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting, and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there, a removed, made-owner or unmade-owner event when the actor was an owner there, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — needs nothing and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once the chain arrives, or dropped and offered again by the next session. Every entry SHALL be written once: an entry under a subject sequence the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, made-owner an owner, unmade-owner a plain member, leave and removal no member, a later join a plain member again.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, removed, made-owner, unmade-owner — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting, and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there, a removed, made-owner or unmade-owner event when the actor was an owner there, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once the chain arrives, or dropped and offered again by the next session. Every entry SHALL be written once: an entry under a subject sequence the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, made-owner an owner, unmade-owner a plain member, leave and removal no member, a later join a plain member again.
 
 #### Scenario: A role flip resolves by sequence whatever the arrival order
 
@@ -171,10 +180,15 @@ The membership store SHALL hold, per member, one sequence of membership events u
 - **WHEN** a device of member D produces a left event in B's chain
 - **THEN** no member device persists it and B is still listed as a member
 
-#### Scenario: There is one founding event
+#### Scenario: A founding event that does not derive the cell id is dropped
 
-- **WHEN** a device of owner C produces a founded event in C's own chain, or a second one in the creator's
+- **WHEN** a device of owner C produces a founded event in C's own chain, or one in the creator's chain under another announcement key or nonce
 - **THEN** no member device persists it and the owners are listed unchanged
+
+#### Scenario: A device holding nothing refuses an invented founder whatever arrives first
+
+- **WHEN** a device freshly linked into member D, holding the cell id from D's directory and no membership store, sessions first with a modified device of member B that serves a founded event in B's chain and withholds the creator's, and then with a device of member C
+- **THEN** the linked device persists no event of B's invented chain, and after the session with C lists the members and owners C's device lists
 
 #### Scenario: A made-owner event for no member changes nothing
 
@@ -371,7 +385,7 @@ A tombstone SHALL be the store's empty entry at a record's key without its trail
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement SHALL be admitted by the signature embedded in it, verified against the announcement key the member's join record carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
+A member's device-list statement SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join record, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
 
 #### Scenario: A new device registers itself
 

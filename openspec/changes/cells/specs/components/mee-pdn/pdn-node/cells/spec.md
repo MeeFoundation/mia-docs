@@ -58,7 +58,7 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 
 ### Requirement: The cells service creates a cell for a hosted identity
 
-The cells service SHALL create a cell for a hosted identity: it mints the cell id, creates the membership store and the record store, records the creating identity as the first member, and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 #### Scenario: A created cell is listed with its creator as member
 

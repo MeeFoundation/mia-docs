@@ -29,7 +29,7 @@ This design records the decisions taken for the platform side of cells and the q
 
 ### D1. A cell has no key pair — only an identifier
 
-The cell id is a 32-byte identifier minted at creation, in the same byte-id family as `PdnId`. A cell signs nothing: no grant is issued by a cell, no claim is issued by a cell, and no dialogue proves "this is cell X". Every act inside a cell is a member's act — signed by that member's device author key, and, with KERI, by the member's identity. Consequence: there is nothing to steal and nothing to rotate — a cell's security is its members' security — and the KERI roadmap needs no group identifier and no multi-signature key set built from members' keys.
+The cell id is a 16-byte identifier derived at creation from the creator's announcement key and a random nonce (D25). A cell signs nothing: no grant is issued by a cell, no claim is issued by a cell, and no dialogue proves "this is cell X". Every act inside a cell is a member's act — signed by that member's device author key, and, with KERI, by the member's identity. Consequence: there is nothing to steal and nothing to rotate — a cell's security is its members' security — and the KERI roadmap needs no group identifier and no multi-signature key set built from members' keys.
 
 **Rejected alternatives:**
 
@@ -135,7 +135,7 @@ A record's authorship is cryptographic — the author signature on its entries �
 
 ### D16. A member's devices are announced by the member itself, under its announcement key
 
-Each identity holds a device-announcement key pair. The secret lives in its private metadata store and reaches every new device at linking, beside the store tickets. The cell holds two things about a member's devices: a join-time record binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter, its root the inviter's word exactly as B7 states — and the member's device-list statements: the member's devices with their author keys, a version counter inside the signed bytes, the whole statement signed by the announcement key.
+Each identity holds a device-announcement key pair. The secret lives in its private metadata store and reaches every new device at linking, beside the store tickets. The cell holds two things about a member's devices: a join-time record binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter, its root the inviter's word exactly as B7 states, and for the creator the founding event (D25) — and the member's device-list statements: the member's devices with their author keys, a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
 
 A statement is self-contained proof, so who writes it into the store does not matter: the gate judges an entry in the membership device area by the embedded signature against the announcement key from the join record, never by the entry's author. A freshly linked device therefore registers itself — it holds the write ticket and the announcement secret, writes the newest statement into its local replica of every cell the identity is a member of, and ordinary sync spreads it through the identity's own devices and through any member, with no waiting on anyone being online. Before syncing a cell replica, each of the identity's devices compares the replica's newest statement version against the private metadata store's and writes the newer one in — the sweep that heals an interrupted fan-out, a cell joined after a linking, and a device linked before the join.
 
@@ -210,7 +210,7 @@ The reference proves that the entry is after the named event, not that it is bef
 
 ### D23. A membership event names its actor's sequence, and the store verifies from the founding event
 
-Every membership event names, in its key (D21), the sequence of its actor's own events at the time of acting, and is judged against the actor's chain folded up to that point: a joined event needs the actor a member there, a removed, made-owner or unmade-owner event an owner, a left event the subject itself; the founding event — the creator's first, self-authored, making the creator a member and an owner at once (D11) — needs nothing and is the root every verification ends at. The verdict is a function of the event set alone, so every device reaches the same membership from the same events whatever order they arrived in, and a device holding nothing — a newcomer's, a freshly linked one — verifies the whole store from the founding event in its first session. Within a session the gate re-judges an event it had to defer once the events it depends on are admitted, so a session that brings a dependency brings what depends on it; what a session cannot resolve is offered again by the next (D19). The date in an entry is written by its author and shown to people; the gate never reads it, now or later — order is the sequence, and an anchored log (C11) proves order, not dates.
+Every membership event names, in its key (D21), the sequence of its actor's own events at the time of acting, and is judged against the actor's chain folded up to that point: a joined event needs the actor a member there, a removed, made-owner or unmade-owner event an owner, a left event the subject itself; the founding event — the creator's first, self-authored, making the creator a member and an owner at once (D11) — needs only to derive the cell id (D25) and is the root every verification ends at. The verdict is a function of the event set and the cell id alone, so every device reaches the same membership from the same events whatever order they arrived in, and a device holding nothing — a newcomer's, a freshly linked one — verifies the whole store from the founding event in its first session. Within a session the gate re-judges an event it had to defer once the events it depends on are admitted, so a session that brings a dependency brings what depends on it; what a session cannot resolve is offered again by the next (D19). The date in an entry is written by its author and shown to people; the gate never reads it, now or later — order is the sequence, and an anchored log (C11) proves order, not dates.
 
 What the reference proves is, as for records (D22), that the event is after the actor's named point, not before the point at which the actor lost its membership: the retrograde direction stays open until the KERI roadmap gives each actor a hash-linked log that commits to its own acts (F7, F8).
 
@@ -230,6 +230,27 @@ A tombstone is the store's empty entry at a record's key without its trailing se
 - A signed deletion record with a key of its own, judged at its actor's point (D22).
   - **Pros:** gives a deletion a membership reference.
   - **Cons:** a deletion is a repair act judged when it lands; the empty entry is what reconciliation already carries.
+
+### D25. The cell id is derived from its creator's announcement key and a random nonce
+
+At creation the creator's device draws a 16-byte random nonce and derives the cell id as the first 16 bytes of BLAKE3 in its key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key (D16) and the nonce — BLAKE3 being the hash iroh and pdn-store already use, and the context keeping this derivation apart from any other hash of the same bytes. The founding event carries those three fields and a signature by the announcement secret over the prefix `pdn/cell-founding/v1` followed by the three, the prefix keeping it apart from the device-list statements the same key signs (D16). A device holding the cell id — from its identity's directory, an invite or a link in a note — admits a founding event only when its three fields derive that id and its signature verifies under the key it names, and drops every other founding event whatever order it arrives in; a device holding nothing checks the root of the membership store against the id it already holds (D23). A newcomer learns the id from its inviter, as it learns everything else at join (B7). Without the founding event, which only member devices hold, the id reveals nothing of its creator. The id is 16 bytes, the size of a UUID, and the byte-id type in pdn-types is defined to that size. The id travels in notes to other cells' members, so it never equals either store's namespace id, the read capability (Invariant 3). With KERI the creator's autonomic identifier takes the announcement key's place in the derivation (C11).
+
+**Rejected alternatives:**
+
+- A random cell id, such as a UUID v4.
+  - **Pros:** embeds nothing; the form mia-ontologies asks for.
+  - **Cons:** a device holding nothing takes the root from whoever serves its first session — a member's freshly linked device that catches up first from a modified member device is handed an invented founder, drops the real founding event as a second one on arrival, and stays in the invented cell for good, deleting records on the invented owner's tombstones (D24).
+- A random cell id beside a founding event signed by the creator.
+  - **Cons:** anyone signs a founding event naming the same id under their own key, and the id names no key to tell the two apart.
+- The creator's key and the nonce as the id, unhashed.
+  - **Cons:** every link names the creator; three times the size.
+- The creator's signature over the nonce as the id.
+  - **Cons:** rests on a property the signature scheme does not promise — that no other key verifies the same signature over some message; 64 bytes.
+- The hash of the whole founding event.
+  - **Cons:** how every id is derived follows the founding event's encoding, so a change of its format changes the derivation.
+- The full hash, uncut.
+  - **Pros:** a creator cannot prepare two founding events under one id.
+  - **Cons:** substitution by another member is out of reach at 16 bytes already; the creator sits inside the trust boundary (F1).
 
 ## Risks / Trade-offs
 
@@ -256,11 +277,6 @@ Additive: no existing store, ticket, grant or record changes shape, and a runtim
 ## Open Questions
 
 Grouped; each names its options and, where the team leans somewhere, the leaning — none is decided; a question answered since its posing says so and points at the decision. The ones marked **blocking** are answered before implementation starts (tasks 0.x).
-
-### A. The cell id
-
-- A1 (**blocking**). Form: 32 random bytes, as `PdnId` is minted today, or the hash of a founding record — self-addressing, still keyless — that names the founder and the first members. mia-ontologies asks for a random UUID v4 with no embedded metadata; a hash embeds nothing either, but gives membership a root. Leaning: random, on the app's own reasoning; the founding event (D23) is the founding record if the hash form is chosen.
-- A2. Size and form at the boundary: the app links cells by id inside notes (`[[<id>|text]]`) and expects a UUID; the platform id is 32 bytes. Who converts. And the id is public-safe — it travels in notes to other cells' members — so it is never the replica's namespace id, which is the read capability (Invariant 3).
 
 ### B. Membership
 
