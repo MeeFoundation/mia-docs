@@ -272,7 +272,7 @@ Until KERI's anchored log carries the retrograde direction (cells D29), the gate
 - **WHEN** in one session a device of A receives B's device statement before the join event carrying B's announcement key
 - **THEN** the statement is dropped in that session and admitted in the next
 
-#### Scenario: A dependency whose authoring device died is never resolved until re-issued (G1)
+#### Scenario: A dependency whose authoring device died is never resolved until re-issued (D23)
 
 - **WHEN** A's sequence 3 — the event that made A an owner — reached only A's device before B's device, which authored it, died; A's device then made C an owner naming A's sequence 3, spread that event to a device of D, and died too, so no live device holds A's sequence 3
 - **THEN** every device defers C's made-owner event indefinitely and lists it as waiting on A's sequence 3, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds

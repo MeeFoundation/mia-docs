@@ -28,7 +28,7 @@ The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with t
 
 ### Requirement: The directory routes; grants live in connection metadata stores
 
-The directory carries the identity's own device-internal state — its device set, its connections records, its announcement key pair, and the tickets to its own stores, to its connections' metadata pairs and to the stores of the cells it is a member of. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](../connection-metadata-store/spec.md), where the granting side can withdraw them, so no copy in a directory outlives the grant.
+The directory carries the identity's own device-internal state — its device set, its connections records, its cell records, its announcement key pair, and the tickets to its own stores, to its connections' metadata pairs and to the stores of the cells it is a member of. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](../connection-metadata-store/spec.md), where the granting side can withdraw them, so no copy in a directory outlives the grant.
 
 #### Scenario: No counterparty data ticket in the directory
 
@@ -50,3 +50,17 @@ An identity's device-announcement key pair (cells D16) SHALL be minted when the 
 
 - **WHEN** a node hosts identities A and B
 - **THEN** each directory holds its own announcement key pair and the two differ; denied: a device of B only, requesting a session for A's directory, obtains no session and no entry of it
+
+### Requirement: One entry per cell, cell id in the key
+
+A cell the identity is a member of SHALL be recorded by a directory entry at path `cells/<cell-id-hex>` (32 lowercase hex chars of the cell id), written when the identity creates or joins the cell; leaving the cell SHALL write a pdn-store tombstone at that path. A cell SHALL count as held if and only if the latest entry at its path across all authors has non-zero length, so a later join after a leave holds it again; the payload is opaque, and listing the held cells SHALL read records alone, before any payload arrives.
+
+#### Scenario: A created cell is recorded on the identity's other devices
+
+- **WHEN** the identity creates a cell on the phone and the laptop's directory replica syncs
+- **THEN** the laptop lists the cell among the held cells, without waiting on payload content
+
+#### Scenario: A leave ends holding on every device
+
+- **WHEN** the identity leaves a cell on the phone, while the cell was held on the laptop too, and the laptop's directory replica syncs
+- **THEN** the laptop no longer lists the cell as held
