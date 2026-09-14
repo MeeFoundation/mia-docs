@@ -64,15 +64,19 @@ The order of the acts follows from the cast rather than from convenience. The ph
 
 Two things about the processes are stated in the narration rather than hidden. A machine does not read a code off a screen, so its payload is carried by hand. And the HTTP host spawns the runtime with the default cadence and offers no way to change it, so the acts running through it are the slow ones; making that host's interval configurable is a change of its own if rehearsal shows the slowness is intolerable.
 
-### D7a. One phone means both directions of granting
+### D7a. Both directions of granting are watched, each on a screen
 
-With one screen in the staging, a single granting direction would show either the issuer's acts or the grantee's and hide the other behind a terminal. So both are shown over the one connection: Alice grants Bob, which puts choosing a claim, publishing, withdrawing and granting again on her phone; Bob grants Alice, which puts a claim arriving, a writable claim accepting an edit, a read-only claim refusing one, and a withdrawn claim reading as no longer shared on the same phone.
+Bob's issuer acts still run through the run-through's script against the debug surface, the same surface a browser reads — no person taps them into his node. What changed is what the audience watches: a browser page pointed at Bob's node runs the same screens the phone runs and shows the script's effect there, so granting is watched on a screen rather than read off the script's terminal output. Both directions are therefore watched each on the screen of its issuer: Alice grants Bob by tapping through her phone; what the script does when Bob grants Alice — choosing a claim, publishing, withdrawing, granting again — is watched on the browser screen driving his node. What each grantee obtains — a claim arriving, a writable claim accepting an edit, a read-only claim refusing one, a withdrawn claim reading as no longer shared — is read on the other party's own screen in turn.
 
-The alternative was to narrate a terminal as though it were a grantee's screen, which is the substitution the demonstration's own form rules out. What a counterparty node does is read from a terminal as the counterparty's behaviour, and never as what a person would see.
+The phone remains the only node a person taps acts into by hand; the browser gives every other node's state a screen the audience watches, so what the script did is seen there rather than narrated from a terminal.
+
+### D7b. A grant reaches every device of the identity it names, not the device that first read it
+
+The connection Bob makes already reaches Alice's laptop node on its own (D7); a grant is worth showing the same way, because a grant gates access rather than merely recording who is connected, and the gate must be shown open for the identity as a whole. Act 7 shows Alice's laptop reading claims Bob granted her phone, and reading a later change Bob makes to one of them, with no act performed on the laptop and no phone involved at all.
 
 ### D8. The demonstration's logistics live in a run-through document, not in the spec tree
 
-The product-shaped properties are requirements: identities kept apart, a code that burns, claims absent rather than hidden, a read-only claim refusing a write, a second device standing in, a withdrawal closing access and a re-grant reopening it, an outsider obtaining nothing. How the room is arranged is not. A requirement reading "rehearsed twice, with a camera over the table as the fallback" would archive into the permanent component tree, be stale the following week, and be indistinguishable there from product behaviour.
+The product-shaped properties are requirements: identities kept apart, a code that burns, claims absent rather than hidden, a read-only claim refusing a write, a grant reaching every device of the identity it names, a second device standing in, a withdrawal closing access and a re-grant reopening it, an outsider obtaining nothing. How the room is arranged is not. A requirement reading "rehearsed twice, with a camera over the table as the fallback" would archive into the permanent component tree, be stale the following week, and be indistinguishable there from product behaviour.
 
 ### D9. The withdrawal act is narrated as closing delivery, not as deletion
 

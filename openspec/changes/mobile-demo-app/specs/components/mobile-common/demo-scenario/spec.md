@@ -6,7 +6,7 @@ The demonstration follows one person, Alice, across 2 devices of one identity, a
 
 The audience decides whether this is worth building. That fixes two things about the form. Nothing is shown that a person cannot see happening. And nothing is claimed that the code does not do, because a demonstration that oversells is discovered later by the same audience.
 
-One phone is a limit of this staging, and it is stated rather than worked around. Alice's phone is the only node with a screen; Bob's node and the outsider's are processes driven from a terminal. Terminal output is the counterparty's behaviour and never a stand-in for what a person would see, so every act whose subject is what a person sees is performed on the phone, and both directions of granting are shown for that reason.
+One physical phone is a limit of this staging, and it is stated rather than worked around. Alice's phone is the only node a person taps acts into by hand; Bob's node, Alice's own laptop node, and the outsider's are processes on the presenter's machine, each acted on by the run-through's script against its debug surface and watched through a browser page pointed at the same surface, running the same screens the phone runs. Every act whose subject is what a person sees is therefore watched on a screen — the phone or that browser page — and never narrated from a terminal instead; both directions of granting are watched for that reason, each on the screen of the identity doing the granting.
 
 ## ADDED Requirements
 
@@ -49,7 +49,7 @@ A node that is not a phone is driven over the runtime's own debug surface, which
 
 #### Scenario: Nothing in the staging bypasses the product
 - **WHEN** the whole demonstration is run end to end
-- **THEN** every act corresponds to an exported call of the host surface or to the same runtime call on a node driven from a terminal, and no act reaches a store, a ticket, or a reconciliation directly
+- **THEN** every act corresponds to an exported call of the host surface or to the same runtime call on a node driven from a terminal or from a browser page pointed at its debug surface, and no act reaches a store, a ticket, or a reconciliation directly
 
 #### Scenario: No act is preceded by a reset
 - **WHEN** the acts are performed in order
@@ -113,14 +113,23 @@ The same code SHALL then be presented a second time and be refused, with no seco
 - **WHEN** the ceremony completes on the phone
 - **THEN** Alice's laptop node lists Bob among that identity's connections, with no act performed on it
 
-### Requirement: Both directions of granting are shown over the one connection
-The demonstration SHALL show Alice granting Bob a claim and Bob granting Alice claims of his own, over the same connection.
+### Requirement: Both directions of granting are watched, each on the screen of its issuer
+The demonstration SHALL show Alice granting Bob a claim and Bob granting Alice claims of his own, over the same connection, each watched on the screen of the identity doing the granting.
 
-The 2 directions carry different halves of the subject, and one phone cannot show both from one side. With Alice as the issuer, what the audience sees on her phone is choosing a claim, publishing the grant, withdrawing it and granting it again, while what Bob obtains is read on his node. With Bob as the issuer, what the audience sees on Alice's phone is a granted claim arriving, a writable claim accepting an edit, a read-only claim refusing one, and a withdrawn claim leaving the screen as no longer shared rather than as a fault.
+The 2 directions carry different halves of the subject. With Alice as the issuer, what the audience sees on her phone is choosing a claim, publishing the grant, withdrawing it and granting it again, and what Bob obtains as grantee is read on the browser screen driving his node. With Bob as the issuer, the run-through's script performs the same 4 acts against his node's debug surface, and their effect is watched on that browser screen rather than read off the script's terminal output; what Alice obtains as grantee — a granted claim arriving, a writable claim accepting an edit, a read-only claim refusing one, and a withdrawn claim leaving the screen as no longer shared rather than as a fault — is shown on her phone.
 
-#### Scenario: Each direction is shown where its screen is
+#### Scenario: Each direction is watched where its screen is
 - **WHEN** the granting acts are performed
-- **THEN** the acts of an issuer are performed on Alice's phone and the acts of a grantee with a screen are shown on Alice's phone, and no act whose subject is what a person sees is performed on a node driven from a terminal
+- **THEN** the acts of an issuer are watched on that identity's own screen — Alice's phone, tapped by a person, or the browser screen driving Bob's node, showing what his script did — and the acts of its grantee are shown on the other party's own screen, and no act whose subject is what a person sees is narrated from a terminal instead
+
+### Requirement: A grant reaches every device of the identity it names
+Bob's grant is read first on whichever of Alice's devices happens to check first — her phone, in the demonstration's order. The demonstration SHALL show Alice's laptop node, which read no part of that grant before, reading the same claims afterwards, and reading a later change Bob makes to one of them, with no act performed on the laptop.
+
+The property is the one act 3 already showed for a connection, now shown for what a grant carries: an identity holds the grant, not the device that first read it, so every device of that identity reads what was granted to it.
+
+#### Scenario: A device that read no part of the grant reads it anyway
+- **WHEN** Alice's laptop node reads the claims Bob granted her identity, having taken no part in reading that grant before
+- **THEN** it reads exactly those claims, and a later change Bob makes to one of them arrives there with no act performed on it
 
 ### Requirement: A grant names claims, and the rest is absent rather than hidden
 The demonstration SHALL show a grant naming particular claims of the granting identity's data, after which the grantee reads exactly those claims. The granting identity SHALL hold further claims at the time of the grant, so that what is withheld is real.
@@ -175,16 +184,16 @@ The demonstration SHALL also show the grant given again, over the same claim, an
 ### Requirement: The operating conditions the demonstration covers are named, and so are the rest
 The demonstration SHALL state which of the platform's operating conditions it exercises and which it does not ([operating-conditions](../../../code-practices/operating-conditions.md)).
 
-Exercised: several identities on one node; one identity across 2 devices; a device joining an identity that already holds entries and before any connection exists; a connection established on one device reaching the other; a device leaving while a peer still needs its data; a capability granted, withdrawn, and granted again over the same claim.
+Exercised: several identities on one node; one identity across 2 devices; a device joining an identity that already holds entries and before any connection exists; a connection established on one device reaching the other; a grant reaching a device other than the one that first read it; a device leaving while a peer still needs its data; a capability granted, withdrawn, and granted again over the same claim.
 
-Not exercised, and named as such: a device that restarts and returns with its state, which the runtime does and no act here provokes; a disk that fills, which the runtime reports rather than swallows and no act here fills; a connection that degrades rather than ends; a capability narrowed and widened rather than closed and reopened; a process killed for memory, which a phone does and a container never did; a device joining an identity after a connection already exists, and one joining while a ceremony is in flight — the linking condition names 3 arrivals and the staging puts the earliest of them on stage; a withdrawal performed on a device other than the one that published the grant; and every act of a counterparty as it appears on a phone, since Bob and the outsider are nodes without screens.
+Not exercised, and named as such: a device that restarts and returns with its state, which the runtime does and no act here provokes; a disk that fills, which the runtime reports rather than swallows and no act here fills; a connection that degrades rather than ends; a capability narrowed and widened rather than closed and reopened; a process killed for memory, which a phone does and a container never did; a device joining an identity after a connection already exists, and one joining while a ceremony is in flight — the linking condition names 3 arrivals and the staging puts the earliest of them on stage; a withdrawal performed on a device other than the one that published the grant; and every act of a counterparty as the mobile application would show it, since Bob and the outsider run `pdn-node-http` processes rather than that application, watched through a browser's version of the same screens.
 
 #### Scenario: The uncovered conditions are named rather than implied
 - **WHEN** the demonstration is delivered
 - **THEN** the conditions it does not cover are stated, and no act implies coverage of one of them
 
 ### Requirement: The narration states what is not shown
-The demonstration SHALL state, rather than leave to inference: that what the screens show lives in this device's storage, which holds the only copy of it; that an identity carries no key material, so nothing here proves who a peer is; that the reconcile cadence is a configured number rather than a property of the network; which nodes in the staging are not phones, and that their side of every act is a terminal rather than a screen; and that withdrawing a grant closes further delivery without recalling what was already delivered.
+The demonstration SHALL state, rather than leave to inference: that what the screens show lives in this device's storage, which holds the only copy of it; that an identity carries no key material, so nothing here proves who a peer is; that the reconcile cadence is a configured number rather than a property of the network; which nodes in the staging are not phones, and that their side of every act runs through the run-through's script rather than a person's tap, watched on a browser's screen rather than the mobile application's; and that withdrawing a grant closes further delivery without recalling what was already delivered.
 
 A demonstration silent on these invites the opposite assumption on each, and the assumption is what the audience carries away. The last is the one the demonstration would otherwise oversell hardest: a field vanishing from a phone looks like deletion, and the platform promises that access is gated before delivery rather than that delivered data can be retracted ([invariants](../../mee-pdn/invariants.md), Invariant 2).
 
@@ -203,6 +212,8 @@ This is the tightest denial of the claim the demonstration is delivered to make,
 
 The second read negative that rule names — a party holding the replica's ticket but no capability — cannot be staged here at all, because no ticket crosses the host surface and the application offers no way to hold one. It stays with the runtime's own scenarios, which hold it against a hand-made ticket, and it is named here as deliberately out of scope rather than left unmentioned.
 
+The refusal SHALL be shown on the browser screen driving the outsider's node, not narrated from a terminal, so the audience sees the denial on a screen rather than reads it off text.
+
 #### Scenario: An unconnected node obtains nothing
 - **WHEN** a node with no connection to Alice attempts to read or list her data, while Bob demonstrably reads the granted claim
-- **THEN** it obtains nothing and is refused as addressing an issuer it holds nothing of, and Bob's reading is shown in the same place so the contrast is visible
+- **THEN** it obtains nothing and is refused as addressing an issuer it holds nothing of, shown on the browser screen driving that node, and Bob's reading is shown the same way on his own screen so the contrast is visible
