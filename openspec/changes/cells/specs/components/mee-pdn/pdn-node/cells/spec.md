@@ -206,7 +206,7 @@ Renaming a cell SHALL be available only to an owner's device, and the new name S
 
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 #### Scenario: An owner removes a member
 
@@ -284,9 +284,14 @@ The cells service SHALL place a record as one of three kinds — claim, mergeabl
 
 ### Requirement: Hosted cells survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process.
+A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process. The hosted cells SHALL be re-derived from each hosted identity's directory, as its connections are: every cell whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the cell's published tickets. The runtime's record of hosted identities SHALL name no cell.
 
 #### Scenario: A cell is hosted again after a restart
 
 - **WHEN** a runtime on a storage directory hosts a member of a cell, stops, and starts again on the same directory, while another member wrote an entry in between
 - **THEN** the identity lists the cell, and the entry written meanwhile arrives
+
+#### Scenario: A cell left before the restart stays left
+
+- **WHEN** a runtime on a storage directory hosts a member of a cell, the member leaves the cell, and the runtime stops and starts again on the same directory
+- **THEN** the identity lists no such cell, and neither store is opened or served

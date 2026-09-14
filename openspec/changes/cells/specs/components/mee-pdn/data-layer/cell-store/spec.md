@@ -235,24 +235,24 @@ The membership store SHALL hold, per member, one sequence of membership events u
 
 ### Requirement: Verdicts hold their limits without an anchored log
 
-Until an anchored log carries the retrograde direction (cells F7, F8), the gate SHALL judge by the point an entry names and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the open question that closes it and expected to flip when it does, or after the decision that keeps it.
+Until KERI's anchored log carries the retrograde direction (cells D29), the gate SHALL judge by the point an entry names and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the decision that accepts or keeps it, those under cells D29 expected to flip when KERI lands.
 
-#### Scenario: A demoted owner's act under its old point is admitted (F7)
+#### Scenario: A demoted owner's act under its old point is admitted (D29)
 
 - **WHEN** owner A was unmade at A's sequence 4, and a device of plain member E relays a made-owner event for A itself, authored by A's device after the demotion and naming A's sequence 3
 - **THEN** every member device persists it and lists A as an owner again
 
-#### Scenario: A removed owner rejoins and re-promotes itself through a relaying member (F7)
+#### Scenario: A removed owner rejoins and re-promotes itself through a relaying member (D29)
 
 - **WHEN** A, an owner at A's sequence 3, was removed at A's sequence 5, and a device of plain member E relays a joined event for A at A's sequence 6 and a made-owner event for A at A's sequence 7, both authored by A's device and naming A's sequence 3
 - **THEN** every member device lists A as an owner — a plain member and a former owner together did what the rules reserve to an owner
 
-#### Scenario: A departed member's new record under its old sequence is admitted (F7)
+#### Scenario: A departed member's new record under its old sequence is admitted (D29)
 
 - **WHEN** C was removed at C's sequence 2, and a device of member D relays an operation C's device authored after the removal, naming C's sequence 1
 - **THEN** every member device persists it
 
-#### Scenario: A rewrite that reaches a device first stays there (F8)
+#### Scenario: A rewrite that reaches a device first stays there (D29)
 
 - **WHEN** owner A's device rewrote B's made-owner event at B's sequence 2 under A's own author key, and a device linked into member E catches up first from A's device and only then from a device holding the original
 - **THEN** E's new device keeps the rewrite and drops the original, while every device that held the original keeps it — two devices, two memberships
@@ -272,10 +272,10 @@ Until an anchored log carries the retrograde direction (cells F7, F8), the gate 
 - **WHEN** in one session a device of A receives B's device statement before the join event carrying B's announcement key
 - **THEN** the statement is dropped in that session and admitted in the next
 
-#### Scenario: A dependency whose authoring device died is never resolved until re-issued (G1)
+#### Scenario: A dependency whose authoring device died is never resolved until re-issued (D23)
 
 - **WHEN** A's sequence 3 — the event that made A an owner — reached only A's device before B's device, which authored it, died; A's device then made C an owner naming A's sequence 3, spread that event to a device of D, and died too, so no live device holds A's sequence 3
-- **THEN** every device defers C's made-owner event indefinitely and lists it as waiting on A's sequence 3, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds
+- **THEN** every device defers C's made-owner event indefinitely and lists C as a plain member meanwhile, and lists C as an owner only after a current owner makes C an owner anew — an ordinary made-owner at a point every device holds
 
 ### Requirement: The membership store is reconciled before the record store
 

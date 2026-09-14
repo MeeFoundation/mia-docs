@@ -14,7 +14,7 @@ Several people need one space they all write into: its content stays with every 
 - **Three invariants.** What may be done to a record does not depend on whether the member that placed it is a current member or a removed one. Every state a cell can reach is repairable by its owners, so no situation forces recreating the cell — a new store, re-invited members, re-uploaded content. And authorship is forged by no one: every entry carries its writer's signature, so an edit of another member's mergeable-document reads as the editor's act, never as the member's.
 - **Replacing a claim or an immutable-document is deleting it and placing a new one.** Neither is updated in place by anyone. A member replaces its own record because it is its own; an owner replaces any member's record because it is an owner. The old record is deleted and the new one sits under the replacer's name — a new record with a new id, so a member's file replaced by an owner becomes the owner's file — and references to the old record stay on the old record. That such references break is accepted. A mergeable-document is edited in place, and its id stays.
 - **A human-readable name that is not an address.** A cell carries a name — a string that can repeat, including among one identity's cells; an owner renames it. Several cells with the same members are ordinary.
-- **Nothing existing changes its behaviour.** Connections, grants, per-issuer namespaces and their egress filter keep their requirements. The store beneath them drops prefix deletion — an entry affects only its own key — and every existing delete already addresses one key, except the directory's pruning of an issuer's retraction markers, which deletes them one by one. How they relate to cells — whether a connection is a cell of two, whether grants gain the cell as an audience — is an open question this change names and does not answer.
+- **Nothing existing changes its behaviour.** Connections, grants, per-issuer namespaces and their egress filter keep their requirements. The store beneath them drops prefix deletion — an entry affects only its own key — and every existing delete already addresses one key, except the directory's pruning of an issuer's retraction markers, which deletes them one by one. Cells stand beside them and rest on none of them: no grant names a cell, and cell content never flows through a grant. Once cells prove themselves in practice, the mobile application's integration included, connections go entirely, with the machinery that serves only them.
 - **Chat is a later change.** A cell will carry a chat; this change does not build it, and it is not expected to sit on the store's reconciliation — a stream of messages is a sync shape of its own.
 
 ## Capabilities
@@ -26,6 +26,8 @@ Several people need one space they all write into: its content stays with every 
 | `components/mee-pdn/data-layer/capability-gated-ingest` | `openspec/specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md` |
 | `components/mee-pdn/data-layer/subset-reconciliation`   | `openspec/specs/components/mee-pdn/data-layer/subset-reconciliation/spec.md`   |
 | `components/mee-pdn/data-layer/private-metadata-store`  | `openspec/specs/components/mee-pdn/data-layer/private-metadata-store/spec.md`  |
+| `components/mee-pdn/pdn-node-http/host`                 | `openspec/specs/components/mee-pdn/pdn-node-http/host/spec.md`                 |
+| `components/mee-pdn/pdn-node-http/container-stand`      | `openspec/specs/components/mee-pdn/pdn-node-http/container-stand/spec.md`      |
 
 ### New Capabilities
 
@@ -36,7 +38,9 @@ Several people need one space they all write into: its content stays with every 
 
 - `components/mee-pdn/data-layer/capability-gated-ingest`: the gate arms on a cell's two stores too, judging by the entry's author resolved to a member rather than by the session peer.
 - `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell's stores; the import refusal for tracked non-data replicas names them; a delete is an empty entry at one key, the store keeping no prefix deletion.
-- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds and holds the identity's announcement key pair at a fixed path, minted with the identity.
+- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds, keeps one record per cell that a leave tombstones, and holds the identity's announcement key pair at a fixed path, minted with the identity.
+- `components/mee-pdn/pdn-node-http/host`: the debug surface covers the cells service, one route per operation, with its refusals reported as refusals.
+- `components/mee-pdn/pdn-node-http/container-stand`: the stand runs a cell across three containers with its paired denials, a removal and a restart.
 
 ## Impact
 
@@ -44,6 +48,7 @@ Several people need one space they all write into: its content stays with every 
 - **`crates/data-layer`**: the membership store and the record store as replica kinds beside the directory, the data store and the connection metadata store — creation, import from their tickets, forgetting, the session order between them; classification of member devices; the authorship policy in the ingest gate; swarm membership on import; contact derivation from member device records; a download policy for payloads; the record store's deletion of a whole record and its refusal of content for a deleted one (D24); entries outside the key layout kept, used by nothing and listed (D27).
 - **`crates/pdn-node`**: the cells service; the join dialogue on its own ALPN; the ownership surface; the directory kinds that carry a cell to a member's other devices; restart recovery of hosted cells; the join and removal paths under the flaky-test discipline.
 - **`crates/pdn-layer`**: the vocabulary — the record and its three kinds, claim, mergeable-document and immutable-document and their envelope.
+- **`crates/pdn-node-http`**: debug routes for every operation of the cells service (D31); the stand's three-container cell scenario.
 - **`crates/pdn-store`**: one change — no entry affects another key: prefix deletion leaves the store, and the store gains the two primitives the record store's deletion builds on, removing every author's entries at one key with their blobs and looking one key up at ingest (D24); the swarm, the content-free topic and the ingest hook are used as they are. The linear-scan range fingerprint (`get_fingerprint` in `store/fs.rs`) is a cost the record store makes visible; it is among the open questions, not in this change.
 - **Specs**: a glossary entry `architecture/language/cell.md`; a sweep of specs that describe connections as the only sharing path.
 - **Depends on**: ADR-0011 and ADR-0012 for the shape of the join dialogue; multi-identity hosting; the classifier's device resolution. Nothing pending.
