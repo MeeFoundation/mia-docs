@@ -56,7 +56,7 @@ The consequence for the staging: locking a phone is not a neutral gesture. Where
 
 4 roles cannot be collapsed. The granting identity's first device and the grantee are 2. A third is needed because 2 acts require a node that stays up while another goes away — the granting identity's second device joining, and that device serving the grantee once the first is gone. A fourth is needed because the outsider must hold no connection to the granting identity, and the other 3 all do.
 
-The fourth cannot be a second identity on the grantee's phone. The data service is keyed by the issuer whose namespace is read, not by the identity a screen believes it is acting under, so once that phone has bound the granting identity's replica it answers the read whichever identity is selected. Hosting an outsider beside a grantee would stage a denial that cannot fail.
+The fourth is a node rather than a second identity on the grantee's phone, although the platform would carry either: every operation names the identity performing it and reaches nothing a co-located identity holds, so an identity hosted beside the grantee is refused the granting identity's replica exactly as a stranger's device is (ADR-0013). It stays a node because the audience watches devices: a refusal staged on the grantee's own phone is not seen as a stranger being refused.
 
 So: 2 phones running the application, and 2 `pdn-node-http` processes on the presenter's machine in the same local network. Both processes are real nodes with real addresses, reached by the phones over the runtime's own protocols.
 

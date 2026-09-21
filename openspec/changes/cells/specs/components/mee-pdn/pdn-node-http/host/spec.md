@@ -13,6 +13,10 @@ When enabled, the debug surface SHALL make identity creation and linking, connec
 - **WHEN** a linking payload is minted on 1 host and consumed on a second
 - **THEN** the second host reports the identity as hosted and reads entries written before the link
 
+#### Scenario: A read as a co-located identity is refused
+- **WHEN** a host hosting two identities is asked, over HTTP, to read an issuer one identity holds under a grant, naming the other identity
+- **THEN** the response is a client error and no entry is returned
+
 #### Scenario: A cell scenario runs over HTTP alone
 - **WHEN** 3 hosts are driven only over HTTP through creating a cell, two invitations, a record placed by one member and an operation appended to it by another
 - **THEN** every member reads the record and the operation without an in-process call into any runtime

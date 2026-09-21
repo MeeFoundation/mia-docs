@@ -1,21 +1,6 @@
-# Durable storage
+# data-layer: durable storage — delta for identity-scoped-replicas
 
-## Purpose
-
-What a node keeps on disk, and where. Storage is named at the spawn — memory, or a directory — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([data store](../data-store/spec.md), [private metadata store](../private-metadata-store/spec.md), [connection metadata store](../connection-metadata-store/spec.md)) and the one author it writes them with, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts, their connections, the namespaces they were granted — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
-
-## Requirements
-
-### Requirement: Storage is configured at spawn, and neither mode is a default
-A node's storage SHALL be chosen when it is spawned, by name: memory, or a directory. A spawn that names neither SHALL NOT be expressible — no caller wants a default, because the production consumer embeds the runtime and passes a directory inside its own sandbox, and the test suites want memory and say so. The location SHALL NOT be read from the process environment inside the data layer, because several nodes spawn in one process and a directory belongs to one node.
-
-#### Scenario: A node spawned on memory stores in memory
-- **WHEN** a node is spawned with memory named as its storage
-- **THEN** it creates no files, and its state ends with the process
-
-#### Scenario: Two nodes in one process store apart
-- **WHEN** two nodes are spawned in one process, each configured with a directory of its own
-- **THEN** each keeps its own state, and neither reads the other's directory
+## MODIFIED Requirements
 
 ### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
 A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store and author, the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
@@ -39,30 +24,9 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
 #### Scenario: A leftover staging file does not block the start
 - **WHEN** a node is spawned on a directory holding a half-written key staging file and no key
 - **THEN** a key is minted, the leftover is gone, and a later start on the directory reads the committed key back
-### Requirement: The node's wire identity is stable across starts
-A node spawned on a directory holding a key SHALL bind its endpoint with that key, so its node id is the one it had before. A node's device records, the tickets it minted, and the contacts its peers hold all name that id, so a node that came back under a different id would be unreachable by everything it handed out.
 
-#### Scenario: The node id survives a restart
-- **WHEN** a node is shut down and spawned again on the same directory
-- **THEN** it reports the same node id, and a ticket minted before the shutdown still names a reachable address
+## ADDED Requirements
 
-#### Scenario: A fresh directory is a different node
-- **WHEN** a node is spawned on an empty directory
-- **THEN** it reports a node id of its own, holding none of another directory's state
-
-### Requirement: One running node per directory
-A directory SHALL be used by one running node at a time. A node spawned on a directory another running node holds SHALL fail to start, naming the directory and the reason, rather than reporting a corrupt store or starting alongside.
-
-#### Scenario: The second node is refused
-- **WHEN** a node is spawned on the directory of a node that is already running
-- **THEN** the spawn fails with an error naming that directory, and the running node is unaffected
-
-### Requirement: A storage failure is reported, never swallowed
-A write the storage layer refuses — an exhausted disk above all — SHALL surface as a failed operation to the caller that made it. A refused write SHALL NOT be reported as stored, and a replica whose last transaction did not commit SHALL NOT be reported as converged.
-
-#### Scenario: A write on a full disk fails loudly
-- **WHEN** a node's directory is on a filesystem with no free space and an entry write is attempted
-- **THEN** the write fails with an error naming the storage failure, and a subsequent read does not report the entry as stored
 ### Requirement: A replica store's cache is a share of a node budget, cut at spawn
 A node SHALL be spawned with the memory its replica stores may hold together and the number of identities the device is provisioned for, and the cache one identity's replica store keeps SHALL be bounded at that memory divided by that number. The share SHALL be computed at spawn and SHALL bound every store the node opens, so an identity created while the node runs opens its store at that same share and no other identity's store is reopened for it. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores and one identity. A node holding more identities than the number its share was cut from SHALL report that its replica store caches may together exceed the budget, and SHALL NOT change the bound of a store already open. A host running where memory is scarce states both values once at that application's first start, from the memory that device can spare and the identities it offers to carry, and keeps them with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
 
@@ -96,3 +60,9 @@ Every store a hosted identity holds SHALL write with that identity's one author,
 #### Scenario: Two identities on one node write as two authors
 - **WHEN** two identities hosted on one node each write an entry
 - **THEN** the two entries carry two different authors, and each identity's later writes carry the one it wrote with before
+
+## REMOVED Requirements
+
+### Requirement: One author per node, persisted with the stores
+**Reason**: The author is a property of a hosted identity rather than of a node: one author for every store made two identities of one node indistinguishable as writers, so an entry either could have written passed as either one's.
+**Migration**: The same persistence and the same latest-per-key behaviour are stated per hosted identity by "One author per hosted identity, persisted with that identity's stores"; a node that held one author writes each identity's entries under that identity's author instead.

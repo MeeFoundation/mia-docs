@@ -1,10 +1,6 @@
-# Write retraction
+# data-layer: write retraction — delta for identity-scoped-replicas
 
-## Purpose
-
-The writer-side discipline that keeps a refused foreign write from breaking the writer forever. A write into a granted namespace is provisional until the issuer keeps it: [capability-gated ingest](../capability-gated-ingest/spec.md) refuses an out-of-scope entry and signals that refusal back to the sender on the reconciliation reply — a withdrawal race or an adversarial client reaches here. The writer, on the issuer's rejection, physically removes the entry, replicates the verdict to its sibling devices as a marker, and surfaces the outcome, so acquisition stays capability-covered (Invariant 2) on the write side and no honest writer wedges. The marker is an accelerator for a sibling that has not itself reached the issuer, not the enforcement.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: A foreign write is provisional until the issuer keeps it
 
@@ -29,26 +25,6 @@ An own entry in a granted (audience-postured) namespace is provisional until the
 
 - **WHEN** a device of the issuer returns a rejection whose timestamp matches no record the writer holds at that author and path
 - **THEN** the writer retracts nothing, records no marker, and the entry stands
-
-### Requirement: A rejection carries one device's knowledge, not the issuer's
-
-A rejection states that the refusing device lacks the named entry, which on an issuer of several devices is narrower than the issuer lacking it. A device that admitted an entry can go offline before that entry replicates to its siblings, and a sibling the writer reaches afterwards — judging by a grant narrowed meanwhile — lacks the entry honestly and signals. The writer then retracts a write the issuer holds and keeps, marks it, refuses its re-ingest until the marker is superseded or ages out, and surfaces a retraction event for a write that was in fact accepted. This is the accepted window, bounded by the marker's retention: no device can establish what its siblings hold without asking them, and asking would put sibling availability back into the path this discipline exists to keep clear of it. Two guards SHALL therefore stand: the writer's confirmation against its own replica, which establishes that the named entry is one the writer holds and never that the issuer lacks it, and the content hash the marker records, since a wrongly retracted entry has no other address to be recovered from.
-
-Three ways to close the window are open and none is chosen. Leaving it as it stands costs nothing further and relies on the recovery surface the recorded content hash seeds, at the price of a wrong verdict shown to the writer's user. Signalling only from a device that can vouch for its identity — one that knows itself caught up with its siblings — is exact, and it returns the sibling availability this design took out of the path. Making retraction reversible, so that later sight of the entry at the issuer restores it, keeps availability out of the path and turns the guarantee from prevention into repair, at the cost of a recovery mechanism the writer does not have. Choosing between them wants a measurement this spec does not carry: how often an admitting device goes offline before it replicates.
-
-#### Scenario: A stale sibling's rejection retracts an accepted write
-
-- **WHEN** one device of the issuer admits a write, goes offline before the entry replicates, and the writer afterwards reaches a sibling that lacks the entry and holds a grant narrowed meanwhile
-- **THEN** the sibling signals, the writer retracts and marks the entry, and the issuer goes on holding it — the divergence standing until the marker is superseded or ages out
-
-### Requirement: Retraction restores the issuer's accepted state locally
-
-A rejected entry SHALL be physically removed from the local replica — never tombstoned: a tombstone is one more entry the gate refuses, and it shadows the issuer's entries locally instead of restoring them. After removal, the issuer's entry is the latest for the path again and later sessions re-offer nothing. A session already open when the retraction runs is not a later one: it serves the store as of its own setup ([subset reconciliation](../subset-reconciliation/spec.md)), so it goes on offering the retracted entry until it ends, and what it handed over is removed by the marker rather than by the removal.
-
-#### Scenario: The local view returns to the issuer's value
-
-- **WHEN** retraction runs on an own entry at a claim the issuer refused
-- **THEN** reading that path locally returns the issuer's value, and subsequent reconciliations with the issuer re-send nothing for it
 
 ### Requirement: The verdict replicates to sibling devices as a directory marker
 
@@ -83,11 +59,3 @@ The rejection reaches only the writer device that was in the session, so a sibli
 
 - **WHEN** one hosted identity's write into a granted namespace is retracted while a co-located identity holds a grant of the same issuer
 - **THEN** the marker is recorded in the writing identity's directory alone, and the co-located identity's directory and replica are unchanged
-### Requirement: The retraction outcome is observable
-
-Retraction SHALL emit a log record and a runtime-consumable event carrying the issuer, the path, the author, the timestamp, the content hash, and the deciding device — the refusal is never silent at the writer, and the marker is the durable half of the same record. The payload blob is not copied: it stays in the blob store as long as the store lives, so the marker's address is the seed of a later recovery surface.
-
-#### Scenario: A verdict produces an event
-
-- **WHEN** an entry is retracted
-- **THEN** a subscriber to the retraction events observes one event naming that issuer, path, author, timestamp, and content hash

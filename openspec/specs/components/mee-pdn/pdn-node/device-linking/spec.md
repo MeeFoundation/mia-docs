@@ -146,7 +146,7 @@ The caller's timeout SHALL bound the whole act, the dialogue included: the dialo
 
 The dialing runtime SHALL arm the identity for session classification the moment its directory is imported, before the data namespace is imported — so at no instant does the data binding exist ahead of the book that judges its sessions. The other order would serve the data namespace ticket-bounded (full view to any caller) for the whole catch-up wait, on a long-lived namespace id already known to every past grantee and every holder of a leaked ticket. The cost of arming early is bounded and fail-closed: while the directory is still converging, callers it cannot yet resolve are refused, and a refused device is served once its record replicates in — the node's periodic reconcile pass is the retry cadence.
 
-On any failure after import, the dialing runtime SHALL undo what this linking did, in reverse order — the data-namespace import, the arming, the directory — so a failed link leaves no local residue and the identity is unknown to the runtime again. Undoing SHALL restore what the import displaced rather than delete it: an issuer can already be bound when the link runs, because a namespace reached through a peer's grant binds the same issuer without making the identity hosted, and the pre-dial refusal cannot see it. A rollback that forgot the issuer outright would destroy a replica this linking never imported, permanently — so the data namespace is unbound only when the link's import was what bound it, and the replica it brought up is dropped only when it is not the replica the restored binding names. A device record already committed on the inviter side may remain, per the lost-reply posture above.
+On any failure after import, the dialing runtime SHALL undo what this linking did, in reverse order — the data-namespace import, the arming, the directory — so a failed link leaves no local residue and the identity is unknown to the runtime again. The link brings up stores of its own for the identity it joins, so the undo drops what it brought up and reaches nothing else: a namespace of that same issuer which another identity of this node holds under a grant is held for that identity and is untouched by this rollback. The emptied store the undo leaves, and the subdirectory holding it, MAY remain; a start SHALL host nothing from a subdirectory the runtime's record of hosted identities does not name. A device record already committed on the inviter side may remain, per the lost-reply posture above.
 
 #### Scenario: Success implies the directory is caught up
 - **WHEN** `link` returns success
@@ -162,8 +162,11 @@ On any failure after import, the dialing runtime SHALL undo what this linking di
 
 #### Scenario: A failed link leaves a granted namespace of the same issuer intact
 - **WHEN** a runtime reached an issuer's namespace through a peer's grant, then links into that same issuer and the link fails
-- **THEN** the grant still reads that namespace's entries afterwards, and the identity is still not hosted — the rollback restored the binding it displaced instead of forgetting the issuer
+- **THEN** the grant still reads that namespace's entries afterwards, and the identity is still not hosted — the two replicas are held for two identities, and the rollback reaches only the one the link brought up
 
+#### Scenario: A start hosts nothing from what a failed link left
+- **WHEN** a link fails after its import and the runtime is restarted on the same directory
+- **THEN** the identity is not hosted, nothing of it is readable, and the subdirectory the failed link created carries no identity into the hosted set
 ### Requirement: A refused link is legible to the dialer's caller
 Linking SHALL report a refusal by the inviting device to its own caller as a refusal, distinguishable from a failure to reach or complete the dialogue and from a failure to catch up after it. A dialogue still in flight when the caller's budget runs out SHALL surface as its own outcome — distinct from the refusal, whose dialogue ended, and from the catch-up timeout, whose dialogue completed. The refusal SHALL carry no reason, leaving the uniformity seen by the dialed device unchanged. A caller SHALL be able to make every one of these distinctions without inspecting human-readable error text.
 
