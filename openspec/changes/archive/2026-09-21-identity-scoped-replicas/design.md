@@ -124,7 +124,7 @@ Importing a ticket names the identity the replica is held for, and the import la
 
 ### D12. The storage directory holds a subdirectory per hosted identity
 
-A node's directory keeps its endpoint key and its lock where they are, and holds one subdirectory per hosted identity with that identity's replica store and author. The blob store stays one directory for the node.
+A node's directory keeps its endpoint key and its lock where they are, and holds one subdirectory per hosted identity with that identity's replica store and author. The blob store stays one directory for the node. Those subdirectories are also what a store's share of the cache budget is counted from (D14), so the layout is read as well as written.
 
 ### D13. Every create and every import names its identity
 
@@ -151,20 +151,21 @@ Every replica sits in the identity of an identity the node hosts, and a data rep
   - **Pros:** the suites that reconcile a replica between two bare nodes keep their arrange steps.
   - **Cons:** those steps are a ticket handed over by hand, which the product path practice admits only as a test's subject or its negative control, and the state they arrange — data under no identity — is one the product never reaches.
 
-### D14. A replica store's cache is a share of a node budget, cut at spawn
+### D14. A replica store's cache is a share of a node budget, cut as the store opens
 
-A node is spawned with the memory its replica stores may hold together and the number of identities the device is provisioned for, and the share one hosted identity takes is that memory divided by that number. The share is computed at spawn and fixed for every store the node opens, an identity created while it runs included, so that identity's store opens at the same share and every other hosted identity keeps running untouched. The workspace states one default in a single place that the hosts and the suites take: 1 GiB for a node's replica stores and one identity, so a device carrying a single identity gives it the whole budget and a device provisioned for ten cuts the same budget ten ways. A node that comes to hold more hosted identities than the number its share was cut from stays above the budget until the next start and reports it, because the number is the host's statement and the node is the only place its breach is visible. A host on a phone states both values once at that application's first start, from the memory that device can spare and the identities it offers to carry, and keeps them with its own settings; this change states that expectation and writes no mobile code. The bound caps resident memory rather than reserving it — pages enter a cache as they are read and leave it at the cap — and the store reports what it uses and how often it evicts, so both numbers are answered by measurement.
+A node is spawned with the memory its replica stores may hold together, and the share one hosted identity takes is that memory divided by the identities its storage directory holds once that identity has a subdirectory of its own there (D12), cut as that identity's store opens. A device carrying one identity therefore gives it the whole budget, the second identity of a directory takes half, and the tenth a tenth. The bound cannot be changed on an open store, so a store keeps what it opened at: an identity created or linked while the node runs takes a share cut from the set that now includes it, every other hosted identity keeps running untouched, and the bounds handed out together pass the budget until the next start cuts every share from the whole set. A session that grows from one identity to ten hands out under three budgets in all, and the node reports that it stands above its budget, because it is the only place that is visible. The workspace states one default in a single place that the hosts and the suites take: 1 GiB for a node's replica stores, which is the whole budget for a device carrying one identity. A host on a phone states that one number once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this change states that expectation and writes no mobile code. The bound caps resident memory rather than reserving it — pages enter a cache as they are read and leave it at the cap — and the store reports what it uses and how often it evicts, so both numbers are answered by measurement.
 
 **Rejected alternatives:**
 
-- A flat share per hosted identity, with the count left to the host.
-  - **Cons:** the stated default then either cuts a device carrying one identity down to a tenfold node's share, or sanctions a worst case that grows with every identity a host forgot to account for; the arithmetic is the same in both cases, and only the second one fails silently.
+- A count of identities stated by the host at spawn.
+  - **Pros:** one share for the whole start, cut before any store opens; a host that knows it will carry five says so before it carries them.
+  - **Cons:** no platform answers that count, so a host either guesses or copies the default — and a host that states one identity while carrying ten multiplies the bound by the nine it left out, while a host that states ten on a device carrying one cuts a single heavy store to a tenth of the budget it could have had. The node cannot tell either case from a correct statement, so neither is reported.
 - Leave the cache at the storage library's own default.
   - **Cons:** the cap is per database and there is one database per hosted identity, so the caps multiply with the identities a node hosts, and each evicts knowing nothing of the others.
 - One budget shared by every hosted identity's cache.
   - **Cons:** the bound cannot be changed on an open store, so an identity created while the node runs would mean reopening every other hosted identity's store and cutting the sessions it is in.
-- Divide the budget among the hosted identities the node currently holds.
-  - **Pros:** a node hosting two identities uses the whole budget rather than two shares of it.
+- Recut the share among the identities the node holds whenever that set changes.
+  - **Pros:** the bounds handed out always sum to the budget, with no overshoot to report.
   - **Cons:** same reopening, and a share that moves under a running store is a bound the store cannot take.
 
 ### D15. The node is the trust boundary, and the checks bound what a device can claim

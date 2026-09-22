@@ -27,24 +27,24 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
 
 ## ADDED Requirements
 
-### Requirement: A replica store's cache is a share of a node budget, cut at spawn
-A node SHALL be spawned with the memory its replica stores may hold together and the number of identities the device is provisioned for, and the cache one identity's replica store keeps SHALL be bounded at that memory divided by that number. The share SHALL be computed at spawn and SHALL bound every store the node opens, so an identity created while the node runs opens its store at that same share and no other identity's store is reopened for it. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores and one identity. A node holding more identities than the number its share was cut from SHALL report that its replica store caches may together exceed the budget, and SHALL NOT change the bound of a store already open. A host running where memory is scarce states both values once at that application's first start, from the memory that device can spare and the identities it offers to carry, and keeps them with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
+### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
+A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory holds once that identity has a subdirectory of its own there. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory holds, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
 
 #### Scenario: The default gives a single identity the whole budget
-- **WHEN** a node is spawned without naming a budget or a count
+- **WHEN** a node is spawned without naming a budget
 - **THEN** its one identity bounds its store's cache at the stated default budget
 
-#### Scenario: A host names its budget and its count
-- **WHEN** a node is spawned with a budget and a count of the identities the device is provisioned for
-- **THEN** each of its identities bounds its store's cache at the budget divided by that count
+#### Scenario: A store in memory carries no bound
+- **WHEN** a node spawned on memory provisions an identity
+- **THEN** that identity's store carries no cache bound, and the node reports no breach of its budget
 
-#### Scenario: An identity added later takes the same share
-- **WHEN** an identity is created on a running node
-- **THEN** its store opens bounded at the share cut at spawn, and the stores already open are not reopened
+#### Scenario: A start cuts every share from the identities the directory holds
+- **WHEN** a node is spawned on a directory holding two identities and provisions both
+- **THEN** each store opens bounded at half the budget, and the node reports no breach of its budget
 
-#### Scenario: More identities than the count the share was cut for
-- **WHEN** a node provisioned for two identities comes to hold three
-- **THEN** the third store opens at the same share, no open store's bound changes, and the node reports that its caches may together exceed the budget
+#### Scenario: An identity added later takes a share of its own
+- **WHEN** an identity is provisioned on a running node whose directory held one identity before
+- **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
 
 ### Requirement: One author per hosted identity, persisted with that identity's stores
 Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and prefix deletion are scoped to the writing author, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a counterparty or a cell binds to an identity on this device is that identity's author and not the node's.
