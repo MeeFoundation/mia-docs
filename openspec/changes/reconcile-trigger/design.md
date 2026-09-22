@@ -22,15 +22,21 @@ subset-rbsr puts capability-scoped peers outside the gossip swarm and makes filt
 
 On a write, the serving node resolves the scoped peers whose capabilities cover the written claim — the same capability / audience index the reconciliation filter already maintains — and sends each a content-free trigger over its existing direct connection. Directedness is what avoids the side channel: a broadcast tick would wake every scoped peer on every write and expose the issuer's whole write rate, far wider than any one peer's grant (subset-rbsr, Example 1).
 
-### D2. Coalescing
+A peer is a node and the identity holding the replica there, never a node alone (ADR-0013). One node may hold one issuer's namespace for two identities at once, each under its own grant, so a trigger addressed by node id alone would reach the wrong replica or both of them, and the covering identity is exactly what the capability index already names.
+
+### D2. A co-located addressee is reached inside the process
+
+When the addressed identity is hosted on the sending node itself, the trigger does not go over the network: the node cannot dial itself, and two identities of one node already reconcile over the in-process path (ADR-0013). Whatever transport the network half settles on, the in-process half is the same resolution the reconciliation already performs, so the trigger follows it rather than adding a second rule.
+
+### D3. Coalescing
 
 A peer holds at most one pending trigger until it reconciles; consecutive covered writes collapse into that one pending tick. So what a peer receives is bounded by its own reconciliation cadence, not the write rate (subset-rbsr, Example 2: about 100 covered writes a day become a few ticks, never a flood).
 
-### D3. Best-effort; reconciliation heals
+### D4. Best-effort; reconciliation heals
 
 A trigger is never required for correctness: an unreachable or missed peer is left to reconciliation-on-contact, which subset-rbsr names the sole carrier of correctness. Delivery is best-effort, so the retry policy is a latency knob, not a correctness one.
 
 ## Open Questions
 
-- Transport: which message carries the trigger — a small frame on the docs ALPN, or a dedicated protocol.
+- Transport: which message carries the trigger — a small frame on the docs ALPN, or a dedicated protocol — and how it names the addressed identity, which every transport has to carry.
 - Retry policy: how long to keep retrying an unreachable peer before leaving it to reconciliation-on-contact.
