@@ -85,7 +85,7 @@ The write set travels with the session it was decided for, the way the egress fi
 
 ### D6. An accepted connection is dispatched by its first message
 
-The docs protocol handler reads the first message of an accepted connection, resolves the holder it names, and hands the streams and that message to the engine of that hosted identity; a message naming a holder the node does not host is refused as not hosted, in the same shape as a replica that is not here. The engines below the dispatcher keep the accept path they have.
+The docs protocol handler reads the first message of an accepted connection, resolves the holder it names, and hands the streams and that message to the engine of that hosted identity; a message naming a holder the node does not host is refused as not hosted, in the same shape as a replica that is not here. Reading that first message belongs to the handler and never to an engine: an engine is only ever handed a session whose first message is already read, so no accept path waits on the wire inside an engine's own loop, where it would stop every other thing that loop does. A node hosting one identity takes the same contract with a resolver of one holder, so the two assemblies differ in the resolver alone.
 
 ### D7. Two identities of one node sync over in-process streams
 
