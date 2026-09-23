@@ -149,6 +149,8 @@ A peer whose access arrived through a grant SHALL NOT be a member of the replica
 
 Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
+A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a grant or imported it out of band. Minting restarts the replica's sync as a store of the minting identity's own: the replica rejoins the swarm, and every peer the engine recorded is dialed naming that identity instead of the issuer, which the issuer's devices refuse as not hosted.
+
 #### Scenario: A scoped peer receives nothing over gossip
 
 - **WHEN** a claim is written into a replica whose swarm is the issuer's devices, while scoped peers hold capabilities on other claims
@@ -222,5 +224,5 @@ A sync request for a hosted replica from a caller with no computable rights SHAL
 
 #### Scenario: An identity holding a scoped replica does not re-serve it to a third party
 
-- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a sibling-minted ticket — asks the identity holding the scoped replica to sync the issuer's replica
+- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a ticket that addresses a sibling device — asks the identity holding the scoped replica to sync the issuer's replica
 - **THEN** that identity refuses as for an unhosted replica, since it cannot compute a third party's rights

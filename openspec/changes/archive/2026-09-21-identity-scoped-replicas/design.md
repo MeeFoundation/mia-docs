@@ -58,7 +58,7 @@ pdn-store calls the party a replica is held for, and the party a caller acts for
 
 The first message of a sync session carries the identity whose replica is addressed and the identity the caller acts for, beside the namespace it already carries. The dialing side knows both: the contact it dials was derived from a device set or a member statement, which names the identity it belongs to, and the identity it acts as is the identity the session was started for.
 
-A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the issuer for a data namespace, the identity for a store its own devices share. Without that statement a recorded peer would be dialed as the dialing side's own identity, which is right for a sibling and wrong for every other case — a granted replica's peers are the issuer's devices, and naming the wrong identity is refused as not hosted.
+A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the issuer for a data namespace, the identity for a store its own devices share. Without that statement a recorded peer would be dialed as the dialing side's own identity, which is right for a sibling and wrong for every other case — a granted replica's peers are the issuer's devices, and naming the wrong identity is refused as not hosted. The act that brings the replica makes the statement, and a grantee mints no ticket on its replica: the fork's share restarts the replica's sync with the minting identity in the statement's place, and back in the swarm.
 
 **Rejected alternatives:**
 
