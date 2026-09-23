@@ -59,7 +59,7 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: The inviter registers the newcomer as pending before replying
-After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges.
+After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
 
 #### Scenario: The newcomer is registered on the inviting device
 - **WHEN** runtime B completes the linking dialogue against runtime A
@@ -106,7 +106,7 @@ Every pending registration SHALL carry a durable creation time. An unconfirmed r
 - **THEN** the dialing device is not in the confirmed set, and it appears there only after the commit is released
 
 #### Scenario: A link that cannot be recorded leaves nothing on the identity
-- **WHEN** a link fails because the dialing device cannot write its hosted-identities record
+- **WHEN** a link fails because the dialing device cannot write the identity's hosting record
 - **THEN** it hosts nothing, the identity's directory never names it, and a later link from the same device succeeds and is named
 
 #### Scenario: Abandoned pending registrations expire
@@ -140,17 +140,21 @@ The linking reply SHALL carry write tickets to the identity's directory and to i
 - **THEN** device 3 comes up with the directory and the data namespace, and all three devices' device sets converge to three
 
 ### Requirement: Link returns caught up, and failure leaves no local residue
-`link` SHALL NOT report success until the imported directory has completed one successful sync exchange that started after the import — one bounded wait against the peer that just answered the dialogue, not a retry loop; a directory that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the directory's contents does not discharge this requirement.
+`link` SHALL NOT report success until the imported directory has completed one successful sync exchange that started after the import — one bounded wait against the peer that just answered the dialogue, not a retry loop; a directory that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the directory's contents does not discharge this requirement. The first exchange counts however quickly it finishes: the wait SHALL be listening before the arming starts the directory's sync, because an exchange that finished before the wait began would leave it waiting for the next one, which the node's periodic reconcile pass may bring only after the caller's budget is spent.
 
 The caller's timeout SHALL bound the whole act, the dialogue included: the dialogue spends from the budget first and the catch-up gets what remains, so a dialed inviter that never answers costs the caller its budget — surfaced as its own typed outcome — and never the transport's idle timeout. Without this bound the budget would govern only the last third of the act, and a hung inviter would hold the caller for as long as the transport tolerates a silent connection, however small a budget the caller named.
 
 The dialing runtime SHALL arm the identity for session classification the moment its directory is imported, before the data namespace is imported — so at no instant does the data binding exist ahead of the book that judges its sessions. The other order would serve the data namespace ticket-bounded (full view to any caller) for the whole catch-up wait, on a long-lived namespace id already known to every past grantee and every holder of a leaked ticket. The cost of arming early is bounded and fail-closed: while the directory is still converging, callers it cannot yet resolve are refused, and a refused device is served once its record replicates in — the node's periodic reconcile pass is the retry cadence.
 
-On any failure after import, the dialing runtime SHALL undo what this linking did, in reverse order — the data-namespace import, the arming, the directory — so a failed link leaves no local residue and the identity is unknown to the runtime again. Undoing SHALL restore what the import displaced rather than delete it: an issuer can already be bound when the link runs, because a namespace reached through a peer's grant binds the same issuer without making the identity hosted, and the pre-dial refusal cannot see it. A rollback that forgot the issuer outright would destroy a replica this linking never imported, permanently — so the data namespace is unbound only when the link's import was what bound it, and the replica it brought up is dropped only when it is not the replica the restored binding names. A device record already committed on the inviter side may remain, per the lost-reply posture above.
+On any failure after import, the dialing runtime SHALL undo what this linking did, in reverse order — the data-namespace import, the arming, the directory — so a failed link leaves no local residue and the identity is unknown to the runtime again. The link brings up stores of its own for the identity it joins, so the undo drops what it brought up and reaches nothing else: a namespace of that same issuer which another identity of this node holds under a grant is held for that identity and is untouched by this rollback. The emptied store the undo leaves, and the subdirectory holding it, MAY remain; a start SHALL host nothing from a subdirectory the runtime's record of hosted identities does not name. A device record already committed on the inviter side may remain, per the lost-reply posture above.
 
 #### Scenario: Success implies the directory is caught up
 - **WHEN** `link` returns success
 - **THEN** the newcomer's directory replica has completed a successful sync exchange started after the import, and the device set it reads locally includes the identity's existing devices
+
+#### Scenario: The first exchange counts however quickly it finishes
+- **WHEN** the directory's first sync exchanges finish before the link begins its wait, and the caller's budget ends before the next periodic reconcile pass
+- **THEN** `link` succeeds on the first exchange rather than failing with the catch-up timeout
 
 #### Scenario: No serving window opens while the link catches up
 - **WHEN** the data namespace of a linking identity receives a session from a caller the still-converging directory cannot resolve, before `link` has returned
@@ -162,8 +166,11 @@ On any failure after import, the dialing runtime SHALL undo what this linking di
 
 #### Scenario: A failed link leaves a granted namespace of the same issuer intact
 - **WHEN** a runtime reached an issuer's namespace through a peer's grant, then links into that same issuer and the link fails
-- **THEN** the grant still reads that namespace's entries afterwards, and the identity is still not hosted — the rollback restored the binding it displaced instead of forgetting the issuer
+- **THEN** the grant still reads that namespace's entries afterwards, and the identity is still not hosted — the two replicas are held for two identities, and the rollback reaches only the one the link brought up
 
+#### Scenario: A start hosts nothing from what a failed link left
+- **WHEN** a link fails after its import and the runtime is restarted on the same directory
+- **THEN** the identity is not hosted, nothing of it is readable, and the subdirectory the failed link created carries no identity into the hosted set
 ### Requirement: A refused link is legible to the dialer's caller
 Linking SHALL report a refusal by the inviting device to its own caller as a refusal, distinguishable from a failure to reach or complete the dialogue and from a failure to catch up after it. A dialogue still in flight when the caller's budget runs out SHALL surface as its own outcome — distinct from the refusal, whose dialogue ended, and from the catch-up timeout, whose dialogue completed. The refusal SHALL carry no reason, leaving the uniformity seen by the dialed device unchanged. A caller SHALL be able to make every one of these distinctions without inspecting human-readable error text.
 

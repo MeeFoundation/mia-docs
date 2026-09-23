@@ -47,13 +47,22 @@ On a replica data-bound to an identity the node hosts, an entry arriving over sy
 
 ### Requirement: The write set is frozen per session
 
-The caller's write set SHALL be computed at session setup from the issuer's recorded grants — the same resolution and the same records the read side uses — and SHALL hold for that session's lifetime.
+The caller's write set SHALL be computed at session setup from the issuer's recorded grants toward the identity the caller names — the same resolution and the same records the read side uses — and SHALL hold for that session's lifetime. It SHALL be recorded per identity as well as per replica and caller, so a node hosting several identities granted by one issuer is admitted, in each session, exactly what the identity named there was granted.
 
 #### Scenario: Rights are read at session setup
 
 - **WHEN** a grant's write set changes after a session has started
 - **THEN** the running session judges entries by the set read at its setup, and the next session judges by the changed set
 
+#### Scenario: Two co-located audiences are admitted separately
+
+- **WHEN** an issuer grants write on one claim to one identity and write on another claim to a co-located identity, and that node writes both claims, each under the identity that holds it
+- **THEN** both entries are admitted at the issuer
+
+#### Scenario: A write under the wrong identity is refused
+
+- **WHEN** that node writes, under the identity granted write on the first claim, an entry for the claim only the co-located identity may write
+- **THEN** the issuer's gate drops it and the writer retracts it
 ### Requirement: Own devices and unarmed replicas are not narrowed
 
 A session peer resolving as a device of the issuer SHALL be admitted in full. The gate SHALL arm only on replicas data-bound to a hosted identity: directories and connection metadata stores keep ticket-bounded admission (Invariants 1 and 3), a grantee-held replica of a foreign namespace admits what the serving side's egress delivers, and an unregistered replica admits as it serves — whole, bounded by ticket possession. Retraction markers SHALL be consulted on data replicas only, the only replicas whose entries a marker can name, so no state of the marker set can reach the stores that carry device records and grants.
@@ -67,6 +76,20 @@ A session peer resolving as a device of the issuer SHALL be admitted in full. Th
 
 - **WHEN** a device of the audience identity catches up a granted replica from a sibling device holding read-only claims
 - **THEN** the read-slice entries arrive, although the relaying sibling holds no write on them
+
+### Requirement: A key longer than the store's bound is refused on every replica
+
+The fork SHALL hold no key longer than 8,192 bytes, in any replica. A local write at a longer key SHALL be refused to its caller, and an entry at a longer key arriving over sync SHALL be dropped silently whatever the sender's grant covers, as the base validation drops an entry with a bad signature, while the session goes on with the rest. The longest key the platform writes is a retraction marker, `retractions/<issuer-hex>/<author-hex>/<path>` with a path at its longest, 4,253 bytes. The bound is what keeps the first message a replica sends small: that message carries the replica's first key twice, and a peer reads it before anything classifies the caller ([node assembly](../node-assembly/spec.md)), so a replica holding a longer key would send a first message every peer refuses, and its sync would stop for every holder.
+
+#### Scenario: A local write at a key over the bound is refused
+
+- **WHEN** a device writes an entry whose key is 8,193 bytes long
+- **THEN** the write is refused, while a write at a key of 8,192 bytes succeeds
+
+#### Scenario: An entry at a key over the bound is dropped at ingest
+
+- **WHEN** a peer's replica holds an entry whose key is longer than 8,192 bytes beside an ordinary entry, and a device syncs with it
+- **THEN** the device holds the ordinary entry and not the long one, and the session completes
 
 ### Requirement: Admitted writes compete by last-write-wins within a stated window
 

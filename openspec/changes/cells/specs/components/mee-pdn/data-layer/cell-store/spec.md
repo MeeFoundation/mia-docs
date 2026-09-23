@@ -71,12 +71,17 @@ Receiving a founding event, on every member device (reconciliation, a fresh devi
 
 ### Requirement: A cell is two dedicated replicas
 
-A cell SHALL be served by exactly two pdn-store replicas — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other cell's stores. Two cells SHALL NOT share a replica, whatever their member sets. Both stores SHALL be addressed through the cell id, and no domain namespace id is allocated for either. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states.
+A cell SHALL be served by exactly two pdn-store replicas — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other cell's stores. Two cells SHALL NOT share a replica, whatever their member sets. Both stores SHALL be addressed through the cell id, and no domain namespace id is allocated for either. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a cell's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a directory, a connection metadata store, another cell's store or the cell's other store — with nothing registered, and a data import SHALL refuse a ticket naming a cell's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
 
 #### Scenario: Creating a cell allocates two dedicated replicas
 
 - **WHEN** a node creates a cell
 - **THEN** two fresh pdn-store replicas are created for it, both reached through the cell id, and no domain namespace id is allocated
+
+#### Scenario: A store ticket naming a replica held in another role is refused
+
+- **WHEN** a joining identity is handed a store ticket whose namespace it already holds as a data store received under a grant
+- **THEN** the join fails with no cell registered, and the data store is still held and reconciled as before
 
 #### Scenario: Two cells with the same members are four replicas
 
@@ -413,7 +418,7 @@ A tombstone SHALL be the store's empty entry at a record's key — the key of th
 
 ### Requirement: Entries outside the key layout are kept, used by nothing, and listed
 
-An entry in either store whose key fits neither store's layout, or fits one only in part, SHALL be admitted when its author resolves to a device of a current member, and dropped silently otherwise; once admitted it SHALL be reconciled, held and relayed like any entry. No membership fold, no admission verdict and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
+An entry in either store whose key fits neither store's layout, or fits one only in part, SHALL be admitted when its author resolves to a device of a current member, and dropped silently otherwise; once admitted it SHALL be reconciled, held and relayed like any entry. A key longer than the store's bound of 8,192 bytes is dropped before any layout is read ([capability-gated ingest](../capability-gated-ingest/spec.md)), so every record key the layouts define, a record's id included, has to fit under that bound. No membership fold, no admission verdict and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
 
 #### Scenario: An unknown entry from a member converges and changes nothing
 

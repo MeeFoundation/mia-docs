@@ -28,7 +28,7 @@ The demonstration SHALL name each node it uses, the person or persona it stands 
 
 4 nodes are needed, and each for a reason. The granting identity's first device and the grantee are 2. A third is required because 2 acts need a node that stays up while another goes away — the granting identity's second device joining, and that device serving the grantee after the first is gone. A fourth is required because the outsider must hold no connection to the granting identity, and the other three all do.
 
-The fourth cannot be saved by hosting a second identity on the grantee's phone. The data service is keyed by the issuer whose namespace is read, not by the identity a screen believes it is acting under, so once that phone has bound the granting identity's replica it answers the read whichever identity is selected. The outsider is a node or it is nothing.
+The fourth is a node rather than a second identity on the grantee's phone, although the platform would carry either: every operation names the identity performing it and reaches nothing a co-located identity holds, so an identity hosted beside the grantee reads none of the granting identity's replica (ADR-0013). It stays a node because an outsider shown on the grantee's own phone is not watched as an outsider — the refusal it demonstrates is about a stranger's device, and the audience sees the device.
 
 Where a node is a process on the presenter's machine rather than a phone, the narration says so, and says that its payload is carried by hand because a machine does not read a code off a screen.
 

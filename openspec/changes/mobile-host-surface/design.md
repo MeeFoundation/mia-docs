@@ -77,6 +77,8 @@ This is the one place the surface breaks its own "one exported call, one service
 
 The runtime holds every replica in memory. On a container an unbounded entry payload is a large allocation; on a phone it is the end of the process, and with it every identity the node hosts. The facade therefore bounds one payload by a stated ceiling and refuses above it before calling the runtime, as the HTTP host bounds its own. Memory pressure is the one operating condition a phone adds that a container never had.
 
+The other half of that pressure is the replica stores' own caches, and the spawn now names it: a node states the memory its replica stores may hold together, and one identity's store bounds its cache at that memory divided by the identities the storage directory holds when the store opens (identity-scoped-replicas D14). The count is the node's to read, not the facade's to state, so a mobile host states one number and a facade that names none still runs on the default. The figure to state it from is measured: a store of 100,000 entries holds 36 MiB resident, about half of its 64 MiB file, and a share below that costs evictions rather than correctness (identity-scoped-replicas, Measurement).
+
 ## Operating conditions
 
 Walked per [operating-conditions](../../specs/code-practices/operating-conditions.md), for the facade rather than for the demonstration.

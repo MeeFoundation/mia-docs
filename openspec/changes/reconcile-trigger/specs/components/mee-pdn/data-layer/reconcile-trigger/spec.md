@@ -6,12 +6,17 @@ A capability-scoped peer — authorized (per subset-rbsr) to read only a subset 
 
 ### Requirement: A covered write triggers the covered scoped peers
 
-When a write lands in a replica, the serving node SHALL trigger — directly, not by broadcast — exactly those scoped peers whose read capabilities cover the written claim. The trigger SHALL carry no claim content; the triggered peer fetches through filtered reconciliation. Triggers are best-effort: a missed trigger SHALL be compensated by the next reconciliation, which remains the sole carrier of correctness.
+When a write lands in a replica, the serving node SHALL trigger — directly, not by broadcast — exactly those scoped peers whose read capabilities cover the written claim. A peer SHALL be addressed as a node together with the identity holding the replica there, since one node may hold one issuer's namespace for two identities at once, each under its own grant; an addressed identity hosted on the sending node itself SHALL be triggered inside the process, where its reconciliation already runs. The trigger SHALL carry no claim content; the triggered peer fetches through filtered reconciliation. Triggers are best-effort: a missed trigger SHALL be compensated by the next reconciliation, which remains the sole carrier of correctness.
 
 #### Scenario: Only the covered peer is triggered
 
 - **WHEN** an issuer holds 1,000,000 claims, 1,000 peers each hold a capability on 1 distinct claim, and the issuer writes the claim covered by peer B's capability
 - **THEN** peer B receives 1 trigger and fetches that claim through filtered reconciliation, and the other scoped peers receive nothing
+
+#### Scenario: A node holding the namespace for two identities is triggered per identity
+
+- **WHEN** one node holds one issuer's namespace for two identities it hosts, each granted a different claim, and the issuer writes the claim covered by the first identity's grant
+- **THEN** the first identity's replica is triggered and the second one's is not, although both replicas sit on one node
 
 #### Scenario: An unshared write triggers no one
 

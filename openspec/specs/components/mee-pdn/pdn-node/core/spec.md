@@ -76,30 +76,48 @@ A grant SHALL name the granting identity itself as the data issuer; publishing o
 - **THEN** the operation is refused as unsupported delegation, and no grant record for that issuer ever reaches the peer's view of the pair
 
 ### Requirement: Data service writes, reads, lists, and imports granted namespaces
-The data service SHALL write and read entries in a hosted issuer's [data namespace](../../data-layer/data-store/spec.md), SHALL list its entries as metadata (no payload bytes; optionally filtered by a path prefix), SHALL share a namespace hosted here as a ticket, and SHALL import a peer's namespace from a ticket obtained out of band: the imported replica stays outside its gossip swarm and is re-served only to the devices of the grant's audience identity, per the locally replicated grant record ([subset reconciliation](../../data-layer/subset-reconciliation/spec.md)). A ticket is addressing, not access: an armed issuer serves a caller only per its recorded grants, so an out-of-band ticket with no grant behind it delivers nothing. The sanctioned transport for namespace access between connected identities is the connections service's grant surface above, which the runtime acts on by itself; the import operation remains for a ticket obtained out of band. A write addressed at a granted namespace SHALL be refused up front when the local grant record's write set does not cover the claim — the error arrives at the call site, before the replica is touched. The refusal SHALL rest on a grant this node has actually read: a record whose payload is still replicating says nothing about what it covers, and refusing there would turn a courtesy into a denial of writes the issuer would keep. The enforcement proper is the issuer-side ingest gate, and the writer-side outcome of a bypass is [write retraction](../../data-layer/write-retraction/spec.md).
+Every data operation SHALL name the identity performing it, and SHALL act for that identity alone. The data service SHALL write and read entries in a hosted issuer's [data namespace](../../data-layer/data-store/spec.md), SHALL list its entries as metadata (no payload bytes; optionally filtered by a path prefix), SHALL share a namespace the identity issues as a ticket, and SHALL import a peer's namespace from a ticket obtained out of band for the identity named: the imported replica stays outside its gossip swarm and is re-served only to the devices of the grant's audience identity, per the locally replicated grant record ([subset reconciliation](../../data-layer/subset-reconciliation/spec.md)). An import under the identity's own id SHALL be refused, whatever namespace its ticket names: an identity holds its own data as its issuer, and a binding under a grant would take that replica out of its swarm and away from its own devices, or drop it for the ticket's replica. A ticket is addressing, not access: an armed issuer serves a caller only per its recorded grants, so an out-of-band ticket with no grant behind it delivers nothing. The sanctioned transport for namespace access between connected identities is the connections service's grant surface above, which the runtime acts on by itself; the import operation remains for a ticket obtained out of band. A namespace imported that way has no grant record behind it, so this node re-serves it to no one — not to another holder of the same ticket and not to the importing identity's own devices, which import their own ticket if they want it — while its entries stay readable to the identity that imported it. A namespace the identity holds under a grant or imported out of band SHALL NOT be shared. A ticket minted there would add no reader: this node serves such a replica only to the audience identity's own devices, which the grant binder already reaches, and serves an out-of-band import to no one. Minting it would also restart the replica's sync as if the identity issued it — back in the gossip swarm, and naming the identity instead of the issuer to every peer the engine recorded, which the issuer's devices refuse as not hosted. A write addressed at a granted namespace SHALL be refused up front when the local grant record's write set does not cover the claim — the error arrives at the call site, before the replica is touched. The refusal SHALL rest on a grant this node has actually read: a record whose payload is still replicating says nothing about what it covers, and refusing there would turn a courtesy into a denial of writes the issuer would keep. The enforcement proper is the issuer-side ingest gate, and the writer-side outcome of a bypass is [write retraction](../../data-layer/write-retraction/spec.md).
 
 #### Scenario: Write then read locally
-- **WHEN** an entry is written under a hosted issuer at a path
-- **THEN** reading that issuer and path returns the payload
+- **WHEN** an entry is written under a hosted issuer at a path, by the identity that issues it
+- **THEN** reading that issuer and path as that identity returns the payload
 
 #### Scenario: Listing yields exactly the written paths
 - **WHEN** entries are written at two paths under a hosted issuer
-- **THEN** listing that issuer yields exactly those two paths, without payload bytes
+- **THEN** listing that issuer as the identity that issues it yields exactly those two paths, without payload bytes
+
+#### Scenario: A co-located identity reads nothing of another's granted namespace
+- **WHEN** one hosted identity holds a namespace under a grant and a co-located identity, holding no grant of that issuer, reads and lists the same issuer
+- **THEN** both operations fail with the unknown-issuer error, and nothing of that namespace is returned
 
 #### Scenario: A bare ticket delivers nothing from an armed issuer
-- **WHEN** runtime A shares issuer I's namespace as a ticket out of band and runtime B, holding no grant from I, imports it
-- **THEN** the import itself succeeds as a local registration, and no entry of I's namespace ever reaches B — A refuses B's sessions as if the replica were not hosted
+- **WHEN** runtime A shares issuer I's namespace as a ticket out of band and an identity on runtime B, holding no grant from I, imports it
+- **THEN** the import itself succeeds as a local registration held for that identity, and no entry of I's namespace ever reaches B — A refuses B's sessions as if the replica were not hosted
+
+#### Scenario: What was imported out of band is re-served to nobody
+
+- **WHEN** an identity imports a namespace from a ticket obtained out of band, and a sibling device of that identity or another holder of the same ticket asks this node to sync it
+- **THEN** the request is refused indistinguishably from the replica not being hosted, and the entries stay readable to the identity that imported them
+
+#### Scenario: An import under the identity's own id is refused
+
+- **WHEN** an identity imports a ticket under its own id, naming its own namespace or another identity's
+- **THEN** the import is refused, and the identity still shares its own namespace and reads its own entries
+
+#### Scenario: A namespace held as a grantee is not shared
+- **WHEN** an identity asks to share a namespace it holds under a grant, or one it imported out of band
+- **THEN** the operation is refused before the replica is touched, while the issuer shares the same namespace
 
 #### Scenario: A write on a write-granted claim reaches the issuer
-- **WHEN** a peer's grant carries write on a claim and the audience runtime writes that claim under the peer's issuer
+- **WHEN** a peer's grant carries write on a claim and the audience identity writes that claim under the peer's issuer
 - **THEN** the issuer's runtime eventually reads the written value, and the audience reads the same value back through its granted view
 
 #### Scenario: A write outside the write set is refused up front
-- **WHEN** the audience runtime writes, under the peer's issuer, a claim its grant covers read-only
+- **WHEN** the audience identity writes, under the peer's issuer, a claim its grant covers read-only
 - **THEN** the operation fails at the call site and the local replica is unchanged
 
 #### Scenario: Unhosted issuer is refused
-- **WHEN** a read, write, or list addresses an issuer the runtime neither created nor imported
+- **WHEN** a read, write, or list names an identity and an issuer that identity neither created nor imported
 - **THEN** the operation fails with an unknown-issuer error, and nothing is read, written, or listed
 
 ### Requirement: The runtime surfaces retraction verdicts
@@ -110,58 +128,9 @@ The runtime SHALL expose a subscription to write-retraction events of its hosted
 - **WHEN** a hosted identity's write into a granted namespace is retracted
 - **THEN** a subscriber on that runtime observes one event naming the retracted entry's issuer, path, author, timestamp, and content hash
 
-### Requirement: Granted namespaces bind and unbind with their grant record
-
-The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names. A grant whose ticket comes to name a different replica SHALL be re-imported onto it. A grant that disappears from the counterparty's replica SHALL take its binding back out.
-
-The backing replica is shared: one namespace per issuer (ADR-0009) means every pair whose grant names this issuer binds the same replica. The runtime SHALL therefore forget the replica only with the last such binding — while any other pair still holds one, only the unbinding pair's bookkeeping leaves and the issuer keeps resolving. Once no pair holds it, the runtime SHALL forget what was imported, so the issuer resolves to nothing again rather than to a replica no grant justifies.
-
-The decision that destroys the replica SHALL be grounded in the durable grant records, not in in-memory bookkeeping alone: the bookkeeping is empty after a restart and rebuilds sweep by sweep, and a pair whose binder has not swept yet still holds its grant. A live readable grant record in any open pair therefore keeps the replica, whatever the bookkeeping says.
-
-The import bookkeeping SHALL be an optimization, not the arbiter. An issuer already resolving to the very namespace a grant names SHALL be adopted into the bookkeeping rather than re-imported: each import holds one more open handle on the replica, and the drop at the end of its life must find exactly one. An issuer resolving to nothing SHALL be re-imported even when the bookkeeping names exactly the namespace the grant carries, so a replica forgotten while the bookkeeping survived comes back on the pair's next sweep instead of being skipped forever.
-
-The runtime SHALL bound this to what it imported itself. A namespace imported by any other route SHALL never be forgotten by this mechanism, and the explicit import operation SHALL remain available for a ticket obtained out of band. Nor SHALL such a namespace be displaced: while an issuer resolves to a replica an import of another route bound, a grant whose ticket names a different replica waits, and the binding follows the grant only once that import is forgotten or the grant comes to name the replica the issuer already resolves to — re-importing over it would have two owners displace each other on every sweep.
-
-Watching SHALL include the counterparty replica's payload arrivals, not only its entry arrivals: a grant's ticket travels as a payload blob, so a record whose entry has replicated is not yet a ticket that can be acted on.
-
-#### Scenario: A grant binds its namespace with no import act
-
-- **WHEN** a connected peer publishes a grant of its data store toward a hosted identity, and the grant record and its ticket payload replicate to the identity's runtime
-- **THEN** the runtime imports the granted namespace by itself and the granted entries become readable there, with no import operation invoked by the caller
-
-#### Scenario: A linked device binds a grant established elsewhere
-
-- **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
-- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
-
-#### Scenario: A withdrawn grant unbinds its namespace
-
-- **WHEN** the granting peer withdraws the grant and the tombstone replicates to the grantee's copy of the pair
-- **THEN** the grantee forgets the namespace it imported under that grant, and operations addressing that issuer fail with an unknown-issuer error
-
-#### Scenario: A withdrawal toward one audience spares the co-hosted other
-
-- **WHEN** one node hosts two identities granted by the same issuer, and the issuer withdraws the grant toward one of them
-- **THEN** the other still reads the shared replica's entries and receives the issuer's fresh writes, and only the last withdrawal makes the issuer resolve to nothing
-
-#### Scenario: The unbind decision counts grants, not bookkeeping
-
-- **WHEN** the binder's record of one co-hosted audience's import is absent — as after a restart, before that pair's first sweep — while its grant sits live and readable in its pair, and the issuer withdraws toward the other audience
-- **THEN** the shared replica stays
-
-#### Scenario: A forgotten replica re-imports on the next sweep
-
-- **WHEN** a bound replica is forgotten while the binder's bookkeeping still names its import, and the pair's replica changes next
-- **THEN** the runtime re-imports the granted namespace and its entries are readable again
-
-#### Scenario: An out-of-band import is not unbound
-
-- **WHEN** a runtime imports a namespace from a ticket obtained outside any grant, and no grant record for that issuer exists in any of its pairs
-- **THEN** the imported namespace stays bound — the binding mechanism forgets only namespaces it imported itself
-
 ### Requirement: A granted replica's sibling contacts follow the audience directory
 
-The runtime SHALL point a granted replica at the other devices of the identities the grants on it are addressed to, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from those identities' directory device records rather than kept beside them, and SHALL be re-derived as the directories change, so a device linked after the namespace was imported is dialed too. Only the directories of hosted identities holding a grant of this issuer SHALL be consulted: the devices of a hosted identity unrelated to the replica — no grant of this issuer names it — SHALL NOT become its contacts.
+The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's directory device records rather than kept beside them, and SHALL be re-derived as the directory changes, so a device linked after the namespace was imported is dialed too. The directory of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
 
 #### Scenario: A sibling contact is dialed with the issuer offline
 
@@ -173,9 +142,76 @@ The runtime SHALL point a granted replica at the other devices of the identities
 - **WHEN** a runtime hosts a second identity that holds no grant from the issuer
 - **THEN** that identity's devices do not appear among the granted replica's contacts
 
-### Requirement: A granted replica reaches the issuer's other devices
+#### Scenario: A co-located audience's devices are not contacts either
 
-The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata stores of the connections whose grants bind this issuer here, in addition to the addresses the grant's ticket carried and the audience identities' own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
+- **WHEN** a runtime hosts a second identity granted by the same issuer, holding a replica of its own
+- **THEN** each replica's contacts are its own identity's devices and the issuer devices its own connection publishes
+### Requirement: Sync service reports the node id and the hosted identities
+The sync service SHALL report the runtime's node id (its endpoint id) and the identities the runtime hosts — exactly those created or linked on it. It SHALL also answer a storage check from the replica store itself — the read a host's readiness probe rests on ([host](../../pdn-node-http/host/spec.md)) — because every other report here is in-memory bookkeeping, which a store that stopped answering leaves untouched.
+
+#### Scenario: Hosted identities follow create and link
+- **WHEN** a fresh runtime reports its status, then creates one identity and links another
+- **THEN** the report lists no identities first and afterwards exactly those two, with the node id unchanged throughout
+### Requirement: A granted namespace binds and unbinds for the identity its grant addresses
+
+The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names for that identity. A grant whose ticket comes to name a different replica SHALL be re-imported onto it, and the replica it bound before SHALL be forgotten in that import, so a counterparty that keeps moving its grant leaves no replica behind. A grant that disappears from the counterparty's replica SHALL take its binding back out, and the replica it bound SHALL be forgotten with it, so the issuer resolves to nothing for that identity again.
+
+The replica belongs to the identity the grant addresses, and one pair binds one issuer there: a grant names its own identity as the data issuer, and an identity holds one connection per counterparty. A withdrawal therefore decides from the pair it swept alone, and a co-located identity granted by the same issuer holds a replica of its own that the withdrawal leaves untouched.
+
+The import bookkeeping SHALL be an optimization, not the arbiter. An issuer already resolving in that identity to the very namespace a grant names SHALL be adopted into the bookkeeping rather than re-imported: each import holds one more open handle on the replica, and the drop at the end of its life must find exactly one. An issuer resolving to nothing SHALL be re-imported even when the bookkeeping names exactly the namespace the grant carries, so a replica forgotten while the bookkeeping survived comes back on the pair's next sweep instead of being skipped forever.
+
+The runtime SHALL bound this to what it imported itself. A namespace imported by any other route SHALL never be forgotten by this mechanism, and the explicit import operation SHALL remain available for a ticket obtained out of band. Nor SHALL such a namespace be displaced: while an issuer resolves in that identity to a replica an import of another route bound, a grant whose ticket names a different replica waits, and the binding follows the grant only once that import is forgotten or the grant comes to name the replica the issuer already resolves to — re-importing over it would have two owners displace each other on every sweep.
+
+Watching SHALL include the counterparty replica's payload arrivals, not only its entry arrivals: a grant's ticket travels as a payload blob, so a record whose entry has replicated is not yet a ticket that can be acted on.
+
+#### Scenario: A grant binds its namespace with no import act
+
+- **WHEN** a connected peer publishes a grant of its data store toward a hosted identity, and the grant record and its ticket payload replicate to the identity's runtime
+- **THEN** the runtime imports the granted namespace for that identity by itself and the granted entries become readable there, with no import operation invoked by the caller
+
+#### Scenario: A linked device binds a grant established elsewhere
+
+- **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
+- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
+
+#### Scenario: A withdrawn grant unbinds its namespace
+
+- **WHEN** the granting peer withdraws the grant and the tombstone replicates to the grantee's copy of the pair
+- **THEN** the grantee forgets the namespace it imported under that grant, and operations addressing that issuer as that identity fail with an unknown-issuer error
+
+#### Scenario: A withdrawal toward one audience spares the co-hosted other
+
+- **WHEN** one node hosts two identities granted by the same issuer, and the issuer withdraws the grant toward one of them
+- **THEN** the withdrawn identity's replica is forgotten and its issuer resolves to nothing for it, while the co-located identity goes on reading its own replica and receiving the issuer's fresh writes there
+
+#### Scenario: A forgotten replica re-imports on the next sweep
+
+- **WHEN** a bound replica is forgotten while the binder's bookkeeping still names its import, and the pair's replica changes next
+- **THEN** the runtime re-imports the granted namespace and its entries are readable again
+
+#### Scenario: A grant moved onto another replica replaces the one it bound
+
+- **WHEN** the counterparty's grant record comes to carry a ticket of a namespace other than the one it bound, and the record replicates to the grantee's copy of the pair
+- **THEN** the grantee imports the namespace the record now names, and the replica the grant bound before is no longer held or reconciled
+
+#### Scenario: A grant waits while an out-of-band import holds its issuer
+
+- **WHEN** a runtime has imported a namespace out of band under an issuer, and that issuer's grant naming a different namespace then becomes readable in the pair
+- **THEN** the grant's sweep neither imports the granted namespace nor forgets the one imported out of band
+
+#### Scenario: An out-of-band import is not unbound
+
+- **WHEN** a runtime imports a namespace from a ticket obtained outside any grant, and no grant record for that issuer exists in any of its pairs
+- **THEN** the imported namespace stays bound — the binding mechanism forgets only namespaces it imported itself
+
+#### Scenario: A withdrawal leaves an out-of-band import that holds the issuer
+
+- **WHEN** a runtime holding a grant's namespace imports another namespace out of band under that grant's issuer, and the grant is then withdrawn
+- **THEN** the namespace imported out of band stays bound and held — the withdrawal forgets only the replica the grant bound, and that one had already been replaced
+
+### Requirement: A granted replica reaches the issuer devices its own connection publishes
+
+The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata store of the connection whose grant bound this replica, in addition to the addresses the grant's ticket carried and the holding identity's own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
 
 A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own directory is not a source here: it is device-internal and the audience cannot read it.
 
@@ -183,9 +219,7 @@ Leaving the contact set is what this requirement governs. The sync engine keeps 
 
 The set published by a counterparty SHALL be used only for namespaces that counterparty issues. It is the issuer's device set exactly while the two are the same identity, which the grant surface holds today by refusing to publish a grant of another identity's data; a delegated grant would need the originating issuer's set, and this requirement does not supply it.
 
-One node may host several identities granted by the same issuer; with one namespace per issuer they bind one replica, and the replica's contact set SHALL union every such audience's siblings and every such connection's published issuer devices, rather than carry whichever set the last sweeping identity read. Each connection's records replicate on their own, so their statements of the issuer's device set differ while one lags, and one connection's word taken as the whole set would strip a device the issuer never withdrew. A device therefore leaves the contact set once no connection whose grant binds this issuer publishes it, not at the first withdrawal; while any of them still names the device it stays a route to the one replica, and what a session delivers is governed by classification as ever.
-
-The same union SHALL govern the device set the runtime consults to decide whose writes it may retract, which is per replica for the same reason: a set read from one connection alone would leave a rejection from a device the others publish unhonored, and a provisional write standing that the issuer refused.
+One node may host several identities granted by the same issuer, and each holds a replica with stores of its own: the contact set of each SHALL come from that identity's own connection alone, and the device set the runtime consults to decide whose writes it may retract SHALL be read from the same one connection. A withdrawal a counterparty publishes toward one identity therefore governs that identity's replica and leaves the co-located one as it was.
 
 #### Scenario: The audience converges from a device that did not publish the grant
 
@@ -199,13 +233,13 @@ The same union SHALL govern the device set the runtime consults to decide whose 
 
 #### Scenario: A withdrawn device stops being a contact
 
-- **WHEN** the issuing identity withdraws a device's published record from every connection whose grant binds this issuer on the audience node
-- **THEN** that device is no longer among the granted replica's contacts, while the still-published device remains
+- **WHEN** the issuing identity withdraws a device's published record from the connection whose grant bound the replica
+- **THEN** that device is no longer among that replica's contacts, while the still-published device remains
 
-#### Scenario: A device withdrawn in one audience's connection stays while another publishes it
+#### Scenario: A withdrawal toward one audience leaves the co-located one alone
 
 - **WHEN** one node hosts two identities granted by the same issuer and the issuer withdraws a device's record from one of the two connections only
-- **THEN** that device remains among the replica's contacts, and leaves once the record is withdrawn from the other connection too
+- **THEN** that device leaves the contacts of that identity's replica and stays among the contacts of the co-located identity's replica
 
 #### Scenario: Another counterparty's devices are not contacts
 
@@ -217,19 +251,12 @@ The same union SHALL govern the device set the runtime consults to decide whose 
 - **WHEN** the grant is published from a device the issuer linked later — the founder never touches the grant surface — and the publishing device then goes offline
 - **THEN** the audience converges on the granted claims from the founder
 
-#### Scenario: Audiences hosted together keep both sibling sets
+#### Scenario: Audiences hosted together keep separate replicas
 
 - **WHEN** one node hosts two identities and one issuer grants each of them a claim of its namespace
-- **THEN** the one bound replica's contact set holds the issuer's devices and both identities' siblings at once
+- **THEN** the node holds a replica per identity, each carrying the claim its own grant names and dialing its own contacts
 
 #### Scenario: A re-grant after withdrawal rebuilds the contacts
 
 - **WHEN** a grant is withdrawn — the audience's binder forgets the namespace — and the issuer grants the same claim anew
 - **THEN** the audience converges again, and the fresh import's contact set counts the issuer's other devices as before
-
-### Requirement: Sync service reports the node id and the hosted identities
-The sync service SHALL report the runtime's node id (its endpoint id) and the identities the runtime hosts — exactly those created or linked on it. It SHALL also answer a storage check from the replica store itself — the read a host's readiness probe rests on ([host](../../pdn-node-http/host/spec.md)) — because every other report here is in-memory bookkeeping, which a store that stopped answering leaves untouched.
-
-#### Scenario: Hosted identities follow create and link
-- **WHEN** a fresh runtime reports its status, then creates one identity and links another
-- **THEN** the report lists no identities first and afterwards exactly those two, with the node id unchanged throughout

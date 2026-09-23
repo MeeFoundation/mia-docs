@@ -26,23 +26,23 @@ A node hosts the store sets of several identities of one person — Alice-at-wor
 
 ## Decision Outcome
 
-Chosen: **a scope per hosted identity** — its own replicas, its own author, its own sessions — over the endpoint the node already has. It removes the mixing where the mixing happens, in storage and in authorship, without paying a transport per identity; and what it gives holds without anyone remembering to apply it.
+Chosen: **replicas, an author and sessions per hosted identity**, over the endpoint the node already has. It removes the mixing where the mixing happens, in storage and in authorship, without paying a transport per identity; and what it gives holds without anyone remembering to apply it.
 
 The shape, specified by the identity-scoped replicas and in-process sessions capabilities under `components/mee-pdn/data-layer/` and by [multi-identity](../../components/mee-pdn/data-layer/multi-identity/spec.md):
 
-* Every replica belongs to exactly one identity's scope, and the act that creates or imports it names that scope. Two identities that acquired one namespace hold a replica each.
-* A sync session names the replica's scope and the scope its caller acts as. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted.
-* A session's rights, its egress filter and its write admission follow the named scope alone, and are never unioned across the identities a node hosts.
+* Every replica belongs to exactly one hosted identity, and the act that creates or imports it names that identity. Two identities that acquired one namespace hold a replica each.
+* A sync session names the identity whose replica it addresses and the identity its caller acts as, as opaque bytes the store compares and never interprets. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted.
+* A session's rights, its egress filter and its write admission follow the named identity alone, and are never unioned across the identities a node hosts.
 * Each identity writes with its own author, persisted with its own stores.
 * Two identities of one node reach each other through a path inside the process, because a node does not dial its own endpoint; they establish, grant and converge exactly as identities on two nodes do.
 
-The arrangement is sized for a personal device carrying between 1 and 10 identities of one person. A node shared by different people is a question of process boundaries rather than of scopes, and is not what this decision answers.
+The arrangement is sized for a personal device carrying between 1 and 10 identities of one person. A node shared by different people is a question of process boundaries rather than of how one node divides itself, and is not what this decision answers.
 
 ### Consequences for access
 
 * Good — a session serves exactly what the identity named in it was granted, so a node holding two grants of one issuer receives each on its own.
 * Good — a withdrawal toward one identity closes that identity's access and leaves a co-located identity's untouched, the two holding separate replicas.
-* Good — a local read answers from the acting identity's scope, so an issuer only a co-located identity holds is unknown to the caller.
+* Good — a local read answers from the acting identity's own stores, so an issuer only a co-located identity holds is unknown to the caller.
 * Good — an entry names the identity that wrote it, so a cell member and a counterparty bind an author to an identity rather than to a device.
 * Neutral — a node's claim to act as an identity is checked against that identity's device set rather than proven; a node that legitimately hosts two identities can act as either, which it can do in any arrangement, holding the material of both.
 * Bad — payload bytes stay content-addressed in one store per node and are served to any caller that asks for a hash, so the isolation covers entries and not payload transfer; closing it belongs with identity-bound authorization.
@@ -53,7 +53,7 @@ The arrangement is sized for a personal device carrying between 1 and 10 identit
 * Bad — one endpoint is one node id, published in the device set of every identity the node hosts, so a counterparty of two identities of one person sees that they share a node.
 * Neutral — the network says as much: those identities share an address and a relay, and they are online together.
 * Good — the author no longer correlates them, each identity writing under its own.
-* Neutral — separating the node ids is what an endpoint per identity would take; this decision leaves everything above the scope independent of how many endpoints a node binds, so that arrangement stays open.
+* Neutral — separating the node ids is what an endpoint per identity would take; this decision leaves everything above the hosted identity independent of how many endpoints a node binds, so that arrangement stays open.
 
 ### Other consequences
 

@@ -53,3 +53,40 @@ A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHA
 #### Scenario: A panicking handler does not take down the node
 - **WHEN** node A spawns with a handler that panics mid-accept, and node B dials it and drives a stream
 - **THEN** that connection fails and node A still converges a replica with node B over the ordinary ticket flow
+### Requirement: Shutdown stops every protocol side by side, and a late call fails
+The node's shutdown SHALL stop a supplied handler beside the built-in stack rather than before it: the router shuts every protocol down at once, the blob store and gossip among them. A supplied handler whose work in flight writes through the node's stores therefore SHALL be let finish by its owner before the node's shutdown is called — a wait inside the handler's own shutdown runs against stores already going away. A call into a replica store that reaches it after its shutdown began, including one already queued behind the shutdown, SHALL fail rather than wait: its caller would otherwise wait for as long as any handle to the store lives.
+
+#### Scenario: A request queued behind the store's shutdown fails
+- **WHEN** a request to a replica store is queued behind that store's shutdown
+- **THEN** the shutdown completes and the request's caller receives an error rather than waiting
+
+### Requirement: An accepted sync connection is dispatched to the hosted identity it names
+
+The node SHALL read the [identity](../../../../architecture/language/mee-identity.md) an accepted sync connection names before the session reaches any replica, and SHALL hand the session to that hosted identity alone. A connection naming an identity the node does not host SHALL be refused indistinguishably from the replica not being hosted, and no hosted identity SHALL observe a session addressed to another.
+
+What the node reads before it knows whom a connection addresses SHALL be bounded. The first message names the namespace, the two identities and a first range whose two boundaries carry one key each, so the largest one an honest node sends is fixed by the longest key a replica holds, 8,192 bytes, and comes to about 16 KiB. A first message whose length prefix announces more than 32 KiB SHALL be refused on the prefix alone, before its body is read, so a caller that holds no ticket and no grant makes the node hold no more than that per connection. The session a classified caller goes on to run reads its later messages under the session's own ceiling, since one message of a first sync often carries a replica's whole content.
+
+#### Scenario: A session reaches the hosted identity it names
+
+- **WHEN** a peer syncs a namespace two identities of one node hold, naming one of them
+- **THEN** the entries it delivers land in the named identity's replica, and the other hosted identity's replica is unchanged by that session
+
+#### Scenario: An oversized first message is refused before its body
+
+- **WHEN** a peer opens a sync connection whose first message announces more than 32 KiB, and holds the stream open without sending the body
+- **THEN** the node refuses the connection on the announced length, without waiting for the body, and no replica is touched
+
+#### Scenario: The largest honest first message opens a session
+
+- **WHEN** a replica whose first key is 8,192 bytes long opens a session with its first message
+- **THEN** the message is read and the session proceeds
+
+#### Scenario: A session past its first message reads larger messages
+
+- **WHEN** a session opened with an ordinary first message goes on to carry a message larger than 32 KiB
+- **THEN** that message is read, and a replica it carries whole reaches the other side whole
+
+#### Scenario: An unknown identity is refused
+
+- **WHEN** a session names an identity the node does not hold
+- **THEN** it is refused indistinguishably from the replica not being hosted, and no replica is touched

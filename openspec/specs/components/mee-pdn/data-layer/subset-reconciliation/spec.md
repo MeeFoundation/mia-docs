@@ -58,7 +58,7 @@ A claim SHALL be filtered out before transmission, never retracted after — Inv
 
 ### Requirement: The caller's rights are resolved once, at session setup
 
-A serving node SHALL resolve the caller's read rights when a reconciliation session is set up, and that resolution SHALL govern the session for its whole lifetime. A grant widened, narrowed, or withdrawn while a session is under way SHALL NOT change what that session serves — it governs the sessions set up after it. The ingest gate resolves the same records at the same moment ([capability-gated ingest](../capability-gated-ingest/spec.md)), so the read and write halves of one session's decisions rest on one state. The bound this places on revocation is the point rather than a side effect: a withdrawal takes effect from the next session, and what the peer obtained while it was granted stays with it — Invariant 2 governs acquisition, not retention.
+A serving node SHALL resolve the caller's read rights when a reconciliation session is set up, for the identity the caller names in that session and for no other identity its node id resolves to, and that resolution SHALL govern the session for its whole lifetime. A grant widened, narrowed, or withdrawn while a session is under way SHALL NOT change what that session serves — it governs the sessions set up after it. The ingest gate resolves the same records at the same moment ([capability-gated ingest](../capability-gated-ingest/spec.md)), so the read and write halves of one session's decisions rest on one state. The bound this places on revocation is the point rather than a side effect: a withdrawal takes effect from the next session, and what the peer obtained while it was granted stays with it — Invariant 2 governs acquisition, not retention.
 
 #### Scenario: A withdrawn grant refuses the next session and keeps delivered data
 
@@ -69,6 +69,11 @@ A serving node SHALL resolve the caller's read rights when a reconciliation sess
 
 - **WHEN** a grant is narrowed while a session over that replica is still exchanging rounds
 - **THEN** that session goes on serving what it was set up to serve, and the narrowing governs the next session
+
+#### Scenario: A node holding two grants is served each on its own
+
+- **WHEN** an issuer grants one claim to one identity and another claim to a co-located identity, and that node reconciles once for each
+- **THEN** each session serves the claim granted to the identity it names, and neither serves the other's
 
 ### Requirement: A session serves a view frozen at session setup
 
@@ -144,6 +149,8 @@ A peer whose access arrived through a grant SHALL NOT be a member of the replica
 
 Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
+A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a grant or imported it out of band. Minting restarts the replica's sync as a store of the minting identity's own: the replica rejoins the swarm, and every peer the engine recorded is dialed naming that identity instead of the issuer, which the issuer's devices refuse as not hosted.
+
 #### Scenario: A scoped peer receives nothing over gossip
 
 - **WHEN** a claim is written into a replica whose swarm is the issuer's devices, while scoped peers hold capabilities on other claims
@@ -166,7 +173,7 @@ Membership SHALL follow the recorded sync strategy in both directions: a grantee
 
 ### Requirement: A granted replica serves the audience identity's devices
 
-A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. On a node hosting several identities, only the directory of the identity the grant is addressed to is consulted.
+A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. The replica is held for one identity, and the session names it; the caller's named identity is resolved in that identity's own directory, so no other identity hosted on either node takes part in the decision.
 
 #### Scenario: A sibling catches up while the issuer is offline
 
@@ -190,7 +197,7 @@ A node holding a granted replica SHALL serve a sync session for it to a caller t
 
 ### Requirement: A granted replica reconciles with siblings as well as the issuer
 
-A granted replica's tracked contacts SHALL admit devices of the audience identities and of the issuer alike — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records. Setting SHALL replace the previous list, so a device absent from the new derivation stops being dialed by the periodic reconcile pass and the before-access nudge; both SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
+A granted replica's tracked contacts SHALL admit devices of the audience identity and of the issuer alike, each paired with the identity it is dialed as — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records. Setting SHALL replace the previous list, so a device absent from the new derivation stops being dialed by the periodic reconcile pass and the before-access nudge; both SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
 
 #### Scenario: The reconcile pass dials a sibling contact
 
@@ -202,6 +209,10 @@ A granted replica's tracked contacts SHALL admit devices of the audience identit
 - **WHEN** the tracked list is set anew without a device that was in it
 - **THEN** the following passes and nudges dial the new list, and the dropped device is not in it
 
+#### Scenario: A contact is dialed as the identity it belongs to
+
+- **WHEN** a granted replica held for one identity dials a contact derived from that identity's device records
+- **THEN** the session names that identity as the caller, and a device of a co-located identity is not among the contacts of this replica
 ### Requirement: Unauthorized callers are refused uniformly
 
 A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's directory and the local grant record; every other caller SHALL be refused.
@@ -211,7 +222,7 @@ A sync request for a hosted replica from a caller with no computable rights SHAL
 - **WHEN** a caller holding the replica's ticket but no grant requests a sync
 - **THEN** the request is refused with the same answer an unhosted replica would produce, and no fingerprint, count, or existence signal is revealed
 
-#### Scenario: A scoped holder does not re-serve to a third party
+#### Scenario: An identity holding a scoped replica does not re-serve it to a third party
 
-- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a sibling-minted ticket — asks a scoped holder to sync the issuer's replica
-- **THEN** the scoped holder refuses as for an unhosted replica, since it cannot compute a third party's rights
+- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a ticket that addresses a sibling device — asks the identity holding the scoped replica to sync the issuer's replica
+- **THEN** that identity refuses as for an unhosted replica, since it cannot compute a third party's rights

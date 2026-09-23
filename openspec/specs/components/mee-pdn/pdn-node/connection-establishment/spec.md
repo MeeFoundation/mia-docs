@@ -91,3 +91,35 @@ Establishment SHALL report a refusal by the inviter to its own caller as a refus
 #### Scenario: The refusal names no reason
 - **WHEN** establishment is refused for a wrong secret, for an expired one, and for an already burned one
 - **THEN** all three report the same refusal, carrying nothing that separates the three cases
+### Requirement: Two identities of one node establish through the same dialogue
+
+Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and the connection's metadata pair SHALL be two replicas — one held for each identity — that converge without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
+
+#### Scenario: Two identities of one node connect and exchange a grant
+
+- **WHEN** one hosted identity mints an invite and a co-located identity establishes from it, with no other node reachable
+- **THEN** each lists the other as a connection, and a grant one publishes reads back on the other, its granted claim arriving
+
+#### Scenario: The burned secret refuses a second attempt
+
+- **WHEN** the same invite payload is presented again by the co-located identity
+- **THEN** the establishment is refused and no second connection is recorded
+
+#### Scenario: A third identity on the node sees nothing of the pair
+
+- **WHEN** a third identity hosted on the same node lists its connections and reads grants toward the two
+- **THEN** it lists no connection with either and reads nothing of what they published to each other
+
+### Requirement: A stop lets the serving half in flight finish
+
+The runtime's shutdown SHALL let the serving half of every pairing dialogue in flight — one answering another node, and one answering another identity of the same node over the in-process pipe — finish within a fixed budget, before it stops anything that serving half writes through: the replica stores, the blob store, gossip. A stop that landed between the burn of the secret and the commit of the connection would leave the invite spent and the connection half assembled, with nothing to retry it. The wait SHALL come before the node's own protocols shut down, because those shut down side by side and a wait inside one of them runs against stores already going away. A dialogue that would begin after the wait SHALL be refused before its secret is verified, so nothing burns. The scanning half is the host's own call and is not waited for: a host awaits its `establish` before it stops the runtime.
+
+#### Scenario: A stop waits for the serving half of a dialogue from another node
+
+- **WHEN** the inviting runtime is shut down while its serving half has read the request and not yet verified it, and the runtime is started again on the same directory
+- **THEN** the shutdown returned only after the serving half finished, and the inviting identity lists the connection after the restart
+
+#### Scenario: A stop waits for the serving half of a co-located dialogue
+
+- **WHEN** the runtime is shut down while two of its identities are mid-dialogue, the serving half having read the request, and the runtime is started again on the same directory
+- **THEN** the shutdown returned only after the serving half finished, and the inviting identity lists the connection after the restart

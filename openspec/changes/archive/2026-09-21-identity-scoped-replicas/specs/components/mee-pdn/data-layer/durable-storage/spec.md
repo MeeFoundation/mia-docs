@@ -1,0 +1,68 @@
+# data-layer: durable storage — delta for identity-scoped-replicas
+
+## MODIFIED Requirements
+
+### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
+A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its private metadata directory, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
+
+#### Scenario: A fresh directory is provisioned
+- **WHEN** a node is spawned on a directory that does not exist
+- **THEN** the directory is created with owner-only permissions, a secret key is generated and stored the same way, and the node runs
+
+#### Scenario: The stores come back
+- **WHEN** a node writes entries, is shut down, and a node is spawned on the same directory
+- **THEN** the entries are readable, with their payloads, without any peer being reachable
+
+#### Scenario: Each hosted identity's stores come back as its own
+- **WHEN** a node hosting two identities writes an entry under each, is shut down, and a node is spawned on the same directory
+- **THEN** each identity reads back what it wrote, and neither reads the other's entry
+
+#### Scenario: A malformed key stops the start
+- **WHEN** a node is spawned on a directory whose key file cannot be parsed
+- **THEN** the spawn fails with an error naming that file, and no new key is written
+
+#### Scenario: A leftover staging file does not block the start
+- **WHEN** a node is spawned on a directory holding a half-written key staging file and no key
+- **THEN** a key is minted, the leftover is gone, and a later start on the directory reads the committed key back
+
+## ADDED Requirements
+
+### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
+A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory records as hosted — each subdirectory holding a hosting record — with the opening identity counted whether or not its record is written yet. A subdirectory with no record, which is what an unfinished create or link leaves, SHALL take no share. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory records, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
+
+#### Scenario: The default gives a single identity the whole budget
+- **WHEN** a node is spawned without naming a budget
+- **THEN** its one identity bounds its store's cache at the stated default budget
+
+#### Scenario: A store in memory carries no bound
+- **WHEN** a node spawned on memory provisions an identity
+- **THEN** that identity's store carries no cache bound, and the node reports no breach of its budget
+
+#### Scenario: A start cuts every share from the identities the directory records
+- **WHEN** a node is spawned on a directory recording two hosted identities and holding the subdirectory of a third that no commit recorded, and provisions the two
+- **THEN** each store opens bounded at half the budget, and the node reports no breach of its budget
+
+#### Scenario: An identity added later takes a share of its own
+- **WHEN** an identity is provisioned on a running node whose directory recorded one hosted identity before
+- **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
+
+### Requirement: One author per hosted identity, persisted with that identity's stores
+Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and prefix deletion are scoped to the writing author, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a counterparty or a cell binds to an identity on this device is that identity's author and not the node's.
+
+#### Scenario: A rewritten key keeps one live record
+- **WHEN** a hosted identity writes a path, the node restarts, and it writes the same path again
+- **THEN** the replica holds one live record for that path, carrying the newer value
+
+#### Scenario: A withdrawn device does not come back with a restart
+- **WHEN** a device is withdrawn from an identity's device set, and a device of that identity restarts
+- **THEN** the withdrawn device is absent from the set as read after the restart
+
+#### Scenario: Two identities on one node write as two authors
+- **WHEN** two identities hosted on one node each write an entry
+- **THEN** the two entries carry two different authors, and each identity's later writes carry the one it wrote with before
+
+## REMOVED Requirements
+
+### Requirement: One author per node, persisted with the stores
+**Reason**: The author is a property of a hosted identity rather than of a node: one author for every store made two identities of one node indistinguishable as writers, so an entry either could have written passed as either one's.
+**Migration**: The same persistence and the same latest-per-key behaviour are stated per hosted identity by "One author per hosted identity, persisted with that identity's stores"; a node that held one author writes each identity's entries under that identity's author instead.
