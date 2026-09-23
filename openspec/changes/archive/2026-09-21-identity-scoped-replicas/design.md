@@ -163,8 +163,14 @@ Creating or importing a replica names the identity it is held for, the private m
 
 Every replica sits in the identity of an identity the node hosts, and a data replica's session is judged by that identity's records; a session the records cannot judge is refused. The store takes a session access provider as a requirement of assembling it, so a consumer states what judges its sessions before it can serve one. A directory and a connection metadata store keep the ticket bound Invariants 1 and 3 give them, because a directory carries the records every other verdict reads and judging it by its own unconverged device set would close the bootstrap that delivers them.
 
+A session no one can judge is refused, so a store starts syncing only once it can be judged. A directory or a connection metadata store imported for an identity is tracked at the import and starts its sync when it is armed: hosting the identity starts the directory's, hosting the connection its two halves'. The grantee import registers its binding before its first sync for the same reason. Two sides of a connection arm at moments neither controls, and a first session the earlier side sends toward a later one is refused there; hosting a connection therefore points the identity's own half at the devices its peer half is dialed at, which hold both halves under the same identity each, so the side that arms second reaches the first over both.
+
 **Rejected alternatives:**
 
+- Start a device-shared store's sync at the import, as the library's own import does.
+  - **Cons:** the first dial reaches this identity's own book before the store is armed and is refused, and nothing retries it before the next reconcile pass — for two identities of one node, which share no gossip, a whole interval, and for a link with a tight budget a catch-up that times out.
+- Name the store's role in the import, so the import arms it.
+  - **Cons:** the knowledge of what kinds of device-shared store exist moves from the runtime into the data layer, and a connection, armed as a pair, would need both halves imported in one act.
 - Keep the store's provider optional, with an unset provider serving every session whole.
   - **Pros:** the fork's constructor and its upstream-derived suites stay as upstream wrote them.
   - **Cons:** the permissive posture is what a consumer gets by forgetting, on a fork whose reason to exist is the gate.

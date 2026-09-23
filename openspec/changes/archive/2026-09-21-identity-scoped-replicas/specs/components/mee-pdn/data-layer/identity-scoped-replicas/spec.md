@@ -25,6 +25,20 @@ Every replica a node holds SHALL belong to exactly one hosted identity, and the 
 - **WHEN** a ticket carried by a grant addressed to one identity is imported naming a different hosted identity
 - **THEN** the import is refused and neither identity holds a replica of it afterwards
 
+### Requirement: A device-shared store starts syncing once it is armed
+
+A private metadata directory or a connection metadata store imported for an identity SHALL start its sync only once it is armed for that identity's sessions — the directory when the identity is hosted on it, a connection's two halves when the connection is hosted. Until then this identity's own book knows nothing to judge the store's sessions by and refuses them, and a first session refused that way is retried by nothing before the next reconcile pass; two identities of one node share no gossip, so for them that pass is the only retry. The devices that hold one half of a connection hold the other, under the same identity each, so hosting a connection SHALL point the identity's own half at the devices its peer half is dialed at: whichever side of a connection arms second then reaches the first over both halves, including the one whose first session the earlier side lost.
+
+#### Scenario: Both halves converge whichever side arms first
+
+- **WHEN** two identities of one node import each other's half of a connection and arm it one after the other, on a node whose reconcile interval is far longer than the wait
+- **THEN** each reads the other's published devices within that wait
+
+#### Scenario: A co-located establishment reads the counterparty's devices at once
+
+- **WHEN** two identities of one node establish a connection on a node whose reconcile interval is far longer than the wait
+- **THEN** each reads the other's published devices within that wait, from the first session of the store the establishment imported
+
 ### Requirement: A sync session names the replica's identity and the caller's
 
 A sync session SHALL name the identity whose replica is addressed and the identity the caller acts as, and the serving side SHALL admit the caller's named identity only when the records it holds of that identity list the caller's authenticated node id among its devices — that identity's own directory where the serving node is one of its devices, and the device set the counterparty published into their connection's metadata store where a hosted issuer serves a counterparty, the same resolution each already uses for read rights. A caller naming an identity it is not a device of SHALL be refused indistinguishably from the replica not being hosted, and so SHALL a session naming an identity the node does not host. The session's rights, its egress filter and its write admission SHALL follow the named identities alone.
