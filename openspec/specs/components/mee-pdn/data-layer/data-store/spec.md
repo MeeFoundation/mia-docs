@@ -69,24 +69,24 @@ Concurrent writes to the same path on different devices SHALL resolve on every d
 - **THEN** both devices eventually read the same payload, and it is one of the two written
 
 ### Requirement: The data store is shared by ticket
-A data store SHALL be shareable as a ticket, and importing that ticket SHALL register the replica under the issuer on the importing node, joining it into the replica's sync. A write ticket admits writing through any local author; a read ticket admits replication only.
+A data store SHALL be shareable as a ticket, and importing that ticket SHALL register the replica under the issuer on the importing node, joining it into the replica's sync. A write ticket admits writing through any local author; a read ticket admits replication only. An import under an issuer that already resolves to another replica SHALL move the issuer onto the imported replica and forget the other one in the same act, so an issuer resolves to one replica for the identity that holds it, and a replica it no longer resolves to is neither reconciled nor kept.
 
 #### Scenario: Import joins the replica
 - **WHEN** a node imports a data store from its ticket under the issuer
 - **THEN** subsequent reads under that issuer on that node observe the replica's entries as they sync
 
+#### Scenario: An import onto another replica forgets the one it replaced
+- **WHEN** an identity holding an issuer's replica imports a ticket of another namespace under that same issuer, by the device-replication or the grantee import
+- **THEN** the issuer resolves to the imported replica, and the earlier replica is no longer held or reconciled
+
 ### Requirement: A registered data namespace can be forgotten
 Registering a data store under an issuer SHALL have a counterpart: forgetting an issuer's data namespace stops reconciling its replica, drops it, and removes the issuer's registration together — so operations addressed to that issuer afterwards fail with the unknown-issuer error, exactly as before the import, rather than resolving to a dropped replica. Dropping the replica without removing the registration is not sufficient and SHALL NOT be the surface offered: the issuer would still resolve, and its operations would fail as storage errors instead of the distinguishable refusal this store's addressing requirement mandates.
 
-Forgetting an issuer is not, however, the rollback of an import: an issuer can already be bound when an import runs, and forgetting would then delete a replica that import never brought up — permanently, since dropping takes the entries with it. An import SHALL therefore report what it did, and be undoable by that report alone: undoing an import that bound a free issuer forgets the namespace, and undoing one that replaced an existing binding restores that binding, dropping the imported replica only when it is not the one the restored binding names. A rollback SHALL NOT destroy state that predates the act it rolls back. This is the rollback path for an import that must not survive the operation that made it ([device-linking](../../pdn-node/device-linking/spec.md)).
+Forgetting an issuer is not, however, the rollback of an import: an issuer can already be bound when an import runs, and forgetting would then delete a replica that import never brought up — permanently, since dropping takes the entries with it. An import SHALL therefore report what it did, and be undoable by that report alone: undoing an import that bound a free issuer forgets the namespace. A rollback SHALL NOT destroy state that predates the act it rolls back; a replica the import itself moved its issuer away from is forgotten by the import, not by the rollback, and the rollback does not bring it back. This is the rollback path for an import that must not survive the operation that made it ([device-linking](../../pdn-node/device-linking/spec.md)).
 
 #### Scenario: Forgetting a namespace unregisters its issuer
 - **WHEN** a node imports the data namespace of an issuer, then forgets it
 - **THEN** the replica is no longer reconciled, and reading, writing, or listing under that issuer fails with the unknown-issuer error
-
-#### Scenario: Undoing an import that replaced a binding restores it
-- **WHEN** a node already bound to an issuer's namespace imports under that same issuer, and the import is then undone
-- **THEN** the earlier binding resolves again and its entries are still readable — the undo restored it rather than forgetting the issuer
 
 #### Scenario: Forgetting one issuer leaves the others addressable
 - **WHEN** a node hosts the data namespaces of two issuers and forgets one

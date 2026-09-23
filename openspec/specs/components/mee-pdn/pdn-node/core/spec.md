@@ -149,7 +149,7 @@ The sync service SHALL report the runtime's node id (its endpoint id) and the id
 - **THEN** the report lists no identities first and afterwards exactly those two, with the node id unchanged throughout
 ### Requirement: A granted namespace binds and unbinds for the identity its grant addresses
 
-The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names for that identity. A grant whose ticket comes to name a different replica SHALL be re-imported onto it. A grant that disappears from the counterparty's replica SHALL take its binding back out, and the replica it bound SHALL be forgotten with it, so the issuer resolves to nothing for that identity again.
+The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names for that identity. A grant whose ticket comes to name a different replica SHALL be re-imported onto it, and the replica it bound before SHALL be forgotten in that import, so a counterparty that keeps moving its grant leaves no replica behind. A grant that disappears from the counterparty's replica SHALL take its binding back out, and the replica it bound SHALL be forgotten with it, so the issuer resolves to nothing for that identity again.
 
 The replica belongs to the identity the grant addresses, and one pair binds one issuer there: a grant names its own identity as the data issuer, and an identity holds one connection per counterparty. A withdrawal therefore decides from the pair it swept alone, and a co-located identity granted by the same issuer holds a replica of its own that the withdrawal leaves untouched.
 
@@ -183,6 +183,16 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 
 - **WHEN** a bound replica is forgotten while the binder's bookkeeping still names its import, and the pair's replica changes next
 - **THEN** the runtime re-imports the granted namespace and its entries are readable again
+
+#### Scenario: A grant moved onto another replica replaces the one it bound
+
+- **WHEN** the counterparty's grant record comes to carry a ticket of a namespace other than the one it bound, and the record replicates to the grantee's copy of the pair
+- **THEN** the grantee imports the namespace the record now names, and the replica the grant bound before is no longer held or reconciled
+
+#### Scenario: A grant waits while an out-of-band import holds its issuer
+
+- **WHEN** a runtime has imported a namespace out of band under an issuer, and that issuer's grant naming a different namespace then becomes readable in the pair
+- **THEN** the grant's sweep neither imports the granted namespace nor forgets the one imported out of band
 
 #### Scenario: An out-of-band import is not unbound
 
