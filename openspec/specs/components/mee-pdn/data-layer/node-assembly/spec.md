@@ -53,6 +53,13 @@ A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHA
 #### Scenario: A panicking handler does not take down the node
 - **WHEN** node A spawns with a handler that panics mid-accept, and node B dials it and drives a stream
 - **THEN** that connection fails and node A still converges a replica with node B over the ordinary ticket flow
+### Requirement: Shutdown stops every protocol side by side, and a late call fails
+The node's shutdown SHALL stop a supplied handler beside the built-in stack rather than before it: the router shuts every protocol down at once, the blob store and gossip among them. A supplied handler whose work in flight writes through the node's stores therefore SHALL be let finish by its owner before the node's shutdown is called — a wait inside the handler's own shutdown runs against stores already going away. A call into a replica store that reaches it after its shutdown began, including one already queued behind the shutdown, SHALL fail rather than wait: its caller would otherwise wait for as long as any handle to the store lives.
+
+#### Scenario: A request queued behind the store's shutdown fails
+- **WHEN** a request to a replica store is queued behind that store's shutdown
+- **THEN** the shutdown completes and the request's caller receives an error rather than waiting
+
 ### Requirement: An accepted sync connection is dispatched to the hosted identity it names
 
 The node SHALL read the [identity](../../../../architecture/language/mee-identity.md) an accepted sync connection names before the session reaches any replica, and SHALL hand the session to that hosted identity alone. A connection naming an identity the node does not host SHALL be refused indistinguishably from the replica not being hosted, and no hosted identity SHALL observe a session addressed to another.

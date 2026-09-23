@@ -127,7 +127,7 @@ Every hosted identity holds one author, persisted with its replicas and stable a
 
 ### D11. An import names the identity the replica is held for
 
-Importing a ticket names the identity the replica is held for, and the import lands in that identity. The runtime imports a ticket that arrived inside a connection's grant record into the identity of the identity the grant is addressed to, and refuses to import it into another; the check lives where the grant is known, since a ticket handed over out of band carries no record of where it came from.
+Importing a ticket names the identity the replica is held for, and the import lands in that identity. The runtime imports the ticket a connection's grant record carries only for the identity the grant is addressed to: the grant binder reads a connection's grants for the identity at that connection's end, and a record addressed to anyone else is not a grant to it. An explicit import by the host is checked against no grant, because a ticket carries no record of the grant or the connection it came from, so the host can place a grant's ticket in another hosted identity. Nothing follows from that: the issuer answers only the audiences it granted, and what one identity imports is served to nobody (D17), so the identity the ticket landed in obtains nothing. A replica an identity holds is therefore no evidence that a grant was made to it — the data service's import of a ticket obtained out of band gives a replica with no grant behind it by design.
 
 ### D12. The storage directory holds a subdirectory per hosted identity, and each records its own hosting
 
@@ -207,7 +207,7 @@ What a modified node can obtain is bounded by the identities it is genuinely a d
 | authors an entry as another member | the entry's signature fails; author keys are held by that member's devices |
 | places its own entry under another member's name in a cell | dropped by the gate, which resolves the author to a member through that member's statements |
 | writes outside the write set of its grant | refused at the issuer's gate and retracted at the writer |
-| imports a ticket into another identity | refused (D11) |
+| imports a grant's ticket into another identity it hosts | its own state, not refused; that identity obtains nothing, since the issuer answers only the audience it granted (D11) |
 | asks for payload bytes by hash | served, as it is today |
 
 ### D16. A grant binds and unbinds for the identity it addresses

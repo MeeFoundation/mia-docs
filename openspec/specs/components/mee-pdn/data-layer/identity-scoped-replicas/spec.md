@@ -8,7 +8,7 @@ A hosted identity owns its own half of the node: the replicas it acquired, the a
 
 ### Requirement: Every replica is created and imported for a named identity
 
-Every replica a node holds SHALL belong to exactly one hosted identity, and the act that brings it there — a create or an import, a private metadata directory and a connection metadata store included — SHALL name that identity. Two identities SHALL NOT share a replica, whether they acquired the same namespace under two grants of one issuer or hold the two ends of one connection's metadata pair. A ticket carried by a grant record SHALL be imported for the identity the grant is addressed to, and the runtime SHALL refuse to import it into another; the refusal belongs where the grant is known, since a ticket handed over out of band carries no record of the connection it came from.
+Every replica a node holds SHALL belong to exactly one hosted identity, and the act that brings it there — a create or an import, a private metadata directory and a connection metadata store included — SHALL name that identity. Two identities SHALL NOT share a replica, whether they acquired the same namespace under two grants of one issuer or hold the two ends of one connection's metadata pair. The runtime SHALL import the ticket a grant record carries only for the identity the grant is addressed to: it reads a connection's grants for the identity at that connection's end alone, and a record addressed to anyone else binds nothing there. An import the host makes explicitly SHALL land in the identity it names, whichever hosted identity that is, and SHALL bring that identity nothing it was not granted: a ticket carries no record of the grant or the connection it came from, so no import can tell a grant's ticket from any other, and what makes one useless to an identity the grant does not address is that the issuer answers only the audiences it granted and a replica one identity imports is served to nobody. A replica an identity holds is therefore no evidence that a grant was made to it.
 
 #### Scenario: Two audiences of one issuer hold two replicas
 
@@ -20,10 +20,10 @@ Every replica a node holds SHALL belong to exactly one hosted identity, and the 
 - **WHEN** an identity is granted a claim and a co-located identity holds no grant of that issuer
 - **THEN** the co-located identity reads and lists nothing of that issuer, and is answered as it is for an issuer no identity here holds
 
-#### Scenario: An import naming another identity is refused
+#### Scenario: A grant's ticket imported for another identity brings it nothing
 
-- **WHEN** a ticket carried by a grant addressed to one identity is imported naming a different hosted identity
-- **THEN** the import is refused and neither identity holds a replica of it afterwards
+- **WHEN** the host imports the ticket a grant addressed to one identity carries, naming a co-located identity the grant does not address
+- **THEN** the import lands in the named identity, which obtains nothing of the issuer's entries, and the replica the addressed identity holds is served to neither that identity nor any other node
 
 ### Requirement: A device-shared store starts syncing once it is armed
 

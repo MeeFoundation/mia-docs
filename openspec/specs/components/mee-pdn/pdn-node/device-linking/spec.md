@@ -59,7 +59,7 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: The inviter registers the newcomer as pending before replying
-After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges.
+After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
 
 #### Scenario: The newcomer is registered on the inviting device
 - **WHEN** runtime B completes the linking dialogue against runtime A
@@ -140,7 +140,7 @@ The linking reply SHALL carry write tickets to the identity's directory and to i
 - **THEN** device 3 comes up with the directory and the data namespace, and all three devices' device sets converge to three
 
 ### Requirement: Link returns caught up, and failure leaves no local residue
-`link` SHALL NOT report success until the imported directory has completed one successful sync exchange that started after the import — one bounded wait against the peer that just answered the dialogue, not a retry loop; a directory that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the directory's contents does not discharge this requirement.
+`link` SHALL NOT report success until the imported directory has completed one successful sync exchange that started after the import — one bounded wait against the peer that just answered the dialogue, not a retry loop; a directory that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the directory's contents does not discharge this requirement. The first exchange counts however quickly it finishes: the wait SHALL be listening before the arming starts the directory's sync, because an exchange that finished before the wait began would leave it waiting for the next one, which the node's periodic reconcile pass may bring only after the caller's budget is spent.
 
 The caller's timeout SHALL bound the whole act, the dialogue included: the dialogue spends from the budget first and the catch-up gets what remains, so a dialed inviter that never answers costs the caller its budget — surfaced as its own typed outcome — and never the transport's idle timeout. Without this bound the budget would govern only the last third of the act, and a hung inviter would hold the caller for as long as the transport tolerates a silent connection, however small a budget the caller named.
 
@@ -151,6 +151,10 @@ On any failure after import, the dialing runtime SHALL undo what this linking di
 #### Scenario: Success implies the directory is caught up
 - **WHEN** `link` returns success
 - **THEN** the newcomer's directory replica has completed a successful sync exchange started after the import, and the device set it reads locally includes the identity's existing devices
+
+#### Scenario: The first exchange counts however quickly it finishes
+- **WHEN** the directory's first sync exchanges finish before the link begins its wait, and the caller's budget ends before the next periodic reconcile pass
+- **THEN** `link` succeeds on the first exchange rather than failing with the catch-up timeout
 
 #### Scenario: No serving window opens while the link catches up
 - **WHEN** the data namespace of a linking identity receives a session from a caller the still-converging directory cannot resolve, before `link` has returned
