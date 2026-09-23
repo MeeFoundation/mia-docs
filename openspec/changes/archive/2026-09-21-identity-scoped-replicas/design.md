@@ -107,7 +107,14 @@ Establishment between two identities of one node runs the pairing dialogue over 
 
 A write broadcasts to the swarm as it does now, and in the same step notifies the co-located identities that hold the same namespace, which then reconcile over the in-process path. An announcement names the identity of the replica that wrote it, so a receiving node knows which replica to address when it pulls.
 
+The engine hands that notification to its node, and a dial of D7 that resolves to this node the same way, as a request on a channel; a task of the node finds the co-located identities and opens the sessions. An engine holds nothing of its node but that channel's sending end, and the node's task holds the map of hosted identities weakly, ending once the last engine is gone. The task serving an engine's API holds the engine, and a handle into that API can sit inside what the engine itself holds — its access provider and its ingest validator hold replica handles — so that task is owned by the engine's protocol handle and stops with it. Ownership runs from the node down, and a node dropped without a shutdown while its process goes on releases its engines, its stores and its directory.
+
 **Rejected alternatives:**
+
+- A callback into the node for each notification and dial, holding the map of hosted identities.
+  - **Cons:** the map holds every engine and the callback lives in each, so the node and its engines keep each other alive, and a node dropped without a shutdown releases nothing for the rest of the process.
+- A weak reference to the map in each callback.
+  - **Cons:** it holds only while every callback keeps to it; nothing in the engine's types stops a later callback from taking a strong reference again.
 
 - Rely on the swarm to carry a co-located identity's write.
   - **Cons:** iroh-gossip does not deliver a broadcast to the broadcasting node's own subscribers and marks it received, so it never arrives, with or without a neighbour.

@@ -17,6 +17,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 - [x] 2.6 The periodic pass reconciles a co-located pair whose replicas differ and leaves a converged pair alone; verified by an identity brought up behind converging on the next pass, and by a metric showing no in-process session opened for a quiet pair over several intervals
 - [x] 2.7 The store's own gates stay green across its feature sets and the wasm target: `just check-store`, `just test-store`, and the workspace doctests
 - [x] 2.8 The session access provider is a requirement of assembling the store, not an option that defaults to serving whole (D17); verified by the store's own suites naming the provider they take and by the build refusing an assembly that names none
+- [x] 2.9 The engine hands a local write's announcement and a dial that resolves to this node to its node as requests on a channel, the live actor is owned from its spawn, and the task serving an engine's API stops with the engine's protocol handle (D9); verified by `a_runtime_dropped_without_shutdown_releases_its_directory`, which fails with the node's task holding the map of hosted identities strongly and with the API task detached
 
 ## 3. data-layer: the hosted identity's own stack
 

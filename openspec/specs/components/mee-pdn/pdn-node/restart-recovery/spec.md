@@ -77,6 +77,13 @@ The asymmetry is the reason: skipping loses one identity's hosting on this devic
 - **WHEN** a runtime starts on a directory recording three identities — one whose store holds its directory replica, one whose store is gone, and one whose store holds no such replica — and creates a fourth identity afterwards
 - **THEN** the first is hosted and its entries read back, the other two are not hosted and reads addressed to them are refused, no store is opened where one was gone, the start succeeds, and both skipped records are left as they were
 
+### Requirement: A runtime dropped without a shutdown releases its directory
+A runtime dropped without a shutdown while its process goes on SHALL release its stores and its directory once its own tasks wind down, so a runtime spawned on the same directory in the same process starts and hosts what the first one hosted. Nothing an identity's engine holds SHALL keep the runtime's node alive: an embedding host that brings runtimes up and drops them, or a handle released without a stop, would otherwise hold a socket, the replica stores and their memory for the rest of the process.
+
+#### Scenario: A dropped runtime's directory is spawned on again
+- **WHEN** a runtime hosting an identity is dropped without a shutdown, and a runtime is spawned on the same directory in the same process
+- **THEN** the spawn succeeds within a bounded time and the new runtime hosts that identity
+
 ### Requirement: Access does not survive an outage, only bytes do
 A granted replica's bytes persist across a restart, but the issuer behind them SHALL NOT be registered until a live grant record is read again, so between the start and the pair's first sweep the replica is not readable and not served. A grant withdrawn while the runtime was off SHALL be honoured on the sweep that reads the withdrawal, exactly as one withdrawn while it was running.
 
