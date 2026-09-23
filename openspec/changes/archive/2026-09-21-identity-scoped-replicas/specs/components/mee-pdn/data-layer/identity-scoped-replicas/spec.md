@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A hosted identity owns its own half of the node: the replicas it acquired, the author its writes carry, and the sessions it takes part in. On the wire that party is a [holder](../../../../architecture/language/holder.md) — 32 opaque bytes pdn-store compares and never interprets, filled here with the identity's `PdnId`. What one identity holds is stored, written and served apart from what another identity of the same node holds, so co-location separates by where the bytes live rather than by a check at each read. ADR-0013 states the level of isolation this carries and what it leaves to a counterparty's observation.
+A hosted identity owns its own half of the node: the replicas it acquired, the author its writes carry, and the sessions it takes part in. On the wire that party travels as 32 opaque bytes pdn-store compares and never interprets, filled here with the identity's `PdnId`: the store keeps the value, not the vocabulary that gives it meaning. What one identity holds is stored, written and served apart from what another identity of the same node holds, so co-location separates by where the bytes live rather than by a check at each read. ADR-0013 states the level of isolation this carries and what it leaves to a counterparty's observation.
 
 ## ADDED Requirements
 
@@ -27,7 +27,7 @@ Every replica a node holds SHALL belong to exactly one hosted identity, and the 
 
 ### Requirement: A sync session names the replica's identity and the caller's
 
-A sync session SHALL name, as holders, the identity whose replica is addressed and the identity the caller acts as, and the serving side SHALL admit the caller's named identity only when the records it holds of that identity list the caller's authenticated node id among its devices — that identity's own directory where the serving node is one of its devices, and the device set the counterparty published into their connection's metadata store where a hosted issuer serves a counterparty, the same resolution each already uses for read rights. A caller naming an identity it is not a device of SHALL be refused indistinguishably from the replica not being hosted, and so SHALL a session naming an identity the node does not host. The session's rights, its egress filter and its write admission SHALL follow the named identities alone.
+A sync session SHALL name the identity whose replica is addressed and the identity the caller acts as, and the serving side SHALL admit the caller's named identity only when the records it holds of that identity list the caller's authenticated node id among its devices — that identity's own directory where the serving node is one of its devices, and the device set the counterparty published into their connection's metadata store where a hosted issuer serves a counterparty, the same resolution each already uses for read rights. A caller naming an identity it is not a device of SHALL be refused indistinguishably from the replica not being hosted, and so SHALL a session naming an identity the node does not host. The session's rights, its egress filter and its write admission SHALL follow the named identities alone.
 
 #### Scenario: A caller naming an identity it is not a device of is refused
 
@@ -39,9 +39,9 @@ A sync session SHALL name, as holders, the identity whose replica is addressed a
 - **WHEN** a device listed in an identity's records names that identity and addresses a replica that identity holds
 - **THEN** the session proceeds under that identity's rights
 
-#### Scenario: A holder the node does not host is refused
+#### Scenario: An identity the node does not host is refused
 
-- **WHEN** a session names a holder no identity on the serving node corresponds to
+- **WHEN** a session names an identity the serving node does not host
 - **THEN** it is refused indistinguishably from the replica not being hosted
 
 ### Requirement: Rights are the named identity's and are never unioned across a node's identities

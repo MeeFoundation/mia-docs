@@ -1,19 +1,19 @@
 # Tasks: identity-scoped-replicas
 
-Scope: a hosted identity owns its own replicas, author and sessions over the node's one endpoint; every session names, as holders, the identity whose replica it addresses and the identity it acts as; rights are never unioned across a node's identities; two identities of one node meet through a path inside the process. Nothing about grants, swarms or reconciliation cadence changes shape.
+Scope: a hosted identity owns its own replicas, author and sessions over the node's one endpoint; every session names, as identities, the identity whose replica it addresses and the identity it acts as; rights are never unioned across a node's identities; two identities of one node meet through a path inside the process. Nothing about grants, swarms or reconciliation cadence changes shape.
 
 ## 1. Vocabulary and decision record
 
-- [x] 1.1 Glossary entry `architecture/language/holder.md` — the 32 opaque bytes pdn-store compares to tell whose replica a session addresses and whom its caller acts for, filled with a hosted identity's `PdnId` — linked from the first use in the identity-scoped replicas and node assembly specs; verified by the link resolving from both
+- [x] 1.1 The vocabulary of the wire value — the 32 opaque bytes pdn-store compares to tell whose replica a session addresses and whom its caller acts for, filled with a hosted identity's `PdnId` — stated where it is used, in the identity-scoped replicas spec. A glossary entry of its own carried a word the code has since dropped and was folded back in
 - [x] 1.2 ADR-0013 stands as the decision record for the level of isolation; verified by the proposal, the design and the new capability spec citing it and by no other ADR contradicting it after the sweep in 8.3
 
 ## 2. pdn-store: the protocol boundary
 
-- [x] 2.1 The first message of a sync session carries the holder of the replica addressed and the holder the caller acts for, as opaque 32-byte values (D2, D3); verified by a codec test driving a session over an in-memory stream pair and by the message failing to decode when a field is absent
-- [x] 2.2 An accepted connection is dispatched by that message before any replica is touched (D6): the handler resolves the holder, hands the streams and the message to that hosted identity's engine, and refuses an unknown holder as not hosted; verified by a node of two hosted identities receiving a session for each and by the refusal being byte-identical to the not-hosted refusal
-- [x] 2.3 The session access provider receives the caller's holder beside the namespace, the peer and the role (D3, D5); verified by a test asserting the provider sees the holder the caller named, and by the dispatch test of 2.2 failing if the value is dropped on the way
+- [x] 2.1 The first message of a sync session carries the identity of the replica addressed and the identity the caller acts for, as opaque 32-byte values (D2, D3); verified by a codec test driving a session over an in-memory stream pair and by the message failing to decode when a field is absent
+- [x] 2.2 An accepted connection is dispatched by that message before any replica is touched (D6): the handler resolves the identity, hands the streams and the message to that hosted identity's engine, and refuses an unknown identity as not hosted; verified by a node of two hosted identities receiving a session for each and by the refusal being byte-identical to the not-hosted refusal
+- [x] 2.3 The session access provider receives the caller's identity beside the namespace, the peer and the role (D3, D5); verified by a test asserting the provider sees the identity the caller named, and by the dispatch test of 2.2 failing if the value is dropped on the way
 - [x] 2.4 A session entry point over an in-memory stream pair, running the same codec, the same session setup and the same access provider calls on both sides (D7); verified by two identities of one node converging a namespace both hold, and by the filtered case of 5.3 leaking when the egress filter is disabled
-- [x] 2.5 A write announces to the identities of its own node that hold the namespace, content-free, and the announcement carries the holder of the replica that wrote (D9); verified by a co-located identity reading the entry within one reconcile interval and by the withheld claim staying absent from it
+- [x] 2.5 A write announces to the identities of its own node that hold the namespace, content-free, and the announcement carries the identity of the replica that wrote (D9); verified by a co-located identity reading the entry within one reconcile interval and by the withheld claim staying absent from it
 - [x] 2.6 The periodic pass reconciles a co-located pair whose replicas differ and leaves a converged pair alone; verified by an identity brought up behind converging on the next pass, and by a metric showing no in-process session opened for a quiet pair over several intervals
 - [x] 2.7 The store's own gates stay green across its feature sets and the wasm target: `just check-store`, `just test-store`, and the workspace doctests
 - [x] 2.8 The session access provider is a requirement of assembling the store, not an option that defaults to serving whole (D17); verified by the store's own suites naming the provider they take and by the build refusing an assembly that names none
@@ -27,7 +27,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 - [x] 3.5 One author per hosted identity, persisted with that identity's stores, and the retraction tracker judging an entry by the author of the identity whose replica holds it (D10); verified by two identities on one node writing entries under two authors, by each keeping its author across a restart, and by the rewritten-key and withdrawn-device scenarios holding per identity
 - [x] 3.6 The replica store's cache bound is a share of a node budget cut as the store opens, from the identities the storage directory then holds, with one default of 1 GiB declared once and taken by the hosts and the suites (D14); verified by a spawn without a budget bounding its one identity at the whole default, a store in memory carrying no bound, a start on a directory of two identities bounding each at half the budget, and an identity provisioned on a running node taking a share of its own while the store already open keeps its bound and the node reports the overshoot
 - [x] 3.7 A dial whose target address carries this node's own wire identity routes to the in-process path, wherever the address came from — a contact list, a ticket, a device record (D7); verified by a node of two identities converging after a restart with no dial failing
-- [x] 3.8 `test-util` fixture that names a holder of the caller's choosing in a session, as `write_unguarded` produces an entry the gate refuses; verified by the denial in 3.3 failing when the device-set check is removed
+- [x] 3.8 `test-util` fixture that names an identity of the caller's choosing in a session, as `write_unguarded` produces an entry the gate refuses; verified by the denial in 3.3 failing when the device-set check is removed
 - [x] 3.9 A data replica whose identity holds no records to judge the caller by is refused rather than served whole, while a directory and a connection metadata store keep their ticket bound (D17); verified by a ticket holder obtaining nothing from such a replica and by an identity's devices still replicating its directory
 
 ## 4. pdn-node: the acting identity
@@ -46,7 +46,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 ## 5. pdn-node-http: the surface and the stand
 
 - [x] 5.1 The debug data routes name the acting identity beside the issuer; verified by a read naming a co-located identity that holds no grant answering a client error, beside the read that succeeds
-- [x] 5.2 The stand runs two identities on one container, each connected to a peer of its own, asserting that each reads what its own peer granted, that neither reads the other's, and that an outsider reads neither; verified by `just test-docker` and by the assertion failing when the holder is dropped from the session
+- [x] 5.2 The stand runs two identities on one container, each connected to a peer of its own, asserting that each reads what its own peer granted, that neither reads the other's, and that an outsider reads neither; verified by `just test-docker` and by the assertion failing when the identity is dropped from the session
 - [x] 5.3 The stand's existing scenarios keep passing unchanged, including the restart and the storage-failure ones
 
 ## 6. Measurement
@@ -59,7 +59,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 - [x] 7.1 The four scenarios in `pdn-node/tests/reachability.rs` that rest on one replica shared by two audiences: three rewritten to the separated expectation, each keeping its paired denial — audiences hosted together keep separate replicas; a withdrawal toward one audience leaves the co-located one alone; an issuer device leaves the contacts of the replica whose connection stopped publishing it — and `a_withdrawal_counts_grants_not_bookkeeping` removed with the count it pins (D16)
 - [x] 7.2 The three author scenarios in `data-layer/tests/persistence.rs` restated per identity, keeping their instrument: a record under a second author still accretes, so the count proves something
 - [x] 7.3 The arrange steps of the `data-layer` suites host the identity whose replicas they hold and put the syncing device in its device set, the way the product reaches them, and name that identity in their creates and imports; verified by `just test -p data-layer` with no suite losing a scenario
-- [x] 7.4 Every scenario this change adds is verified against the mechanism deliberately broken — the device-set check, the holder on the session, the egress filter, the announcement — and the test that would pass either way is rewritten
+- [x] 7.4 Every scenario this change adds is verified against the mechanism deliberately broken — the device-set check, the identity on the session, the egress filter, the announcement — and the test that would pass either way is rewritten
 
 ## 8. Documentation and sweep
 

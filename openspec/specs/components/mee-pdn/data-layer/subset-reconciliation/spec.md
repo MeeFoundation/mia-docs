@@ -220,7 +220,7 @@ A sync request for a hosted replica from a caller with no computable rights SHAL
 - **WHEN** a caller holding the replica's ticket but no grant requests a sync
 - **THEN** the request is refused with the same answer an unhosted replica would produce, and no fingerprint, count, or existence signal is revealed
 
-#### Scenario: A scoped holder does not re-serve to a third party
+#### Scenario: An identity holding a scoped replica does not re-serve it to a third party
 
-- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a sibling-minted ticket — asks a scoped holder to sync the issuer's replica
-- **THEN** the scoped holder refuses as for an unhosted replica, since it cannot compute a third party's rights
+- **WHEN** a caller that resolves as no device of the grant's audience identity — even one holding a sibling-minted ticket — asks the identity holding the scoped replica to sync the issuer's replica
+- **THEN** that identity refuses as for an unhosted replica, since it cannot compute a third party's rights

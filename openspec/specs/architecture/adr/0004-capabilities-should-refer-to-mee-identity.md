@@ -6,7 +6,7 @@ date: 2026-09-04
 
 ## Context and Problem Statement
 
-A capability says who may do what with a claim, and the holder can be named at two levels: the identity, or the key of the device that carries out the access. An identity has several devices, gains and loses them over its life, and every one of them needs the same access the identity was given.
+A capability says who may do what with a claim, and the party it is granted to can be named at two levels: the identity, or the key of the device that carries out the access. An identity has several devices, gains and loses them over its life, and every one of them needs the same access the identity was given.
 
 ## Considered Options
 
@@ -15,7 +15,7 @@ A capability says who may do what with a claim, and the holder can be named at t
 
 ## Decision Outcome
 
-Chosen option: **capabilities name the identity**. `Capability.holders` is a list of `PdnId`, and a UWill token's `iss`, `aud` and `sub` are PdnId-backed. Enforcement matches: the ingest gate resolves the transport-authenticated session peer to an identity and judges it against that identity's recorded grant ([capability-gated ingest](../../components/mee-pdn/data-layer/capability-gated-ingest/spec.md)). Linking a device re-issues nothing.
+Chosen option: **capabilities name the identity**. `Capability.audience` is a list of `PdnId`, and a UWill token's `iss`, `aud` and `sub` are PdnId-backed. Enforcement matches: the ingest gate resolves the transport-authenticated session peer to an identity and judges it against that identity's recorded grant ([capability-gated ingest](../../components/mee-pdn/data-layer/capability-gated-ingest/spec.md)). Linking a device re-issues nothing.
 
 ### Consequences
 

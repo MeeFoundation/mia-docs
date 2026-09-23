@@ -6,11 +6,11 @@ See [proposal.md](proposal.md) for motivation, and ADR-0013 for the level of iso
 
 Three properties of the surrounding libraries shape what is possible without forking them. iroh refuses a connection whose target is the endpoint's own id, before any address or transport is considered, so two identities on one endpoint cannot reach each other over the network at all. iroh-gossip delivers a broadcast to the swarm and never to the broadcasting node's own subscribers, and it marks the message as received, so a co-located subscriber does not see it even echoed back by a neighbour; the same library does support any number of subscribers to one topic, so several identities on one endpoint can share the swarm. iroh-blobs takes an event sender that can refuse a request, so a gate over payload bytes is reachable later without a fork.
 
-Three properties of pdn-store shape the rest. The sync codec runs over any pair of asynchronous streams — its own tests drive it over an in-memory pair — so a session without a network costs no second implementation. The store, the sync actor and the range reconciler know a replica only by its namespace, so keeping the fork's divergence away from them decides where the holder is allowed to appear; the sync actor does carry the session's egress filter through to the ingest gate, and a second session-scoped value rides that same path without reaching the tables or the reconciler. And a store's actor is one thread: it runs a current-thread runtime and does there everything the store does — the signature check on every entry it ingests, the range fingerprints a session computes, its inserts and its commits — while the database underneath admits one writer at a time.
+Three properties of pdn-store shape the rest. The sync codec runs over any pair of asynchronous streams — its own tests drive it over an in-memory pair — so a session without a network costs no second implementation. The store, the sync actor and the range reconciler know a replica only by its namespace, so keeping the fork's divergence away from them decides where the identity is allowed to appear; the sync actor does carry the session's egress filter through to the ingest gate, and a second session-scoped value rides that same path without reaching the tables or the reconciler. And a store's actor is one thread: it runs a current-thread runtime and does there everything the store does — the signature check on every entry it ingests, the range fingerprints a session computes, its inserts and its commits — while the database underneath admits one writer at a time.
 
 The pairing and linking dialogues in the runtime are written against iroh's stream types directly, which is the one place where the in-process path needs the code to become generic.
 
-The count this is sized for is 1 to 10 identities on a node, all of one person. That is what makes a fixed cost per identity affordable and a notification that reaches every co-located holder of a namespace cheap enough to be the whole mechanism.
+The count this is sized for is 1 to 10 identities on a node, all of one person. That is what makes a fixed cost per identity affordable and a notification that reaches every co-located identity of a namespace cheap enough to be the whole mechanism.
 
 ## Goals / Non-Goals
 
@@ -50,19 +50,19 @@ A hosted identity holds its own half of the node: its own docs engine with its o
   - **Pros:** the node id, the swarm membership and the transport separate too, which is what unlinkability needs.
   - **Cons:** a socket, a relay connection, address discovery and a probing schedule per identity, on a phone as well; identity creation waits for an endpoint to bind; a device in a device set becomes one identity's endpoint, so one physical device leaving means as many withdrawals as it hosts identities.
 
-### D2. On the wire a hosted identity is a holder: 32 opaque bytes
+### D2. On the wire a hosted identity is an identity: 32 opaque bytes
 
-pdn-store calls the party a replica is held for, and the party a caller acts for, the **holder**: 32 opaque bytes it compares and never interprets. `data-layer` fills a holder with the hosted identity's `PdnId`, so the store stays free of the platform's identity vocabulary, as it is free of it today.
+pdn-store calls the party a replica is held for, and the party a caller acts for, the **identity**: 32 opaque bytes it compares and never interprets. `data-layer` fills an identity with the hosted identity's `PdnId`, so the store stays free of the platform's identity vocabulary, as it is free of it today.
 
-### D3. The protocol's first message names both holders
+### D3. The protocol's first message names both identities
 
-The first message of a sync session carries the holder whose replica is addressed and the holder the caller acts for, beside the namespace it already carries. The dialing side knows both: the contact it dials was derived from a device set or a member statement, which names the identity it belongs to, and the identity it acts as is the identity the session was started for.
+The first message of a sync session carries the identity whose replica is addressed and the identity the caller acts for, beside the namespace it already carries. The dialing side knows both: the contact it dials was derived from a device set or a member statement, which names the identity it belongs to, and the identity it acts as is the identity the session was started for.
 
-A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the issuer for a data namespace, the identity for a store its own devices share. Without that statement a recorded peer would be dialed as the dialing side's own holder, which is right for a sibling and wrong for every other case — a granted replica's peers are the issuer's devices, and naming the wrong holder is refused as not hosted.
+A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the issuer for a data namespace, the identity for a store its own devices share. Without that statement a recorded peer would be dialed as the dialing side's own identity, which is right for a sibling and wrong for every other case — a granted replica's peers are the issuer's devices, and naming the wrong identity is refused as not hosted.
 
 **Rejected alternatives:**
 
-- Name only the caller's holder and let the serving side pick a replica.
+- Name only the caller's identity and let the serving side pick a replica.
   - **Cons:** a node can hold the same namespace in several hosted identities with equal claim to it — an issuer and an audience it granted, or two members of one cell — so the pick is ambiguous exactly where hosted identities must not be confused.
 
 ### D4. A caller acts as an identity whose device set lists its node id
@@ -85,7 +85,7 @@ The write set travels with the session it was decided for, the way the egress fi
 
 ### D6. An accepted connection is dispatched by its first message
 
-The docs protocol handler reads the first message of an accepted connection, resolves the holder it names, and hands the streams and that message to the engine of that hosted identity; a message naming a holder the node does not host is refused as not hosted, in the same shape as a replica that is not here. Reading that first message belongs to the handler and never to an engine: an engine is only ever handed a session whose first message is already read, so no accept path waits on the wire inside an engine's own loop, where it would stop every other thing that loop does. A node hosting one identity takes the same contract with a resolver of one holder, so the two assemblies differ in the resolver alone.
+The docs protocol handler reads the first message of an accepted connection, resolves the identity it names, and hands the streams and that message to the engine of that hosted identity; a message naming an identity the node does not host is refused as not hosted, in the same shape as a replica that is not here. Reading that first message belongs to the handler and never to an engine: an engine is only ever handed a session whose first message is already read, so no accept path waits on the wire inside an engine's own loop, where it would stop every other thing that loop does. A node hosting one identity takes the same contract with a resolver of one identity, so the two assemblies differ in the resolver alone.
 
 ### D7. Two identities of one node sync over in-process streams
 
@@ -105,7 +105,7 @@ Establishment between two identities of one node runs the pairing dialogue over 
 
 ### D9. A write announces to the identities of its own node directly
 
-A write broadcasts to the swarm as it does now, and in the same step notifies the co-located identities that hold the same namespace, which then reconcile over the in-process path. An announcement names the holder of the replica that wrote it, so a receiving node knows which replica to address when it pulls.
+A write broadcasts to the swarm as it does now, and in the same step notifies the co-located identities that hold the same namespace, which then reconcile over the in-process path. An announcement names the identity of the replica that wrote it, so a receiving node knows which replica to address when it pulls.
 
 **Rejected alternatives:**
 

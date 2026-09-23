@@ -31,7 +31,7 @@ Chosen: **replicas, an author and sessions per hosted identity**, over the endpo
 The shape, specified by the identity-scoped replicas and in-process sessions capabilities under `components/mee-pdn/data-layer/` and by [multi-identity](../../components/mee-pdn/data-layer/multi-identity/spec.md):
 
 * Every replica belongs to exactly one hosted identity, and the act that creates or imports it names that identity. Two identities that acquired one namespace hold a replica each.
-* A sync session names the identity whose replica it addresses and the identity its caller acts as, as opaque holders the store compares and never interprets. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted.
+* A sync session names the identity whose replica it addresses and the identity its caller acts as, as opaque bytes the store compares and never interprets. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted.
 * A session's rights, its egress filter and its write admission follow the named identity alone, and are never unioned across the identities a node hosts.
 * Each identity writes with its own author, persisted with its own stores.
 * Two identities of one node reach each other through a path inside the process, because a node does not dial its own endpoint; they establish, grant and converge exactly as identities on two nodes do.
