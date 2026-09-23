@@ -77,6 +77,20 @@ A session peer resolving as a device of the issuer SHALL be admitted in full. Th
 - **WHEN** a device of the audience identity catches up a granted replica from a sibling device holding read-only claims
 - **THEN** the read-slice entries arrive, although the relaying sibling holds no write on them
 
+### Requirement: A key longer than the store's bound is refused on every replica
+
+The fork SHALL hold no key longer than 8,192 bytes, in any replica. A local write at a longer key SHALL be refused to its caller, and an entry at a longer key arriving over sync SHALL be dropped silently whatever the sender's grant covers, as the base validation drops an entry with a bad signature, while the session goes on with the rest. The longest key the platform writes is a retraction marker, `retractions/<issuer-hex>/<author-hex>/<path>` with a path at its longest, 4,253 bytes. The bound is what keeps the first message a replica sends small: that message carries the replica's first key twice, and a peer reads it before anything classifies the caller ([node assembly](../node-assembly/spec.md)), so a replica holding a longer key would send a first message every peer refuses, and its sync would stop for every holder.
+
+#### Scenario: A local write at a key over the bound is refused
+
+- **WHEN** a device writes an entry whose key is 8,193 bytes long
+- **THEN** the write is refused, while a write at a key of 8,192 bytes succeeds
+
+#### Scenario: An entry at a key over the bound is dropped at ingest
+
+- **WHEN** a peer's replica holds an entry whose key is longer than 8,192 bytes beside an ordinary entry, and a device syncs with it
+- **THEN** the device holds the ordinary entry and not the long one, and the session completes
+
 ### Requirement: Admitted writes compete by last-write-wins within a stated window
 
 An admitted entry SHALL compete with the issuer's own entries by per-path last-write-wins across authors. The fork admits entries dated up to 10 minutes ahead of the receiving clock and refuses anything beyond, so a write-granted audience can date an entry forward and hold the path against the issuer's same-clock writes for up to 10 minutes — the accepted window; the issuer's recourse is withdrawing the grant and outwaiting or outwriting the pinned timestamp.

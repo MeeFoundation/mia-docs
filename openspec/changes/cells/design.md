@@ -272,7 +272,7 @@ Any member's device mints an invite — a QR code or an invite link carrying the
 
 ### D27. An entry outside the key layout is kept, used by nothing, and surfaced
 
-An entry in either store whose key fits neither layout of D21 — or fits one only in part, such as a mergeable-document key without its operation segment — is admitted when its author resolves to a member device, as of the session, and then reconciled, held and relayed like any entry. Nothing on the platform reads it: no fold, no gate verdict, no record view. The record store lists such entries with their authors, and the application shows that the cell holds entries it does not understand. Because no entry affects another key (D24), holding one harms nothing else in the store, and every member device converges on the same set.
+An entry in either store whose key fits neither layout of D21 — or fits one only in part, such as a mergeable-document key without its operation segment — is admitted when its author resolves to a member device, as of the session, and then reconciled, held and relayed like any entry. A key longer than the store's bound of 8,192 bytes never reaches this question: the store drops it at ingest on every honest device, because a replica holding it would send a first message too large for any peer to read, so a record's id (C10) and every layout of D21 fit under that bound. Nothing on the platform reads it: no fold, no gate verdict, no record view. The record store lists such entries with their authors, and the application shows that the cell holds entries it does not understand. Because no entry affects another key (D24), holding one harms nothing else in the store, and every member device converges on the same set.
 
 **Rejected alternatives:**
 
