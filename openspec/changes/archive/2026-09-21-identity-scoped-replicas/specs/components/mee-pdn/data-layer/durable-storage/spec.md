@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
-A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store and author, the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
+A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its private metadata directory, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
 
 #### Scenario: A fresh directory is provisioned
 - **WHEN** a node is spawned on a directory that does not exist
@@ -28,7 +28,7 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
 ## ADDED Requirements
 
 ### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
-A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory holds once that identity has a subdirectory of its own there. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory holds, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
+A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory records as hosted — each subdirectory holding a hosting record — with the opening identity counted whether or not its record is written yet. A subdirectory with no record, which is what an unfinished create or link leaves, SHALL take no share. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory records, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
 
 #### Scenario: The default gives a single identity the whole budget
 - **WHEN** a node is spawned without naming a budget
@@ -38,12 +38,12 @@ A node SHALL be spawned with the memory its replica stores may hold together, an
 - **WHEN** a node spawned on memory provisions an identity
 - **THEN** that identity's store carries no cache bound, and the node reports no breach of its budget
 
-#### Scenario: A start cuts every share from the identities the directory holds
-- **WHEN** a node is spawned on a directory holding two identities and provisions both
+#### Scenario: A start cuts every share from the identities the directory records
+- **WHEN** a node is spawned on a directory recording two hosted identities and holding the subdirectory of a third that no commit recorded, and provisions the two
 - **THEN** each store opens bounded at half the budget, and the node reports no breach of its budget
 
 #### Scenario: An identity added later takes a share of its own
-- **WHEN** an identity is provisioned on a running node whose directory held one identity before
+- **WHEN** an identity is provisioned on a running node whose directory recorded one hosted identity before
 - **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
 
 ### Requirement: One author per hosted identity, persisted with that identity's stores

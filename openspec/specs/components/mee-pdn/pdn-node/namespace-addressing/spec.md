@@ -7,7 +7,7 @@ How PDN addresses and authorizes claims with the `(about, issued_by)` namespace 
 ## Requirements
 
 ### Requirement: Claims are addressed by issuer and path, never by namespace
-Above `data-layer`, an entry SHALL be addressed by its issuer's `PdnId` and its `EntryPath`, and a claim in a grant by its `ClaimId`, derived from those two. No service of the runtime SHALL take a `pdn-store` namespace as an argument, and the `(about, issued_by)` pair SHALL NOT exist as an addressing coordinate — `about` is a field inside the claim. The runtime MAY hold a namespace id as the handle of a replica it opened — the hosted-identities record names each identity's directory namespace, the grant binder records which namespace a grant's ticket bound — but never as the address of a claim.
+Above `data-layer`, an entry SHALL be addressed by its issuer's `PdnId` and its `EntryPath`, and a claim in a grant by its `ClaimId`, derived from those two. No service of the runtime SHALL take a `pdn-store` namespace as an argument, and the `(about, issued_by)` pair SHALL NOT exist as an addressing coordinate — `about` is a field inside the claim. The runtime MAY hold a namespace id as the handle of a replica it opened — an identity's hosting record names its directory namespace, the grant binder records which namespace a grant's ticket bound — but never as the address of a claim.
 
 #### Scenario: pdn-node addresses an entry
 - **WHEN** the data service writes, reads, or lists

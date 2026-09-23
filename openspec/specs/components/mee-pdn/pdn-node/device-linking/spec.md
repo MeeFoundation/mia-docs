@@ -106,7 +106,7 @@ Every pending registration SHALL carry a durable creation time. An unconfirmed r
 - **THEN** the dialing device is not in the confirmed set, and it appears there only after the commit is released
 
 #### Scenario: A link that cannot be recorded leaves nothing on the identity
-- **WHEN** a link fails because the dialing device cannot write its hosted-identities record
+- **WHEN** a link fails because the dialing device cannot write the identity's hosting record
 - **THEN** it hosts nothing, the identity's directory never names it, and a later link from the same device succeeds and is named
 
 #### Scenario: Abandoned pending registrations expire
