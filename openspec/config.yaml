@@ -14,6 +14,7 @@ context: |
   - specs/code-practices/access-control-tests.md — an assertion of authorized access is paired, in the same place, with the tightest denial. A positive-only access test verifies nothing.
   - specs/code-practices/product-path-arrangement.md — arrange and act steps reach a namespace the way the product reaches it; a hand-made ticket handover is admissible only as the test's subject or as the access-control negative control, named in the test's docs.
   - specs/code-practices/flaky-tests.md — a rare failure is a rare defect. Reproduce with statistics before fixing, and stress the affected scenarios after.
+  - specs/code-practices/defect-reachability.md — a defect a host can trigger through the public surface of pdn-node, or a modified node can turn against honest nodes through what it sends, is fixed; one reached neither way may stay, recorded with its argument.
 
   Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands"; platform terms keep their English names. Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
 
