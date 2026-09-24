@@ -260,7 +260,7 @@ At creation the creator's device draws a 16-byte random nonce and derives the ce
 
 ### D26. A newcomer joins through a one-time-secret dialogue with a member device
 
-Any member's device mints an invite — a QR code or an invite link carrying the inviting device's address, a one-time short-lived secret and the cell id, no ticket. The newcomer's device dials the inviting device on a dedicated ALPN and presents the secret; the inviting device verifies and burns it before any state changes, receives the newcomer's signed join record (D16), writes the joined event and hands over both stores' write tickets — the shape of the linking dialogue (ADR-0012). Both devices are online at once and reach each other through iroh relays, which the stack takes on in a change of its own: two devices on different networks without a relay and without DNS do not reliably reach each other. Whoever presents a live secret first joins under the `PdnId` it names; the `PdnId` is the inviter's word, and proving it is the invited identity is KERI's proof step — challenge-response and an exchange of key event logs — in the same dialogue, the slot pairing and linking keep for it; until then that gap is accepted. Inviting a party that is offline is pending-invite machinery with polling, which ADR-0011 leaves possible and a later change builds.
+Any member's device mints an invite — a QR code or an invite link carrying the inviting device's address, a one-time short-lived secret and the cell id, no ticket. The newcomer's device dials the inviting device on a dedicated ALPN and presents the secret; the inviting device verifies and burns it before any state changes, receives the newcomer's signed join record and its first device statement (D16), writes both with the joined event and hands over both stores' write tickets — the shape of the linking dialogue (ADR-0012). The statement lets the inviting device serve the newcomer's first session (D32), so the join returns caught up. The pending secret records the identity it was minted for, and the joined event goes into that identity's replica — a node hosting two members holds the cell twice. Between two identities of one node the dialogue runs inside the process, as pairing does between them, with the secret verified and burned the same way; the dialogue is written once, generic over its streams. Both devices are online at once and reach each other through iroh relays, which the stack takes on in a change of its own: two devices on different networks without a relay and without DNS do not reliably reach each other. Whoever presents a live secret first joins under the `PdnId` it names; the `PdnId` is the inviter's word, and proving it is the invited identity is KERI's proof step — challenge-response and an exchange of key event logs — in the same dialogue, the slot pairing and linking keep for it; until then that gap is accepted. Inviting a party that is offline is pending-invite machinery with polling, which ADR-0011 leaves possible and a later change builds.
 
 **Rejected alternatives:**
 
@@ -315,22 +315,22 @@ The HTTP host serves every operation of the cells service under `/debug/`, one r
 
 The routes take this shape; the host spec leaves paths free to change:
 
-| Route | Operation |
-|---|---|
-| `POST /debug/identities/{id}/cells` | `create` |
-| `GET /debug/identities/{id}/cells` | `list` |
-| `GET …/cells/{cell}/members` | `members` |
-| `PUT …/cells/{cell}/name` | `rename` |
-| `POST …/cells/{cell}/invites` | `invite` |
-| `POST /debug/identities/{id}/cells/join` | `join` |
-| `POST …/cells/{cell}/acts` | `act` |
-| `POST …/cells/{cell}/records` | `put_record` |
-| `GET …/cells/{cell}/records` | `list_records` |
-| `GET …/records/{member}/{kind}/{id}` | `read` |
-| `POST …/records/{member}/{kind}/{id}/ops` | `append_op` |
-| `GET …/records/{member}/{kind}/{id}/ops` | `read_ops` |
-| `DELETE …/records/{member}/{kind}/{id}` | `delete` |
-| `GET …/cells/{cell}/unknown` | `list_unknown` |
+| Route                                     | Operation      |
+| ----------------------------------------- | -------------- |
+| `POST /debug/identities/{id}/cells`       | `create`       |
+| `GET /debug/identities/{id}/cells`        | `list`         |
+| `GET …/cells/{cell}/members`              | `members`      |
+| `PUT …/cells/{cell}/name`                 | `rename`       |
+| `POST …/cells/{cell}/invites`             | `invite`       |
+| `POST /debug/identities/{id}/cells/join`  | `join`         |
+| `POST …/cells/{cell}/acts`                | `act`          |
+| `POST …/cells/{cell}/records`             | `put_record`   |
+| `GET …/cells/{cell}/records`              | `list_records` |
+| `GET …/records/{member}/{kind}/{id}`      | `read`         |
+| `POST …/records/{member}/{kind}/{id}/ops` | `append_op`    |
+| `GET …/records/{member}/{kind}/{id}/ops`  | `read_ops`     |
+| `DELETE …/records/{member}/{kind}/{id}`   | `delete`       |
+| `GET …/cells/{cell}/unknown`              | `list_unknown` |
 
 **Rejected alternatives:**
 
@@ -344,7 +344,7 @@ The routes take this shape; the host spec leaves paths free to change:
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
 - [A removed member keeps both stores' write tickets and topic ids] → honest devices refuse its sessions and drop the entries it authors under a sequence at which it was no longer a member; an entry it authors afterwards under an earlier sequence passes until KERI closes the retrograde direction (D29); it retains what it received and still sees content-free announcements; real expulsion under bearer tickets is a new cell. UWill takes write authority out of the ticket (D13, D28, F3).
 - [Membership is a multi-writer set] → its records order by per-member sequence numbers, never by timestamp (D3, D21); a concurrent add and remove, or grant and revoke, at one sequence needs a tie-break (B10); a member-signed founding chain gives membership a root but no total order.
-- [Authorship is a transport-level binding] → author keys are node-local; the binding of an author key to a member is what the member publishes under its announcement key (D16), verifiable by anyone holding the join record; an honest gate enforces it; a modified member device can forge locally but cannot pass honest gates under another member's name; what it can still do under its own name after departing is D29. Signed claims come with KERI (F2).
+- [Authorship is a transport-level binding] → author keys are held per hosted identity on a device (ADR-0013); the binding of an author key to a member is what the member publishes under its announcement key (D16), verifiable by anyone holding the join record; an honest gate enforces it; a modified member device can forge locally but cannot pass honest gates under another member's name; what it can still do under its own name after departing is D29. Signed claims come with KERI (F2).
 - [Range fingerprints are linear scans] → a record store with 100 writers is never quiescent, so every catch-up session scans it per round; a cached fingerprint tree in pdn-store is the fix (D2'), and the membership store's convergence does not wait for it (D3).
 - [A membership reference proves after, not before] → a departed member's new entries under its old sequence pass through a relaying member (D29); accepted as the price of judging every entry the same on every device (D22).
 - [Dates in entries are self-asserted] → written and shown, never judged (D3, D22, D23); order is the sequence, and "provably before" is D29.
@@ -356,6 +356,8 @@ The routes take this shape; the host spec leaves paths free to change:
 - [An owner deletes another member's records] → accepted as the repair channel (D12, D14); the deletion is the owner's own signed act and forges nothing (D15), and a hostile owner sits inside the trust boundary already (D28).
 - [Any member edits any mergeable-document] → accepted: every member is trusted with the whole cell already (D28), each operation carries its writer's signature (D15), and a spoiled mergeable-document is repaired by further operations or by an owner's deletion (D12).
 - [A replaced record breaks references to the old one] → accepted (D18); the deletion and the new record are two signed acts of the replacer (D15).
+- [Payload bytes are served by hash to any caller] → the blob store is the node's and its egress is ungated (ADR-0013), so a party that learns a record's hash — a removed member among them — fetches its payload from any member device; the gate over payload bytes comes with identity-bound authorization, and iroh-blobs already offers its hook.
+- [A node hosting two members holds the cell twice] → each member identity holds replicas of its own, stored twice and walked twice on every reconcile pass; accepted as the price of separation, at the 1 to 10 identities a device is sized for (ADR-0013, D3, D32).
 
 ## Migration Plan
 
@@ -405,8 +407,8 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### D. Sync and scale
 
-- D1'. One-member cells: a pair of replicas from birth — D3 read literally, hundreds of pairs per device for a full personal tree, each replica its own swarm and its own reconcile pass — or key prefixes in the identity's own namespace promoted to a replica at the second member, which is a data move and raises C10. Leaning: from birth; measure.
-- D2'. The linear-scan range fingerprint in the fork: when to replace it with a cached fingerprint tree; with two stores per cell the tree serves each store over its own order (D3).
+- D1'. One-member cells: a pair of replicas from birth — D3 read literally, hundreds of pairs per device for a full personal tree, each replica its own swarm and its own reconcile pass, whose standing cost D2' measures — or key prefixes in the identity's own namespace promoted to a replica at the second member, which is a data move and raises C10. Leaning: from birth; measure.
+- D2'. The linear-scan range fingerprint in the fork: when to replace it with a cached fingerprint tree; with two stores per cell the tree serves each store over its own order (D3). The identity-scoped replicas measurement shows where the cost sits, on a store of 100,000 entries: a catch-up spends 93% of its time on the receiving store's actor thread and under 2% on the serving one's, while a pass over a converged pair is 97% fingerprint work, 39 milliseconds per pass. The tree therefore pays off on the standing cost of passes over quiet stores — two per cell for every member identity a device hosts — and not on catch-up.
 - D3'. Reachability beyond relays (D26): always-on member devices as de-facto hubs.
 - D4'. Swarm and cadence parameters for 200 nodes: active and passive view sizes, the reconcile interval, churn of mobile devices.
 - D5'. The download policy default for record stores: records everywhere, payloads on demand.
@@ -418,4 +420,4 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 - F2. The author-key-to-member binding: published by the member itself (D16); what a device does when two validly signed statements of one member conflict at one version. Two members of one cell hosted on one node no longer share an author key: a hosted identity owns its own author, persisted with its own replicas (ADR-0013), so each member's device statements list a key of its own and a membership act resolves to the one member that wrote it. What stays open is the conflict case, and that a node holding both identities' secrets can write as either — attribution on honest devices, never a defence against the node.
 - F3. Each store's topic id equals its namespace id, known to removed members forever: content-free announcements leak activity; a cell that must shed a member entirely moves to a new store.
 - F4. Equivocation among members: with n parties the pairwise "first seen wins" of the KERI roadmap is not enough; duplicity detection moves earlier in that roadmap. A member rewriting its own past event is the same problem inside the membership store (D29).
-- F5. Linkability: one `PdnId` across cells; per-cell pairwise identities (the KERI roadmap's later step).
+- F5. Linkability: one `PdnId` across cells; per-cell pairwise identities (the KERI roadmap's later step). Two identities of one person on one node publish one node id in their device statements, so a member of cells with both sees that they share a device; an endpoint per identity would separate them (ADR-0013).
