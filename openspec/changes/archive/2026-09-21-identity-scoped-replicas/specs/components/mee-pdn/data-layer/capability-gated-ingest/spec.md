@@ -20,3 +20,17 @@ The caller's write set SHALL be computed at session setup from the issuer's reco
 
 - **WHEN** that node writes, under the identity granted write on the first claim, an entry for the claim only the co-located identity may write
 - **THEN** the issuer's gate drops it and the writer retracts it
+
+### Requirement: Own devices and unarmed replicas are not narrowed
+
+A session peer resolving as a device of the issuer SHALL be admitted in full. The gate SHALL arm only on replicas data-bound to a hosted identity: directories and connection metadata stores keep ticket-bounded admission (Invariants 1 and 3), and a grantee-held replica of a foreign namespace admits what the serving side's egress delivers. Retraction markers SHALL be consulted on data replicas only, the only replicas whose entries a marker can name, so no state of the marker set can reach the stores that carry device records and grants.
+
+#### Scenario: Device replication is unaffected
+
+- **WHEN** two devices of the issuer's identity reconcile its data namespace
+- **THEN** every entry replicates between them, exactly as without the gate
+
+#### Scenario: A sibling relay of the read slice is not write-gated
+
+- **WHEN** a device of the audience identity catches up a granted replica from a sibling device holding read-only claims
+- **THEN** the read-slice entries arrive, although the relaying sibling holds no write on them

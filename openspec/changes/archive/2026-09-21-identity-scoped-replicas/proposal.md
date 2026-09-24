@@ -30,8 +30,8 @@ This change makes the separation structural, at the level ADR-0013 states. A hos
 ### Modified Capabilities
 
 - `components/mee-pdn/data-layer/multi-identity`: isolation between identities on one node becomes structural rather than classified per session, the identity replaces the node as what a session resolves to, and the replica a node holds under no identity — served whole to any holder of its ticket — goes.
-- `components/mee-pdn/data-layer/subset-reconciliation`: the caller's rights are resolved for the identity it names instead of every identity its node id resolves to, and a granted replica's contacts are addresses paired with the identity each is dialed as.
-- `components/mee-pdn/data-layer/capability-gated-ingest`: the write set a session freezes is recorded per hosted identity as well as per replica and caller.
+- `components/mee-pdn/data-layer/subset-reconciliation`: the caller's rights are resolved for the identity it names instead of every identity its node id resolves to, a granted replica's contacts are addresses paired with the identity each is dialed as, and a retraction's marker reaches the directory of the identity that wrote the entry alone.
+- `components/mee-pdn/data-layer/capability-gated-ingest`: the write set a session freezes is recorded per hosted identity as well as per replica and caller, and no replica outside every identity is left to admit whole.
 - `components/mee-pdn/data-layer/write-retraction`: a verdict's marker is recorded in the directory of the identity that wrote the retracted entry, which the verdict's author names, rather than in every co-hosted audience's directory.
 - `components/mee-pdn/data-layer/durable-storage`: the author becomes one per hosted identity rather than one per node, the directory holds a subdirectory per hosted identity carrying its hosting record, and a store's share of the cache budget is cut from the identities the directory records.
 - `components/mee-pdn/data-layer/node-assembly`: the docs protocol dispatches an accepted connection to the identity its first message names, while the endpoint still carries all protocols.
