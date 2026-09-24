@@ -2,24 +2,26 @@
 
 A cell is a space shared by 0..n members — identities — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store namespaces, each held whole, as a replica of its own, by every member identity on every device that hosts it: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session names the member whose replica it addresses and the member its caller acts as, and is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
 
-The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, the actor's own sequence at the time of acting (`actor_seq`) and the position in the subject's chain (`subject_seq`) sit in the key (cells D21, D23).
+The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, the actor's own sequence at the time of acting (`actor_seq`), the position in the subject's chain (`subject_seq`) and the author's own act number (`act_no`) sit in the key (cells D21, D23, D33).
 
 ```rust
-/// One entry a device writes into the membership store.
+/// One entry a device writes into the membership store. `act_no` is the writing author's own act number in the cell:
+/// 1 for its first act, one more for each next (cells D33).
 enum MembershipAct {
-    /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; the root.
+    /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; act_no = 1; the root.
     /// Derives the cell id and is checked against it by the steps below.
     Found   { nonce: [u8; 16], announcement_key: PublicKey, signature: Signature },
-    /// Records a newcomer's join after its one-time secret was verified and burned. Any member.
-    Join    { subject: PdnId, subject_seq: Seq, actor_seq: Seq, announcement_key: PublicKey, subject_signature: Signature },
+    /// Written by the inviting device once the newcomer's one-time secret is verified and burned, never when the invite is minted.
+    /// Any member; subject ≠ actor; `announcement_key` and `subject_signature` are the newcomer's join statement. Held as `Joined`.
+    Invite  { subject: PdnId, subject_seq: Seq, actor_seq: Seq, act_no: u64, announcement_key: PublicKey, subject_signature: Signature },
     /// The member itself; subject = actor.
-    Leave   { subject_seq: Seq, actor_seq: Seq },
+    Leave   { subject_seq: Seq, actor_seq: Seq, act_no: u64, mark: Mark },
     /// An owner; subject ≠ actor.
-    Kick    { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    Kick    { subject: PdnId, subject_seq: Seq, actor_seq: Seq, act_no: u64, mark: Mark },
     /// An owner.
-    Promote { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    Promote { subject: PdnId, subject_seq: Seq, actor_seq: Seq, act_no: u64 },
     /// An owner; subject ≠ actor.
-    Demote  { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
+    Demote  { subject: PdnId, subject_seq: Seq, actor_seq: Seq, act_no: u64, mark: Mark },
     /// The member's devices, one entry per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
     /// `signature` by the announcement key over "pdn/cell-devices/v1" ‖ version ‖ devices.
     AnnounceDevices { version: u64, devices: Vec<MemberDevice>, signature: Signature },
@@ -29,27 +31,36 @@ enum MembershipAct {
 /// writes with there — one author per hosted identity on a device (ADR-0013), so two members on one node share the node id only.
 struct MemberDevice { node: NodeId, author: AuthorId }
 
-/// A member's chain: `member/<pdnid>/<seq>/<kind>/<aseq>`, walked in `seq` order. `by` is the actor, `by_seq` the actor's own sequence then.
+/// What a narrowing saw of its subject: for each author the subject's device statements list, the highest `act_no` of that
+/// author the writing device holds. An act of the subject naming a point before the narrowing counts only within it (cells D33).
+struct Mark(Vec<(AuthorId, u64)>);
+
+/// A member's chain: `member/<pdnid>/<seq>/<kind>/<aseq>/<an>`, walked in `seq` order. `by` is the actor, `by_seq` the actor's
+/// own sequence then, `act_no` the writing author's `<an>`.
 enum MembershipEvent {
-    Founded  { seq: Seq, nonce: [u8; 16], announcement_key: PublicKey },         // by the member itself; the creator's seq 1 only
-    Joined   { seq: Seq, by: PdnId, by_seq: Seq, announcement_key: PublicKey },  // by any member
-    Left     { seq: Seq, by_seq: Seq },                                          // by the member itself
-    Kicked   { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner other than the member
-    Promoted { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner
-    Demoted  { seq: Seq, by: PdnId, by_seq: Seq },                               // by an owner other than the member
+    Founded  { seq: Seq, nonce: [u8; 16], announcement_key: PublicKey },                      // by the member itself; the creator's seq 1 only
+    Joined   { seq: Seq, by: PdnId, by_seq: Seq, act_no: u64, announcement_key: PublicKey },  // by any member other than the member
+    Left     { seq: Seq, by_seq: Seq, act_no: u64, mark: Mark },                              // by the member itself
+    Kicked   { seq: Seq, by: PdnId, by_seq: Seq, act_no: u64, mark: Mark },                   // by an owner other than the member
+    Promoted { seq: Seq, by: PdnId, by_seq: Seq, act_no: u64 },                               // by an owner
+    Demoted  { seq: Seq, by: PdnId, by_seq: Seq, act_no: u64, mark: Mark },                   // by an owner other than the member
 }
 
 /// Folding a chain up to a sequence: Founded makes a member and an owner, Joined a plain member, Promoted an owner, Demoted a plain member,
 /// Left and Kicked no member; a transition the state does not allow (Promoted of no member, Joined of a member) is ignored.
+/// An act naming a point before a Left, Kicked or Demoted of its actor that forbids it is ignored when its act_no exceeds that
+/// event's mark for its author — the first such event after the point decides, the highest mark at one sequence — and so is
+/// every event resting on it; two acts of one author under one act_no are both ignored (cells D33).
 struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<MemberDevice> }
 
-/// The gate's check of one event, from the write admission alone:
+/// The gate's check of one event, from the write admission alone, `state` folded without the mark (cells D33):
 ///   Founded          → seq == 1 and the receiving steps below pass
-///   Joined           → state(by, by_seq).member
+///   Joined           → by != subject and state(by, by_seq).member
 ///   Left             → by == subject
 ///   Promoted         → state(by, by_seq).owner
 ///   Kicked | Demoted → by != subject and state(by, by_seq).owner
-/// and for every kind: no entry under member/<subject>/<seq>/ by this author yet; by's chain held up to by_seq, else deferred.
+/// and for every kind: no entry under member/<subject>/<seq>/ by this author yet; by's chain held up to by_seq, this author's
+/// acts held below act_no, and for Left | Kicked | Demoted the acts the mark names held — else deferred.
 ```
 
 The cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
@@ -181,7 +192,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once the chain arrives, or dropped and offered again by the next session. Every entry SHALL be written once: an entry under a subject sequence the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>/<an>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain, and `<an>` the writing author's own act number, one more than its previous act in the cell — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>`, or whose author's acts it does not hold below `<an>`, SHALL be deferred within the session and re-judged once they arrive, or dropped and offered again by the next session. Every entry SHALL be written once: an entry under a subject sequence the write admission already shows held by the same author SHALL be dropped, and no entry in the membership store is overwritten or deleted — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again.
 
 #### Scenario: A role flip resolves by sequence whatever the arrival order
 
@@ -205,7 +216,7 @@ The membership store SHALL hold, per member, one sequence of membership events u
 
 #### Scenario: What an owner did while an owner stands after its demotion
 
-- **WHEN** owner A promoted C naming A's sequence 3, A was then demoted at A's sequence 4, and a device linked into member B after that catches up
+- **WHEN** owner A promoted C naming A's sequence 3, A was then demoted at A's sequence 4 by an owner whose device held that promotion, and a device linked into member B after that catches up
 - **THEN** B's new device lists C as an owner
 
 #### Scenario: An event naming an actor point without the membership state it needs is dropped
@@ -222,6 +233,11 @@ The membership store SHALL hold, per member, one sequence of membership events u
 
 - **WHEN** a device of owner A produces a kicked event and a demoted event in A's own chain
 - **THEN** no member device persists either, and A is still listed as a member and an owner
+
+#### Scenario: A departed member does not readmit itself
+
+- **WHEN** C left at C's sequence 2, and a device of member D relays a joined event in C's chain at C's sequence 3, authored by C's device and naming C's sequence 1
+- **THEN** no member device persists it and C is listed as no member
 
 #### Scenario: A founding event that does not derive the cell id is dropped
 
@@ -258,26 +274,60 @@ The membership store SHALL hold, per member, one sequence of membership events u
 - **WHEN** owner A's device writes B's promoted event at sequence 2, and later produces a different entry at the same key
 - **THEN** every member device keeps the first entry and drops the second
 
+### Requirement: A narrowing counts the narrowed member's acts only as far as its writer saw them
+
+Every left, kicked and demoted event SHALL carry a mark — for each author the subject's device statements list, the highest act number of that author the writing device holds — and SHALL be admitted only once the device holds the acts its mark names. An act of the subject naming a point before a narrowing that forbids it — any act before a left or kicked event, an owner's act before a demoted event — SHALL count only if its act number is within that narrowing's mark for its author, the first such narrowing after the named point deciding and, at a sequence holding several, the highest of their marks. Every other such act SHALL be held and relayed like any entry and ignored by the fold on every member device, whatever order the entries arrived in, and so SHALL every event resting on it; the gate SHALL judge an event's named point by the membership folded without this rule, so every member device holds the same entries. Two acts of one author under one act number SHALL both be ignored. A member that joins again SHALL be a plain member at its new point and an owner only through a later promotion.
+
+#### Scenario: A kicked owner that joins again is a plain member until promoted
+
+- **WHEN** A, an owner from A's sequence 2, is kicked at A's sequence 4 by owner C, whose device holds A's acts up to act number 7, member E invites A again at A's sequence 5, and A's device then writes under act numbers 8 and 9 a promoted event for A itself and one for plain member X, both naming A's sequence 2
+- **THEN** every member device holds both entries and lists A and X as plain members, and lists A as an owner only once an owner promotes it anew
+
+#### Scenario: A demoted owner's act under its old point does not count
+
+- **WHEN** owner A is demoted at A's sequence 4 by owner C, whose device holds A's acts up to act number 7, and a device of plain member E relays a promoted event for A itself, authored by A's device after the demotion, naming A's sequence 3 under act number 8
+- **THEN** every member device holds the entry and lists A as a plain member
+
+#### Scenario: An event resting on an ignored act is ignored with it
+
+- **WHEN** kicked owner A's promotion of X, beyond the kick's mark, reaches a device of X before the kick does, and X's device then promotes Y
+- **THEN** once the kick has arrived, every member device holds both promotions and lists X and Y as plain members
+
+#### Scenario: A concurrent act loses to its actor's narrowing
+
+- **WHEN** owner A's device, disconnected, kicks member Z under act number 8, while owner C's device, holding A's acts up to act number 7, demotes A, and the members' devices then reconcile
+- **THEN** every member device holds both entries and lists A as a plain member and Z as a member, until a current owner kicks Z again
+
+#### Scenario: A narrowing leaves the acts it does not forbid
+
+- **WHEN** owner A, demoted at A's sequence 4 under a mark of act number 7, invites newcomer N under act number 8 naming A's sequence 3
+- **THEN** every member device lists N as a plain member
+
+#### Scenario: Two acts under one act number are both ignored
+
+- **WHEN** a device of owner A writes, under one act number of its author, a promoted event for X and a promoted event for Y
+- **THEN** every member device holds both entries and lists X and Y as plain members
+
+#### Scenario: An act ahead of its author's lower act numbers is deferred
+
+- **WHEN** a device of member D receives an act of A's author numbered 5 while holding that author's acts only up to 3
+- **THEN** the act is not persisted until act 4 arrives, and is persisted in the session that brings it
+
+#### Scenario: A mark naming acts that do not exist holds the narrowing back
+
+- **WHEN** a device of member A writes a left event whose mark names act number 20 of A's author while that author's acts go up to 7
+- **THEN** no member device persists the left event until acts 8 to 20 of that author arrive, and every member device lists A as a member meanwhile
+
 ### Requirement: Verdicts hold their limits without an anchored log
 
-Until KERI's anchored log carries the retrograde direction (cells D29), the gate SHALL judge by the point an entry names and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the decision that accepts or keeps it, those under cells D29 expected to flip when KERI lands.
+While the retrograde direction stays open (cells F7), the gate SHALL judge by the point an entry names, by the mark of its actor's narrowing (cells D33) and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are the consequences — what the gate does, not what a cell wants — each named after the decision or the open question that keeps it, those under cells F7 expected to flip once that question is answered.
 
-#### Scenario: A demoted owner's act under its old point is admitted (D29)
-
-- **WHEN** owner A was demoted at A's sequence 4, and a device of plain member E relays a promoted event for A itself, authored by A's device after the demotion and naming A's sequence 3
-- **THEN** every member device persists it and lists A as an owner again
-
-#### Scenario: A kicked owner rejoins and re-promotes itself through a relaying member (D29)
-
-- **WHEN** A, an owner at A's sequence 3, was kicked at A's sequence 5, and a device of plain member E relays a joined event for A at A's sequence 6 and a promoted event for A at A's sequence 7, both authored by A's device and naming A's sequence 3
-- **THEN** every member device lists A as an owner — a plain member and a former owner together did what the rules reserve to an owner
-
-#### Scenario: A departed member's new record under its old sequence is admitted (D29)
+#### Scenario: A departed member's new record under its old sequence is admitted (F7)
 
 - **WHEN** C was kicked at C's sequence 2, and a device of member D relays an operation C's device authored after the kick, naming C's sequence 1
 - **THEN** every member device persists it
 
-#### Scenario: A rewrite that reaches a device first stays there (D29)
+#### Scenario: A rewrite that reaches a device first stays there (F7)
 
 - **WHEN** owner A's device rewrote B's promoted event at B's sequence 2 under A's own author key, and a device linked into member E catches up first from A's device and only then from a device holding the original
 - **THEN** E's new device keeps the rewrite and drops the original, while every device that held the original keeps it — two devices, two memberships

@@ -71,7 +71,8 @@ trait CellsService {
     /// Renames the cell for every member. An owner.
     async fn rename(&self, identity: PdnId, cell: CellId, name: &str) -> Result<()>;
 
-    /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member.
+    /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member. Writes nothing to the cell:
+    /// the invite act is written by the inviting device once a newcomer presents the secret.
     async fn invite(&self, identity: PdnId, cell: CellId, lifetime: Option<Duration>) -> Result<CellInvite>;
     /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
@@ -98,7 +99,7 @@ trait CellsService {
     async fn list_unknown(&self, identity: PdnId, cell: CellId) -> Result<Vec<UnknownEntry>>;
 }
 
-/// Founding, joining and device announcements are written by `create`, `join` and the device sweep, never through `act`.
+/// The founding act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by the device sweep — never through `act`.
 enum CellAct { Promote(PdnId), Demote(PdnId), Kick(PdnId), Leave }
 struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
 enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
@@ -127,7 +128,7 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes with the joined event into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -175,7 +176,7 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 
 ### Requirement: The creator is the first owner; owners promote members and demote other owners
 
-A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to promote any member to owner, and demoting an owner SHALL be available only to another owner. A promotion or a demotion by a member that is no owner, and a demotion of oneself, SHALL be refused with a typed error and change no state. A demoted owner remains a member.
+A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to promote any member to owner, and demoting an owner SHALL be available only to another owner. A promotion or a demotion by a member that is no owner, and a demotion of oneself, SHALL be refused with a typed error and change no state. A demoted owner remains a member. A member that joins again SHALL be a plain member, whatever role it held before, and its owner's acts SHALL be refused with a typed error until an owner promotes it anew.
 
 #### Scenario: The creator is listed as owner
 
@@ -201,6 +202,11 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 - **WHEN** owners A and B both own the cell and A attempts to demote itself
 - **THEN** the attempt is refused with a typed error and every member still lists A among the owners
+
+#### Scenario: A former owner joins again as a plain member
+
+- **WHEN** owner B is kicked, a member invites B again and B joins, and B then attempts to promote a member
+- **THEN** every member lists B as a plain member, and B's attempt is refused with a typed error
 
 ### Requirement: An owner renames the cell for every member
 
