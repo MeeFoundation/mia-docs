@@ -1,19 +1,21 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
 
 **Cell**
 
-|                               | Cell owner | Cell member |
-| ----------------------------- | ---------- | ----------- |
-| Rename cell for all members   | yes        | no          |
-| Invite member to a cell       | yes        | yes         |
-| Leave cell                    | yes        | yes         |
-| Delete cell for all members   | no         | no          |
-| Promote member to owner       | yes        | no          |
-| Demote owner to member        | yes        | no          |
-| Remove member from cell       | yes        | no          |
-| Remove owner-member from cell | yes        | no          |
+|                                | Cell owner | Cell member |
+| ------------------------------ | ---------- | ----------- |
+| Rename cell for all members    | yes        | no          |
+| Invite member to a cell        | yes        | yes         |
+| Leave cell                     | yes        | yes         |
+| Delete cell for all members    | no         | no          |
+| Promote member to owner        | yes        | no          |
+| Demote another owner to member | yes        | no          |
+| Demote oneself to member       | no         | no          |
+| Kick member from cell          | yes        | no          |
+| Kick another owner from cell   | yes        | no          |
+| Kick oneself from cell         | no         | no          |
 
 **Immutable-document** — attachments, for example a PDF file.
 
@@ -74,7 +76,7 @@ trait CellsService {
     /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
-    /// `Leave` also forgets both stores on the identity's devices.
+    /// `Kick` and `Demote` name another member; `Leave` also forgets both stores on the identity's devices.
     async fn act(&self, identity: PdnId, cell: CellId, act: CellAct) -> Result<()>;
 
     /// Places a record under the identity's own name at a fresh id: a claim's or an immutable-document's one entry,
@@ -97,7 +99,7 @@ trait CellsService {
 }
 
 /// Founding, joining and device announcements are written by `create`, `join` and the device sweep, never through `act`.
-enum CellAct { MakeOwner(PdnId), UnmakeOwner(PdnId), Remove(PdnId), Leave }
+enum CellAct { Promote(PdnId), Demote(PdnId), Kick(PdnId), Leave }
 struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
 enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 ```
@@ -125,7 +127,7 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join record, its first device statement, which the inviter writes with the joined event into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes with the joined event into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -144,7 +146,7 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 #### Scenario: A former member joins again
 
-- **WHEN** C left the cell or was removed from it, and a member invites C again and C joins
+- **WHEN** C left the cell or was kicked from it, and a member invites C again and C joins
 - **THEN** C reads the cell, its earlier records among what it reads, and a new record C writes reaches every member
 
 #### Scenario: A wrong secret burns nothing
@@ -171,29 +173,34 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 - **WHEN** a node hosts identity B, a member, and identity D, a non-member
 - **THEN** D lists no such cell and D's read of the cell fails with the unknown-cell error, while B reads it
 
-### Requirement: The creator is the first owner; owners make and unmake owners
+### Requirement: The creator is the first owner; owners promote members and demote other owners
 
-A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to make any member an owner, and taking ownership from a member SHALL be available only to another owner. An ownership act by a member that is no owner SHALL be refused with a typed error and change no state. A member whose ownership is taken remains a member.
+A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to promote any member to owner, and demoting an owner SHALL be available only to another owner. A promotion or a demotion by a member that is no owner, and a demotion of oneself, SHALL be refused with a typed error and change no state. A demoted owner remains a member.
 
 #### Scenario: The creator is listed as owner
 
 - **WHEN** a hosted identity creates a cell
 - **THEN** the cell's owners are exactly the creating identity
 
-#### Scenario: An owner makes a member an owner
+#### Scenario: An owner promotes a member
 
-- **WHEN** owner A makes member B an owner and the record reaches member C's devices
+- **WHEN** owner A promotes member B and the promotion reaches member C's devices
 - **THEN** C lists both A and B among the owners
 
-#### Scenario: A plain member's ownership act is refused
+#### Scenario: A plain member's promotion or demotion is refused
 
-- **WHEN** member C, no owner, attempts to make a member an owner or to take owner B's ownership away
+- **WHEN** member C, no owner, attempts to promote a member or to demote owner B
 - **THEN** the act is refused with a typed error and every member still lists the owners unchanged
 
-#### Scenario: An owner takes ownership from another owner
+#### Scenario: An owner demotes another owner
 
-- **WHEN** owner A takes owner B's ownership away and the record reaches the members' devices
+- **WHEN** owner A demotes owner B and the demotion reaches the members' devices
 - **THEN** B is listed among the members and not among the owners
+
+#### Scenario: An owner does not demote itself
+
+- **WHEN** owners A and B both own the cell and A attempts to demote itself
+- **THEN** the attempt is refused with a typed error and every member still lists A among the owners
 
 ### Requirement: An owner renames the cell for every member
 
@@ -209,24 +216,29 @@ Renaming a cell SHALL be available only to an owner's device, and the new name S
 - **WHEN** member C, no owner, attempts to rename the cell
 - **THEN** the attempt is refused with a typed error and every member lists the cell under its name unchanged
 
-### Requirement: Only an owner removes a member; leaving is forgetting
+### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
-#### Scenario: An owner removes a member
+#### Scenario: An owner kicks a member
 
-- **WHEN** owner A removes member C from a cell with members A, B and C, and the removal reaches B's devices
+- **WHEN** owner A kicks member C from a cell with members A, B and C, and the kick reaches B's devices
 - **THEN** A and B still sync the cell, and C's next session is refused
 
-#### Scenario: A plain member removes nobody
+#### Scenario: A plain member kicks nobody
 
-- **WHEN** member C, no owner, attempts to remove member B
+- **WHEN** member C, no owner, attempts to kick member B
 - **THEN** the attempt is refused with a typed error, B is still listed by every member, and B's devices are still served
 
-#### Scenario: An owner removes another owner
+#### Scenario: An owner kicks another owner
 
-- **WHEN** owners A and B both own the cell and A removes B
+- **WHEN** owners A and B both own the cell and A kicks B
 - **THEN** B's next session is refused, and B is listed by no remaining member
+
+#### Scenario: An owner does not kick itself
+
+- **WHEN** owner A attempts to kick itself
+- **THEN** the attempt is refused with a typed error, and every member still lists A as a member and an owner
 
 #### Scenario: A member leaves
 

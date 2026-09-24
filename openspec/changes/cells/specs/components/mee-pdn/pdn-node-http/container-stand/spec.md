@@ -4,7 +4,7 @@
 
 ### Requirement: The stand runs a cell across three containers with its paired denials
 
-The stand SHALL run, across three containers, a cell's creation, an invitation by its creator and one by an invited member, a claim and a mergeable-document placed by the creator, and an operation on that document appended by another member; it SHALL make a member an owner, remove a member through that owner, and restart a member's node. In the same scenario it SHALL assert the tightest denials: a plain member's deletion of another member's claim, its rename of the cell and its removal of a member are refused while the creator's deletion of its own claim goes through; a consumed invite secret is refused; a removed member stops receiving records after the remaining members are shown to receive a later one; and a cell left before a restart stays left. What a modified node does — a forged entry, an entry outside the key layout, a rewritten event — is not reachable over HTTP, and the data layer's own tests hold it.
+The stand SHALL run, across three containers, a cell's creation, an invitation by its creator and one by an invited member, a claim and a mergeable-document placed by the creator, and an operation on that document appended by another member; it SHALL promote a member to owner, kick a member through that owner, and restart a member's node. In the same scenario it SHALL assert the tightest denials: a plain member's deletion of another member's claim, its rename of the cell and its kick of a member are refused while the creator's deletion of its own claim goes through; a consumed invite secret is refused; a kicked member stops receiving records after the remaining members are shown to receive a later one; and a cell left before a restart stays left. What a modified node does — a forged entry, an entry outside the key layout, a rewritten event — is not reachable over HTTP, and the data layer's own tests hold it.
 
 #### Scenario: Any member invites, and the cell reaches all three
 
@@ -18,12 +18,12 @@ The stand SHALL run, across three containers, a cell's creation, an invitation b
 
 #### Scenario: A plain member's owner-only acts are refused
 
-- **WHEN** C, no owner, deletes A's claim, renames the cell and removes B, and A deletes a second claim of its own
+- **WHEN** C, no owner, deletes A's claim, renames the cell and kicks B, and A deletes a second claim of its own
 - **THEN** C's three requests are client errors and A's first claim, the name and B's membership are unchanged, while A's second claim no longer reads on any container
 
-#### Scenario: A removed member stops receiving
+#### Scenario: A kicked member stops receiving
 
-- **WHEN** A makes B an owner, B removes C, and A places two records one after the other
+- **WHEN** A promotes B, B kicks C, and A places two records one after the other
 - **THEN** B reads both, and C reads neither within the budget once B has read the second
 
 #### Scenario: A member's node comes back with its cell
