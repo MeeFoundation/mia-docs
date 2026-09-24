@@ -125,7 +125,7 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then record the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join record, its first device statement, which the inviter writes with the joined event into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 #### Scenario: A newcomer joins and catches up
 
@@ -152,19 +152,24 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 - **WHEN** a dialer presents a secret that was never minted while an invite is pending
 - **THEN** the attempt is refused with no observable state, and a subsequent join with the pending invite's real secret succeeds
 
+#### Scenario: Two identities of one node invite and join
+
+- **WHEN** a hosted identity invites and a co-located identity joins with the invite, with no other node reachable
+- **THEN** both list each other among the members, a record one places reads back on the other, and a second presentation of the same secret is refused
+
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. A device that resolves only as a device of an identity that is no member — a co-hosted identity on the same node included — SHALL NOT reach the cell.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
 
 #### Scenario: A linked device reaches the cell
 
 - **WHEN** identity B joins a cell on its phone while B's laptop is linked into B
 - **THEN** the laptop eventually lists the cell, reads its entries, and its own device is served by the other members
 
-#### Scenario: A co-hosted non-member identity does not reach the cell
+#### Scenario: A co-located non-member identity does not reach the cell
 
-- **WHEN** a node hosts identity B, a member, and identity D, a non-member, and a caller resolves only as a device of D
-- **THEN** D lists no such cell, and the caller is refused as for an unhosted store
+- **WHEN** a node hosts identity B, a member, and identity D, a non-member
+- **THEN** D lists no such cell and D's read of the cell fails with the unknown-cell error, while B reads it
 
 ### Requirement: The creator is the first owner; owners make and unmake owners
 
@@ -206,7 +211,7 @@ Renaming a cell SHALL be available only to an owner's device, and the new name S
 
 ### Requirement: Only an owner removes a member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device; the attempt by a member that is no owner SHALL be refused with a typed error and change no state. A removal event replicates like every cell entry; the remaining members' devices refuse the removed member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 #### Scenario: An owner removes a member
 
@@ -284,12 +289,17 @@ The cells service SHALL place a record as one of three kinds — claim, mergeabl
 
 ### Requirement: Hosted cells survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process. The hosted cells SHALL be re-derived from each hosted identity's directory, as its connections are: every cell whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the cell's published tickets. The runtime's record of hosted identities SHALL name no cell.
+A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process. The hosted cells SHALL be re-derived from each hosted identity's directory, as its connections are: every cell whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the cell's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no cell.
 
 #### Scenario: A cell is hosted again after a restart
 
 - **WHEN** a runtime on a storage directory hosts a member of a cell, stops, and starts again on the same directory, while another member wrote an entry in between
 - **THEN** the identity lists the cell, and the entry written meanwhile arrives
+
+#### Scenario: Two members hosted on one node come back each with its own copy
+
+- **WHEN** a runtime on a storage directory hosts two members of one cell, restarts on the same directory, and one of them places a record, with no other node reachable
+- **THEN** both list the cell and the other reads the record
 
 #### Scenario: A cell left before the restart stays left
 

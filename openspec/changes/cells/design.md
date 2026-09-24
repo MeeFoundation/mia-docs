@@ -339,6 +339,17 @@ The routes take this shape; the host spec leaves paths free to change:
 - A route that writes raw entries, to exercise forgeries over HTTP.
   - **Cons:** a path the runtime's own callers lack, against the host's rule; forgeries belong to the data layer's tests, where the gate is reached directly.
 
+### D32. A session names two members, and the caller is looked up in the serving identity's own records
+
+Every session on a cell's store names, as every session under identity-scoped replicas does, the member whose replica it addresses and the member its caller acts as, and is served only when the member the caller names is a current member whose records list the caller's node id. Which records follow from who serves. Where the caller names the identity the serving replica belongs to — a sibling device of that identity — its node id is looked up in that identity's own directory, as for every other store of the identity. Where it names another member, it is looked up in that member's device statements in the membership store (D16), whether the session crosses the network or runs inside the process between two identities of one node. A freshly linked device is therefore served by its siblings at once, before any statement lists it, and its statement reaches the other members through them. A caller naming an identity that is no member is refused indistinguishably from the store not being hosted — a co-located identity on a member's own node included, though it shares that member's node id — and so is a caller naming a member whose records do not list it. A node hosting members B and D is served as B in a session naming B and as D in one naming D, never as both.
+
+**Rejected alternatives:**
+
+- The member's device statements alone, siblings included.
+  - **Cons:** a freshly linked device is refused by every device until a statement lists it, and the statement lists the author the member writes with on that device, which only that device knows until it writes it.
+- Naming only the caller's member and leaving the serving node to pick the replica.
+  - **Cons:** a node hosting two members holds the cell twice, and the pick is ambiguous exactly there.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).

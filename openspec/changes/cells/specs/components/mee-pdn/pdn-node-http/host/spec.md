@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The debug surface covers the embedded runtime's operations
-When enabled, the debug surface SHALL make identity creation and linking, connection establishment, grants, entry operations, cells, node status, and hosted identities reachable over HTTP. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The cells routes SHALL cover every operation of the cells service, one route each: creating and listing cells, renaming a cell and listing its members; inviting and joining; the membership acts; placing records, appending operations, deleting, reading and listing records; and listing the entries outside the key layout.
+When enabled, the debug surface SHALL make identity creation and linking, connection establishment, grants, entry operations, cells, node status, and hosted identities reachable over HTTP. An entry operation SHALL name the identity performing it as well as the issuer addressed, and a cells operation the identity performing it as well as the cell, so a caller reaches exactly what that identity holds. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The cells routes SHALL cover every operation of the cells service, one route each: creating and listing cells, renaming a cell and listing its members; inviting and joining; the membership acts; placing records, appending operations, deleting, reading and listing records; and listing the entries outside the key layout.
 
 #### Scenario: A whole scenario runs over HTTP alone
 - **WHEN** 2 hosts are driven only over HTTP through identity creation, establishment, a grant, a write, and a grantee read

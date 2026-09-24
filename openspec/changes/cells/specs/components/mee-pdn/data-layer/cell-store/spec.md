@@ -1,6 +1,6 @@
 # data-layer: cell stores
 
-A cell is a space shared by 0..n members — identities — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store replicas, both held whole by every device of every member: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
+A cell is a space shared by 0..n members — identities — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store namespaces, each held whole, as a replica of its own, by every member identity on every device that hosts it: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session names the member whose replica it addresses and the member its caller acts as, and is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
 
 The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, the actor's own sequence at the time of acting (`actor_seq`) and the position in the subject's chain (`subject_seq`) sit in the key (cells D21, D23).
 
@@ -22,8 +22,12 @@ enum MembershipAct {
     UnmakeOwner { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
     /// The member's devices, one entry per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
     /// `signature` by the announcement key over "pdn/cell-devices/v1" ‖ version ‖ devices.
-    AnnounceDevices { version: u64, devices: Vec<AuthorId>, signature: Signature },
+    AnnounceDevices { version: u64, devices: Vec<MemberDevice>, signature: Signature },
 }
+
+/// A device of the member: its node id, which sessions are classified and contacts dialed by, and the author the member
+/// writes with there — one author per hosted identity on a device (ADR-0013), so two members on one node share the node id only.
+struct MemberDevice { node: NodeId, author: AuthorId }
 
 /// A member's chain: `member/<pdnid>/<seq>/<kind>/<aseq>`, walked in `seq` order. `by` is the actor, `by_seq` the actor's own sequence then.
 enum MembershipEvent {
@@ -37,7 +41,7 @@ enum MembershipEvent {
 
 /// Folding a chain up to a sequence: Founded and Joined make a plain member, MadeOwner an owner, UnmadeOwner a plain member,
 /// Left and Removed no member; a transition the state does not allow (MadeOwner of no member, Joined of a member) is ignored.
-struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<AuthorId> }
+struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<MemberDevice> }
 
 /// The gate's check of one event, from the write admission alone:
 ///   Founded            → seq == 1 and the receiving steps below pass
@@ -69,24 +73,29 @@ Receiving a founding event, on every member device (reconciliation, a fresh devi
 
 ## ADDED Requirements
 
-### Requirement: A cell is two dedicated replicas
+### Requirement: A cell is two dedicated stores, held per member identity
 
-A cell SHALL be served by exactly two pdn-store replicas — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other cell's stores. Two cells SHALL NOT share a replica, whatever their member sets. Both stores SHALL be addressed through the cell id, and no domain namespace id is allocated for either. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a cell's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a directory, a connection metadata store, another cell's store or the cell's other store — with nothing registered, and a data import SHALL refuse a ticket naming a cell's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
+A cell SHALL be served by exactly two pdn-store namespaces — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other cell's stores. Two cells SHALL NOT share a store, whatever their member sets. Both stores SHALL be addressed through the cell id, and no domain namespace id is allocated for either. Every member identity SHALL hold a replica of each store of its own, created or imported for that identity ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): two identities of one node that are both members SHALL each hold both stores, the two copies converging inside the process ([in-process sessions](../in-process-sessions/spec.md)) and sharing no replica. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a cell's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a directory, a connection metadata store, another cell's store or the cell's other store — with nothing registered, and a data import SHALL refuse a ticket naming a cell's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
 
 #### Scenario: Creating a cell allocates two dedicated replicas
 
-- **WHEN** a node creates a cell
-- **THEN** two fresh pdn-store replicas are created for it, both reached through the cell id, and no domain namespace id is allocated
+- **WHEN** a hosted identity creates a cell
+- **THEN** two fresh pdn-store replicas are created for that identity, both reached through the cell id, and no domain namespace id is allocated
 
 #### Scenario: A store ticket naming a replica held in another role is refused
 
 - **WHEN** a joining identity is handed a store ticket whose namespace it already holds as a data store received under a grant
 - **THEN** the join fails with no cell registered, and the data store is still held and reconciled as before
 
-#### Scenario: Two cells with the same members are four replicas
+#### Scenario: Two cells with the same members are four stores
 
 - **WHEN** the same identities are members of two cells and a record is written into one of them
 - **THEN** the record never appears in the other cell's stores
+
+#### Scenario: Two members hosted on one node hold the cell twice
+
+- **WHEN** identities B and D, hosted on one node, are both members of a cell, and B places a record with no other node reachable
+- **THEN** the node holds each store twice, one replica per identity, D's replica comes to carry B's record, payload included, and the record's entry carries B's author, which resolves to B alone
 
 #### Scenario: A record in the membership store is kept and used by nothing
 
@@ -114,7 +123,7 @@ A cell SHALL be identified by a 16-byte cell id, derived on the creator's device
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and authority to write inside the cell is judged by the ingest gate per entry, never by ticket mode — a member's write ticket widens nothing the gate refuses. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and authority to write inside the cell is judged by the ingest gate per entry, never by ticket mode — a member's write ticket widens nothing the gate refuses. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices, dialed as that identity; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states.
 
 #### Scenario: A write reaches a member through another member
 
@@ -138,7 +147,7 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 ### Requirement: Only member devices are served
 
-A session for either of a cell's stores SHALL be served only to a caller that resolves, by authenticated node id, as a device of a current member; every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included. A device of a member removed from the cell SHALL be refused from the first session set up after the removal event reaches the serving device; what it obtained while a member is retained.
+A session for either of a cell's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member removed from the cell SHALL be refused from the first session set up after the removal event reaches the serving device; what it obtained while a member is retained.
 
 #### Scenario: A member device is served whole
 
@@ -149,6 +158,11 @@ A session for either of a cell's stores SHALL be served only to a caller that re
 
 - **WHEN** a caller holding a store's ticket but a device of no member requests a session
 - **THEN** the request is refused with the answer an unhosted replica would produce, and no fingerprint, count or existence signal is revealed
+
+#### Scenario: A co-located identity that is no member is refused
+
+- **WHEN** a node hosts member B and identity E, no member, and a session from that node names E as its caller for either store
+- **THEN** the session is refused as for an unhosted store, while a session from the same node naming B is served
 
 #### Scenario: A removed member is refused from the next session
 
@@ -284,7 +298,7 @@ Until KERI's anchored log carries the retrograde direction (cells D29), the gate
 
 ### Requirement: The membership store is reconciled before the record store
 
-A session between two member devices SHALL reconcile the membership store to convergence, fold it into the write admission, and only then reconcile the record store under it; both stores SHALL be reconciled whole, with no capability filter on either. A record whose author's membership the same session brings SHALL be judged under that membership; a record that reaches a device ahead of its author's join event SHALL be dropped and persisted from the first session after the record arrives.
+A session between two member devices SHALL reconcile the membership store to convergence, fold it into the write admission, and only then reconcile the record store under it; both stores SHALL be reconciled whole, with no capability filter on either. The write admission a session is judged by SHALL be that session's own — the fold of the replica it addresses, carried from its setup to the gate, and on the membership store grown within the session as deferred events are admitted — so two sessions of one node acting as two members never judge by each other's. A record whose author's membership the same session brings SHALL be judged under that membership; a record that reaches a device ahead of its author's join event SHALL be dropped and persisted from the first session after the record arrives.
 
 #### Scenario: A newcomer's first record is admitted in the session that brings its membership
 
@@ -374,7 +388,7 @@ A mergeable-document SHALL hold each edit as its own entry under its own key, ne
 
 ### Requirement: Deleting a record kills it
 
-A tombstone SHALL be the store's empty entry at a record's key — the key of the record's content entries without their last segment. It SHALL be admitted from a device of the member under whose name the record sits or of an owner, judged as of the session, and dropped silently from any other device. Once it is admitted, the record store SHALL remove every author's content entries of that record and release their blobs at once, SHALL refuse at ingest every content entry of that record afterwards whatever its timestamp, and SHALL keep the tombstone entry, so that a peer holding the content and not the tombstone converges on the deletion. Beyond this rule no entry in either store, empty or not, SHALL remove, supersede or refuse an entry at any other key.
+A tombstone SHALL be the store's empty entry at a record's key — the key of the record's content entries without their last segment. It SHALL be admitted from a device of the member under whose name the record sits or of an owner, judged as of the session, and dropped silently from any other device. Once it is admitted, the record store SHALL remove every author's content entries of that record and release their blobs as soon as no replica on the node references them — the blob store is one for every identity the node hosts, so a co-located member's replica of the record keeps them until it takes the tombstone too — SHALL refuse at ingest every content entry of that record afterwards whatever its timestamp, and SHALL keep the tombstone entry, so that a peer holding the content and not the tombstone converges on the deletion. Beyond this rule no entry in either store, empty or not, SHALL remove, supersede or refuse an entry at any other key.
 
 #### Scenario: An owner's deletion removes the record and its blob everywhere
 
@@ -432,12 +446,17 @@ An entry in either store whose key fits neither store's layout, or fits one only
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join record, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join record, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
 
-#### Scenario: A new device registers itself
+#### Scenario: A new device registers itself through its siblings
 
-- **WHEN** a device freshly linked into member B writes B's newest device statement into its local replica and reconciles with a device of member C
-- **THEN** C's device admits the statement, and the new device's next session is served as a member device
+- **WHEN** a device freshly linked into member B writes B's newest device statement into its local replica, reconciles with another device of B that holds the cell, and that device then reconciles with a device of member C
+- **THEN** C's device admits the statement and serves the new device's next session, which it refused before the statement arrived
+
+#### Scenario: Two members on one node are two authors under one node id
+
+- **WHEN** identities B and D, hosted on one node, are both members of a cell and each places a record from that node
+- **THEN** B's and D's statements list the same node id under two different authors, and every member device resolves each record to the one member whose author signed it
 
 #### Scenario: A statement under a wrong key is dropped
 
@@ -451,9 +470,14 @@ A member's device-list statement SHALL be admitted by the signature embedded in 
 
 ### Requirement: A cell's stores are forgotten together
 
-Forgetting a cell SHALL stop reconciling both replicas, leave both swarms, drop both replicas, and remove the cell's registration together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures.
+Forgetting a cell SHALL stop reconciling both replicas, leave both swarms, drop both replicas, and remove the cell's registration together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures. Forgetting SHALL reach the replicas of the identity that forgets alone: a co-located member's replicas of the same cell go on as before.
 
 #### Scenario: Forgetting a cell unregisters it
 
 - **WHEN** a node holds a cell's stores and forgets the cell
 - **THEN** reading or writing under that cell fails with the unknown-cell error, neither replica is reconciled or served, and the node's other cells are unaffected
+
+#### Scenario: One member forgetting spares the co-located other
+
+- **WHEN** a node hosts members B and D of one cell and B forgets it
+- **THEN** operations addressed to the cell as B fail with the unknown-cell error, while D still reads and writes the cell and D's replicas keep reconciling
