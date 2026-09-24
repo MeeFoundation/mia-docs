@@ -65,7 +65,7 @@ The caller's write set SHALL be computed at session setup from the issuer's reco
 - **THEN** the issuer's gate drops it and the writer retracts it
 ### Requirement: Own devices and unarmed replicas are not narrowed
 
-A session peer resolving as a device of the issuer SHALL be admitted in full. The gate SHALL arm only on replicas data-bound to a hosted identity: directories and connection metadata stores keep ticket-bounded admission (Invariants 1 and 3), a grantee-held replica of a foreign namespace admits what the serving side's egress delivers, and an unregistered replica admits as it serves — whole, bounded by ticket possession. Retraction markers SHALL be consulted on data replicas only, the only replicas whose entries a marker can name, so no state of the marker set can reach the stores that carry device records and grants.
+A session peer resolving as a device of the issuer SHALL be admitted in full. The gate SHALL arm only on replicas data-bound to a hosted identity: directories and connection metadata stores keep ticket-bounded admission (Invariants 1 and 3), and a grantee-held replica of a foreign namespace admits what the serving side's egress delivers. Retraction markers SHALL be consulted on data replicas only, the only replicas whose entries a marker can name, so no state of the marker set can reach the stores that carry device records and grants.
 
 #### Scenario: Device replication is unaffected
 
