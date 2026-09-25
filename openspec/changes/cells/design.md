@@ -12,7 +12,7 @@ This design records the decisions taken for the platform side of cells and the q
 
 - A shared space for 0..n members.
 - Everything a member writes reaches every member, from any member, with the author's authorship enforced on every honest device.
-- Reuse: the swarm, the content-free topic, the ingest hook, the linking-shaped dialogue, multi-identity hosting with identity-scoped replicas and their in-process path, the directory as the carrier to a member's other devices. One change in pdn-store: no entry affects another key (D24).
+- Reuse: the swarm, the content-free topic, the ingest hook, the linking-shaped dialogue, multi-identity hosting with identity-scoped replicas and their in-process path, the directory as the carrier to a member's other devices. One addition to pdn-store: the two primitives of D24.
 - Every unanswered question written down, with its options.
 
 **Non-Goals:**
@@ -225,11 +225,11 @@ What the reference proves is, as for records (D22), that the event is after the 
 
 A tombstone is the store's empty entry at a record's key — `…/<kind>/<id>`, the key of its content entries without their last segment (D21) — admitted from a device of the record's member or of an owner (D12), as of the session (D22). The record store knows its key layout and maps a content entry to its record by dropping the last segment of its key. Once a tombstone is admitted, the record store removes every author's content entries of that record and releases their blobs the moment nothing references them, and from then on refuses at ingest every content entry of that record, whatever its timestamp — one lookup of the record's key, apart from the gate, which stays synchronous and reads no replica (D19). That is safe because a record's key is written once and a replacement is a new key (D17, D18), and a mergeable-document's operations die with the document. The blob store is the node's, one under every hosted identity's replicas (ADR-0013), so a blob is released once no replica of any identity the node hosts references it: a co-located member's copy of the record keeps it until that replica takes the tombstone too, which the in-process path brings at once. The tombstone entry itself stays, as the element of the set that reconciliation compares: a peer holding the content and not the tombstone converges on the deletion instead of offering the content back.
 
-The rule belongs to the record store alone. The store beneath carries no relation between keys: an entry, empty or not, affects only its own key, in every replica — so a directory's tombstone at `connections/<P>` leaves that key open for a later connect, a non-empty entry at a record's key erases nothing, and an entry outside the record layout touches nothing (D27). The store offers the two primitives the rule builds on: removing every author's entries at one key with their blobs, and looking one key up at ingest. This is the change in pdn-store this design makes.
+The rule belongs to the record store alone. The store beneath carries no relation between keys: an entry, empty or not, affects only its own key, in every replica — so a directory's tombstone at `connections/<P>` leaves that key open for a later connect, a non-empty entry at a record's key erases nothing, and an entry outside the record layout touches nothing (D27). The store gains the two primitives the rule builds on: removing every author's entries at one key with their blobs, and looking one key up at ingest. They are this design's change in pdn-store.
 
 **Rejected alternatives:**
 
-- The store's read-side deletion as it is today — an empty entry removes only its own author's older entries under the prefix, other authors' entries stay and are hidden on read by the newest timestamp across authors.
+- The store's own deletion alone — an empty entry replaces only its own author's older entry at its key; other authors' entries stay and are hidden on read by the newest timestamp across authors.
   - **Cons:** deleted content and its blob stay on disk until a collection nobody schedules; a content entry with a newer self-set timestamp resurrects a deleted record (D13).
 - Prefix semantics in the store — an empty entry removing every author's entries under its key, a dead prefix admitting nothing more.
   - **Cons:** an entry at a short key or at a key a later layout gives meaning — `by/`, `by/<M>/` — reaches entries it was never meant for; a non-empty entry at a record's key erases its own author's operations under it; the rule holds in every replica, so a dead `connections/<P>` in a directory forbids a reconnect.
@@ -382,7 +382,7 @@ The rule is the fold's: the fold that lists members, serves sessions and judges 
 
 ## Migration Plan
 
-Additive: no existing store, ticket, grant or record changes shape — the directory gains the cell kinds and the announcement key pair — and a runtime without cells behaves as before. The store's prefix deletion goes (D24): every existing delete already addresses one key, and the directory's pruning of an issuer's retraction markers deletes them one by one. Rollback is forgetting cell stores; nothing else depends on them. No migration: the platform has no real users, so an identity created before this change, which holds no announcement key pair, is not carried over.
+Additive: no existing store, ticket, grant or record changes shape — the directory gains the cell kinds and the announcement key pair — and a runtime without cells behaves as before. Rollback is forgetting cell stores; nothing else depends on them. No migration: the platform has no real users, so an identity created before this change, which holds no announcement key pair, is not carried over.
 
 ## Open Questions
 
