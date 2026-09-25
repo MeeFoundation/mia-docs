@@ -13,3 +13,4 @@ Every store a hosted identity holds SHALL write with that identity's one author,
 
 #### Scenario: Two identities on one node write as two authors
 - **WHEN** two identities hosted on one node each write an entry
+- **THEN** the two entries carry two different authors, and each identity's later writes carry the one it wrote with before
