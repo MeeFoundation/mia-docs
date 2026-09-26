@@ -272,7 +272,7 @@ The membership store SHALL hold, per member, one sequence of membership events u
 #### Scenario: A rewritten event is dropped
 
 - **WHEN** owner A's device writes B's promoted event at sequence 2, and later produces a different entry at the same key
-- **THEN** every member device keeps the first entry and drops the second
+- **THEN** every member device other than A's keeps the first entry and drops the second
 
 ### Requirement: A narrowing counts the narrowed member's acts only as far as its writer saw them
 
@@ -440,11 +440,11 @@ A mergeable-document SHALL hold each edit as its own entry under its own key, ne
 #### Scenario: An immutable-document is admitted from its member and from nobody else
 
 - **WHEN** a device of member B places an immutable-document, a device of owner A then produces an entry at its key, and the members' devices reconcile
-- **THEN** every member device persists B's immutable-document and drops A's entry, B's immutable-document reading unchanged
+- **THEN** every member device persists B's immutable-document, and every member device other than A's drops A's entry and reads B's immutable-document unchanged
 
 ### Requirement: Deleting a record kills it
 
-A tombstone SHALL be the store's empty entry at a record's key — the key of the record's content entries without their last segment. It SHALL be admitted from a device of the member under whose name the record sits or of an owner, judged as of the session, and dropped silently from any other device. Once it is admitted, the record store SHALL remove every author's content entries of that record and release their blobs as soon as no replica on the node references them — the blob store is one for every identity the node hosts, so a co-located member's replica of the record keeps them until it takes the tombstone too — SHALL refuse at ingest every content entry of that record afterwards whatever its timestamp, and SHALL keep the tombstone entry, so that a peer holding the content and not the tombstone converges on the deletion. Beyond this rule no entry in either store, empty or not, SHALL remove, supersede or refuse an entry at any other key.
+A tombstone SHALL be the store's empty entry at a record's key — the key of the record's content entries without their last segment. It SHALL be admitted from a device of the member under whose name the record sits or of an owner, judged as of the session, and dropped silently from any other device. Once it is admitted, the record store SHALL remove every author's content entries of that record and release their blobs as soon as no replica on the node references them — the blob store is one for every identity the node hosts, so a co-located member's replica of the record keeps them until it takes the tombstone too — SHALL refuse at ingest every content entry of that record afterwards whatever its timestamp, judging by every author's entries at the record's key, empty ones included, never by the newest of them, and SHALL keep the tombstone entry, so that a peer holding the content and not the tombstone converges on the deletion. Beyond this rule no entry in either store, empty or not, SHALL remove, supersede or refuse an entry at any other key.
 
 #### Scenario: An owner's deletion removes the record and its blob everywhere
 
@@ -484,11 +484,11 @@ A tombstone SHALL be the store's empty entry at a record's key — the key of th
 #### Scenario: A non-empty entry at a record's key erases nothing
 
 - **WHEN** a device of member B writes a non-empty entry at the key of B's own mergeable-document, without an operation segment, and the members' devices reconcile
-- **THEN** every member device still holds all of the document's operations, reads the document unchanged, and holds B's entry as an entry outside the layout
+- **THEN** every member device still holds all of the document's operations and reads the document unchanged
 
 ### Requirement: Entries outside the key layout are kept, used by nothing, and listed
 
-An entry in either store whose key fits neither store's layout, or fits one only in part, SHALL be admitted when its author resolves to a device of a current member, and dropped silently otherwise; once admitted it SHALL be reconciled, held and relayed like any entry. A key longer than the store's bound of 8,192 bytes is dropped before any layout is read ([capability-gated ingest](../capability-gated-ingest/spec.md)), so every record key the layouts define, a record's id included, has to fit under that bound. No membership fold, no admission verdict and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
+An entry in either store whose key fits neither store's layout, or fits one only in part — a non-empty entry at a record's own key excepted, which cells C14 leaves open — SHALL be admitted when its author resolves to a device of a current member, and dropped silently otherwise; once admitted it SHALL be reconciled, held and relayed like any entry. A key longer than the store's bound of 8,192 bytes is dropped before any layout is read ([capability-gated ingest](../capability-gated-ingest/spec.md)), so every record key the layouts define, a record's id included, has to fit under that bound. No membership fold, no admission verdict and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
 
 #### Scenario: An unknown entry from a member converges and changes nothing
 
