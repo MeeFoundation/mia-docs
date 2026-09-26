@@ -81,7 +81,7 @@ The connection armer and the grant binder read one change from their subscriptio
 
 ### D8. The marker sweep applies each marker version once
 
-The access book keeps, beside each armed key's bound, the content hash of the marker version whose removal has run. A sweep lists the markers from their entries alone, and reads the payload, arms and removes only for a version the book does not hold as applied; the removal marks the version applied once it went through, so a failed removal is retried by the next sweep. A disarm — of the key when its marker ages out, of the namespace when it is forgotten — forgets the version with the bound, and a restart starts with none, so a marker met again after either is applied again. Recording markers one at a time then costs one payload read and one removal each, where every sweep read and removed every marker recorded so far; listing the entries stays a pass per sweep. `an_applied_marker_is_forgotten_with_its_disarm` in the data layer's `access.rs` proves the record and its forgetting; recording the 400 markers of `a_withdrawal_over_many_markers_leaves_the_runtime_serving` took 18 seconds before and 4 after.
+The access book keeps, beside each armed key's bound, the content hash of the marker version whose removal has run. A sweep lists the markers from their entries alone, and reads the payload, arms and removes only for a version the book does not hold as applied; the removal marks the version applied once it went through, so a failed removal is retried by the next sweep. A disarm — of the key when its marker ages out, of the namespace when it is forgotten — forgets the version with the bound, and a restart starts with none, so a marker met again after either is applied again. Recording markers one at a time then costs one payload read and one removal each, where every sweep read and removed every marker recorded so far; listing the entries stays a pass per sweep. The verdict consumer records every verdict queued by the time it takes the state lock under that one lock, so the markers of one session's rejections land together and the armer's next sweep takes them in one pass; only those, since an entry not yet retracted is refused again on every session, and a consumer draining until empty would never let the sweep that retracts it take the lock. `an_applied_marker_is_forgotten_with_its_disarm` in the data layer's `access.rs` proves the record and its forgetting; recording the 400 markers of `a_withdrawal_over_many_markers_leaves_the_runtime_serving` took 18 seconds and one sweep per marker before, and under a second and 7 sweeps after.
 
 **Rejected alternatives:**
 
@@ -91,6 +91,8 @@ The access book keeps, beside each armed key's bound, the content hash of the ma
   - **Cons:** change streams carry no detail and drop events under lag, so a full pass stays as the fallback; the same saving with more states to keep in step.
 - A pause before each sweep.
   - **Cons:** markers arriving one per session still cost a full sweep each.
+- The verdict consumer draining its queue until empty under one lock.
+  - **Cons:** the issuer refuses an entry on every session until the sweep retracts it, so the queue never empties and the sweep never gets the lock.
 
 ## Operating conditions
 
