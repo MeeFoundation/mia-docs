@@ -77,7 +77,20 @@ Found in the review of this change, before it reached main: the withdrawal in th
 
 ### D7. The runtime's consumers take every buffered change before they sweep
 
-The connection armer and the grant binder read one change from their subscription, take the state lock, then take every change already buffered before the sweep, so the sweep covers them all and a burst — a binder's unbind deleting hundreds of markers — costs one sweep instead of one per change, each of which read every remaining marker. The binder's unbind still deletes the markers under the lock, as D3 needs; the runtime waits on it for as long as the deletes take, a fraction of a second for hundreds. Proven by `a_withdrawal_over_many_markers_leaves_the_runtime_serving` in `pdn-node/tests/scoped_writes.rs`: 400 markers, the withdrawal, the markers gone, and each call on the runtime answered within five seconds; with the store's delivery made blocking it fails on the first probe. The drain itself is not proven by a scenario: it changes the number of sweeps, not their outcome.
+The connection armer and the grant binder read one change from their subscription, take the state lock, then take every change already buffered before the sweep, so the sweep covers them all and a burst — a binder's unbind deleting hundreds of markers — costs one sweep instead of one per change, each of which listed every remaining marker (D8). The binder's unbind still deletes the markers under the lock, as D3 needs; the runtime waits on it for as long as the deletes take, a fraction of a second for hundreds. Proven by `a_withdrawal_over_many_markers_leaves_the_runtime_serving` in `pdn-node/tests/scoped_writes.rs`: 400 markers, the withdrawal, the markers gone, and each call on the runtime answered within five seconds; with the store's delivery made blocking it fails on the first probe. The drain itself is not proven by a scenario: it changes the number of sweeps, not their outcome.
+
+### D8. The marker sweep applies each marker version once
+
+The access book keeps, beside each armed key's bound, the content hash of the marker version whose removal has run. A sweep lists the markers from their entries alone, and reads the payload, arms and removes only for a version the book does not hold as applied; the removal marks the version applied once it went through, so a failed removal is retried by the next sweep. A disarm — of the key when its marker ages out, of the namespace when it is forgotten — forgets the version with the bound, and a restart starts with none, so a marker met again after either is applied again. Recording markers one at a time then costs one payload read and one removal each, where every sweep read and removed every marker recorded so far; listing the entries stays a pass per sweep. `an_applied_marker_is_forgotten_with_its_disarm` in the data layer's `access.rs` proves the record and its forgetting; recording the 400 markers of `a_withdrawal_over_many_markers_leaves_the_runtime_serving` took 18 seconds before and 4 after.
+
+**Rejected alternatives:**
+
+- The applied versions held by the runtime beside the hosted identity.
+  - **Cons:** a forget or an age-out disarms in the data layer, and a record kept apart from the book goes stale there — a marker not armed again after its namespace is bound again.
+- Acting on the changed entry the event names.
+  - **Cons:** change streams carry no detail and drop events under lag, so a full pass stays as the fallback; the same saving with more states to keep in step.
+- A pause before each sweep.
+  - **Cons:** markers arriving one per session still cost a full sweep each.
 
 ## Operating conditions
 
@@ -85,7 +98,7 @@ Walked from `specs/code-practices/operating-conditions.md`:
 
 - One device or several — changes the outcome: the swap needs a second replica that still holds the entry a delete replaced, a sibling or a device of the audience. Backed by the store's convergence scenario and the connection metadata store's withdrawal scenario.
 - Capabilities granted, narrowed, widened, revoked and granted again — changes the outcome for a withdrawal, as above. A grant published again after a withdrawal is a newer entry at the same key when the publishing device's clock dates it past the delete, and replaces the delete as before; the existing republication scenario covers it.
-- A device that restarts — changes the outcome through the directory: a marker erased by a later marker at a shorter path was gone from the durable store, so a restarted device re-armed without it and admitted the refused entry again. Backed by the directory's marker scenario. A prefix delete already on disk stops acting on longer keys; the proposal leaves stores written before this change unmigrated.
+- A device that restarts — changes the outcome through the directory: a marker erased by a later marker at a shorter path was gone from the durable store, so a restarted device re-armed without it and admitted the refused entry again. Backed by the directory's marker scenario. A prefix delete already on disk stops acting on longer keys; the proposal leaves stores written before this change unmigrated. The access book's record of applied marker versions is in memory and starts empty, so the first sweep after a restart applies every marker again (D8).
 - Several identities on one node — no change: each identity writes with its own author into its own replica store, and the rule is per author.
 - A device linking before, during or after — no change beyond several devices: a device that catches up from a replica still holding a deleted entry receives it and then the delete, like any sibling.
 - An unstable connection — changes the outcome on the unfixed store: a lost gossip link is one of the moments in which the publishing device opens the session first. The withdrawal scenario takes the link away through the swarm hook.

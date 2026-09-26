@@ -14,6 +14,7 @@ Pruning an issuer's markers one key at a time, which the per-key rule needs, exp
 - The store waits on no subscriber outside itself: a subscription opened through its interface drops what its full buffer cannot take and receives a lag notice after the last event it still gets; only the store's live engine subscribes with a delivery that waits. The live engine's own events reach their subscribers the same lossy way.
 - The directory's and the connection metadata store's change streams report a lag notice as a change; the directory's catch-up wait goes on to the next session when it missed one.
 - The connection armer and the grant binder take every change already buffered before they sweep, so a burst of changes costs one sweep.
+- The marker sweep applies each marker version once: it reads the payload, arms and removes only for a version not yet applied, and a disarm or a restart forgets what was applied.
 
 Out of scope, by decision:
 
@@ -41,6 +42,6 @@ Out of scope, by decision:
 
 - `crates/pdn-store`: the ranger `Store` trait (`entry_get` in place of `prefixes_of` and `remove_prefix_filtered`, `put` and `would_insert` over one key), the fs store and the session store beneath it, `Replica::delete`, the actor's delete action, `Doc::del` and `DelRequest`. The wire protocol and the sync messages do not change.
 - `crates/pdn-store`, subscriptions: the `subscribers` module with its two deliveries, a `Lagged` event in the replica's, the live engine's and the API's event types, `OpenOpts::subscribe` closed to code outside the crate.
-- `crates/pdn-node`: the connection armer and the grant binder take the buffered changes before each sweep; a scenario test of a withdrawal over 400 markers.
-- `crates/data-layer`: `prune_retractions` in the directory; the change streams mapping the lag notice to a change; new scenario tests for the data store, the connection metadata store and the directory, and a test-only hook that opens one session of a metadata store from a chosen side.
+- `crates/pdn-node`: the connection armer and the grant binder take the buffered changes before each sweep; the marker sweep over marker heads, applying each version once; a scenario test of a withdrawal over 400 markers.
+- `crates/data-layer`: `prune_retractions` in the directory; the change streams mapping the lag notice to a change; the directory's marker heads, listed without their payload; the access book's record of applied marker versions; new scenario tests for the data store, the connection metadata store and the directory, and a test-only hook that opens one session of a metadata store from a chosen side.
 - Documentation: the store's `CLAUDE.md` records the divergence from upstream; the archived changes that name the removed trait methods or prefix deletion (frozen-session-snapshots, disk-persistence, identity-scoped-replicas) are rewritten as present state.
