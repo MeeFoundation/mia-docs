@@ -80,6 +80,11 @@ A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex char
 - **WHEN** a grant record is present but the payload naming its claims has not replicated yet
 - **THEN** the reading side reports it as not yet readable rather than as no grant, so a caller that must not guess can wait instead of concluding
 
+#### Scenario: A withdrawal holds against a device that still holds the record
+
+- **WHEN** the publishing device withdraws a grant while a device of the audience still holds the grant record, and the publishing device opens the next session of the store toward that device
+- **THEN** after that session and every later one both devices read no grant, and the publishing device refuses the audience a session of the granted data store it served before the withdrawal
+
 ### Requirement: Each side publishes its device set into its directional store
 
 An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>` records in every connection-metadata store it issues, with the directory's device-record semantics (marker payload, LWW, tombstone on revocation), and SHALL keep them current as devices are linked and revoked — so the counterparty can resolve a transport-authenticated node id to this identity. The identity is authoritative over its own device set; the records widen no access beyond what the connection already grants.

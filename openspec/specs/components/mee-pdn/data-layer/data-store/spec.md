@@ -68,6 +68,13 @@ Concurrent writes to the same path on different devices SHALL resolve on every d
 - **WHEN** two devices write different payloads at the same path with no coordination and then sync
 - **THEN** both devices eventually read the same payload, and it is one of the two written
 
+### Requirement: A write affects only its own path
+A write SHALL affect only the entry at its own path: the entry replaces the earlier entry its author wrote at that path and leaves every other path standing on every replica, a longer path beginning with the same components or with the same bytes included. An entry arriving by sync SHALL be refused only by an entry of its author at its own path that is newer or equal.
+
+#### Scenario: A write at a shorter path leaves the longer ones standing
+- **WHEN** a device writes entries at `contact/email` and `contacts/emergency` under one issuer, and then an entry at `contact`
+- **THEN** listing that issuer yields all three paths, each reading the payload written at it, on that device and on the identity's other device once it syncs
+
 ### Requirement: The data store is shared by ticket
 A data store SHALL be shareable as a ticket, and importing that ticket SHALL register the replica under the issuer on the importing node, joining it into the replica's sync. A write ticket admits writing through any local author; a read ticket admits replication only. An import under an issuer that already resolves to another replica SHALL move the issuer onto the imported replica and forget the other one in the same act, so an issuer resolves to one replica for the identity that holds it, and a replica it no longer resolves to is neither reconciled nor kept. An import under an issuer that already resolves to the very replica the ticket names SHALL bind nothing and change nothing — its tracking, its serving posture and its swarm membership stay as they were.
 

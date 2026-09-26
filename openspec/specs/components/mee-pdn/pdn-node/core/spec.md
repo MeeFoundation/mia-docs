@@ -209,6 +209,11 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 - **WHEN** a runtime holding a grant's namespace imports another namespace out of band under that grant's issuer, and the grant is then withdrawn
 - **THEN** the namespace imported out of band stays bound and held — the withdrawal forgets only the replica the grant bound, and that one had already been replaced
 
+#### Scenario: A withdrawal over many retraction markers leaves the runtime serving
+
+- **WHEN** an audience holds more of the issuer's retraction markers than a store subscription buffers, and the issuer withdraws the grant
+- **THEN** the audience's runtime drops those markers as it forgets the namespace, and every call waiting on the runtime answers afterwards
+
 ### Requirement: A granted replica reaches the issuer devices its own connection publishes
 
 The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata store of the connection whose grant bound this replica, in addition to the addresses the grant's ticket carried and the holding identity's own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
