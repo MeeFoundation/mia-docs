@@ -10,17 +10,19 @@ context: |
 
   Cross-cutting practices every change is held to — read the one that applies before writing, they are short:
 
-  - specs/code-practices/operating-conditions.md — the circumstances a design has to survive: several identities on one node, one device or several, a device linking before or during or after a process, an unstable connection, a disk that fills, a device that restarts, capabilities granted and narrowed and widened and revoked and granted again. Walk the list while exploring and designing; back with a scenario and a test the paths where a condition changes the outcome; name the ones deliberately left out. Do not multiply every test by every condition.
+  - specs/code-practices/operating-conditions.md — the circumstances a design has to survive: several identities on one node, one device or several, a device linking before or during or after a process, an unstable connection, a disk that fills, a device that restarts, clocks that disagree and step back, capabilities granted and narrowed and widened and revoked and granted again. Walk the list while exploring and designing; back with a scenario and a test the paths where a condition changes the outcome; name the ones deliberately left out. Do not multiply every test by every condition.
   - specs/code-practices/access-control-tests.md — an assertion of authorized access is paired, in the same place, with the tightest denial. A positive-only access test verifies nothing.
   - specs/code-practices/product-path-arrangement.md — arrange and act steps reach a namespace the way the product reaches it; a hand-made ticket handover is admissible only as the test's subject or as the access-control negative control, named in the test's docs.
   - specs/code-practices/flaky-tests.md — a rare failure is a rare defect. Reproduce with statistics before fixing, and stress the affected scenarios after.
   - specs/code-practices/defect-reachability.md — a defect a host can trigger through the public surface of pdn-node, or a modified node can turn against honest nodes through what it sends, is fixed; one reached neither way may stay, recorded with its argument.
+  - specs/code-practices/decision-priorities.md — what outweighs what when choosing between options. Weigh every decision, open question and recommendation by it.
 
   Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands"; platform terms keep their English names. Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
 
 # Per-artifact rules.
 rules:
   design:
+    - Choose each decision, and the recommendation an open question carries, by specs/code-practices/decision-priorities.md.
     - Walk specs/code-practices/operating-conditions.md and state which of those conditions change the outcome of this change. "None of them" is a legitimate answer and is worth writing down; a condition that does change the outcome belongs in Decisions or in Risks, not only in prose.
     - A decision names what it rejected under one heading and one wording — "**Rejected alternatives:**", bold, nothing else ("Rejected:", "Alternatives considered", "Not chosen" are not used) — followed by a list, one alternative per item. The item says what the alternative was in the fewest words that identify it, and nothing more; anything substantial for or against it goes in a nested list under bold "**Pros:**" and "**Cons:**", each line present only when it has something substantial to say. An alternative with nothing substantial to say about it, for or against, is not listed; a decision with nothing rejected carries no block. The form exists so a design can be skimmed: a reader sees what was on the table and why it lost without reading prose.
     - The text of a decision describes what was chosen and nothing else — no "not X", no "rather than Y", no case against what was not chosen; the alternatives and the case against them live only in the decision's Rejected alternatives block. A reader working to understand the decision, skimming or reading aloud, then holds in mind only what was chosen.
@@ -42,6 +44,8 @@ operations:
         An authorized-access assertion carries its tightest denial beside it. Arrange and act steps reach a namespace the way the product does; a hand-made ticket handover is admissible only as the test's subject or as the negative control, and the test's doc says which.
       - >-
         A task that adds a scenario is done only when its test would fail with the mechanism removed.
+      - >-
+        A choice the design does not settle is made by specs/code-practices/decision-priorities.md.
       - >-
         Comments follow `## Code comments` in CLAUDE.md: one to three lines; an invariant, a non-obvious why, or a pointer to the spec, ADR, or proving test — never a restatement of the spec or of the assertion beside it; present tense only. Every test has a doc comment whose first sentence says which case the scenario tests, carrying at most the paired denial and the rationale of a non-obvious arrangement.
       - >-
