@@ -1,5 +1,11 @@
 # Decision priorities: what outweighs what when choosing between options
 
+## How it is used
+
+No text links here. A decision, a recommendation, a review finding or an answer in chat argues in substance, and where it lists options they stand strongest first.
+
+Asked why one option won, weigh the considerations in words — "access control is a hard requirement, throughput a priority but a lesser one" — without naming this document or numbering its lines.
+
 ## Constraints
 
 An option that breaks any of these is excluded, whatever the priorities below say for it.
