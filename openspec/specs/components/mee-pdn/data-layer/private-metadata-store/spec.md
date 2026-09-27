@@ -20,6 +20,14 @@ An identity's private metadata SHALL be stored in its own pdn-store replica, sep
 ### Requirement: One entry per device, node id in the key
 A device SHALL be recorded by an entry at path `devices/<node-id>` (64 lowercase hex chars of the device's `NodeId`). The payload SHALL be treated as opaque: device-set membership MUST NOT depend on payload bytes.
 
+**Example:** Alice's directory once a1 has created Alice and a2 has linked; `<a1-hex>`, `<a2-hex>`: 64 lowercase hex chars of each `NodeId`.
+
+| key | written by | payload |
+|---|---|---|
+| `devices/<a1-hex>` | a1, at create | `01` |
+| `devices/<a2-hex>` | a2, by its `confirm_device` | `01` |
+| `list_devices` answers a1 and a2; a second `add_device(a2)` replaces a2's entry, and a2 is still listed once | | |
+
 #### Scenario: Registering a device writes the record
 - **WHEN** `add_device` is called with a device's node id
 - **THEN** an entry exists at `devices/<node-id>` in the replica
@@ -29,7 +37,18 @@ A device SHALL be recorded by an entry at path `devices/<node-id>` (64 lowercase
 - **THEN** the device set contains that device once
 
 ### Requirement: Pending device records are disjoint from the device set
-A device that a linking dialogue registered before its reply could be known to have arrived SHALL be recorded at `pending-devices/<node-id>`, a prefix disjoint from `devices/`, with a payload carrying the record's creation time. A pending record SHALL confer nothing: session classification and every published device set read `devices/` alone. The device promotes itself with `confirm_device`, which tombstones the pending record and writes the device record in one act. A pending record left unconfirmed for 24 hours SHALL be tombstoned by cleanup, which runs before every pending listing and after every linking import; a pending record whose payload carries no creation time SHALL be given one when cleanup observes it, so it expires 24 hours from then rather than never.
+A device that a linking dialogue registered before its reply could be known to have arrived SHALL be recorded at `pending-devices/<node-id>`, a prefix disjoint from `devices/`, with a payload carrying the record's creation time. A pending record SHALL confer nothing: session classification and every published device set read `devices/` alone. The device promotes itself with `confirm_device`, which tombstones the pending record and writes the device record in one act. Cleanup runs before every pending listing and after every linking import, judges by its own clock, and SHALL treat each pending record by its payload. A record whose payload is the version byte `01` followed by the creation time as Unix seconds in an 8-byte big-endian integer SHALL be tombstoned once it is 24 hours old. A record whose payload is a bare `01` carries no creation time and SHALL be rewritten with the cleanup's time, so it expires 24 hours from then. Any other payload opening with `01` — a wrong length, or a time past the range of the system clock — is malformed, and its record SHALL be tombstoned at once, whatever its age. A record whose payload opens with any other version byte SHALL be left untouched, so a record a newer build wrote never expires on this one. A record whose payload has not arrived is skipped until it does.
+
+**Example:** cleanup in Alice's directory at 2026-09-27 12:00:00 UTC; a2 to a6 have begun linking and not confirmed; payload: the version byte `01`, then the creation time as Unix seconds in a big-endian `u64`.
+
+| key | payload | created | cleanup |
+|---|---|---|---|
+| `pending-devices/<a2-hex>` | `01 00 00 00 00 6a b7 b3 c0` | 2026-09-26 12:00:00 | tombstones it: 24 hours old |
+| `pending-devices/<a3-hex>` | `01 00 00 00 00 6a b8 f7 30` | 2026-09-27 11:00:00 | leaves it: 1 hour old |
+| `pending-devices/<a4-hex>` | `01` | none | rewrites it with the cleanup's time: `01 00 00 00 00 6a b9 05 40` |
+| `pending-devices/<a5-hex>` | `01 00 00 6a b8` | unreadable | tombstones it at once: 4 bytes of time, not 8 |
+| `pending-devices/<a6-hex>` | `02 00 00 00 00 6a b7 b3 c0` | unknown to this build | leaves it, now and at every later cleanup |
+| `list_devices` names none of the five; a3's `confirm_device` tombstones its pending record and writes `devices/<a3-hex>` | | | |
 
 #### Scenario: A pending record grants nothing
 - **WHEN** a device is recorded as pending in an identity's directory
@@ -71,6 +90,14 @@ The directory carries the identity's own device-internal state — its device se
 ### Requirement: Ticket reads wait for content
 Reading a ticket SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not yet been fetched SHALL read as absent. Entry records and payloads travel independently, so "record present" precedes "ticket readable"; consumers poll until the payload lands.
 
+**Example:** a2 reads Alice's directory while the entry at `tickets/data` travels from a1.
+
+| state on a2 | `list_ticket_kinds` | `get_ticket("data")` |
+|---|---|---|
+| nothing arrived | `[]` | `Ok(None)` |
+| entry record arrived, payload bytes not | `["data"]` | `Ok(None)` |
+| payload bytes arrived | `["data"]` | `Ok(Some(ticket))` |
+
 #### Scenario: Record without payload reads as absent
 - **WHEN** a ticket entry's record has synced to a device but its payload bytes have not yet been fetched
 - **THEN** reading that ticket returns absent, and a later read (after the payload arrives) returns the ticket
@@ -88,6 +115,15 @@ A live connection to peer `P` SHALL be represented by a directory entry at path 
 
 ### Requirement: Disconnect is a tombstone
 `disconnect(P)` SHALL write a pdn-store tombstone (empty entry, length 0) at `connections/<P-hex>`. A connection SHALL be considered live if and only if the latest entry for its key across all authors has non-zero length; tombstones participate in per-key last-writer-wins like ordinary entries.
+
+**Example:** Alice's phone p and laptop l act on her connection to Bob while partitioned; `t1 < t2 < t3` are entry timestamps.
+
+| device | act | entry at `connections/<bob-hex>` |
+|---|---|---|
+| p | `connect(Bob)` | p's author, t1, length 1, payload `01` |
+| l | `disconnect(Bob)` | l's author, t2, length 0: the tombstone |
+| after sync both read l's tombstone as the latest across authors: Bob is not live, and `list_connections` omits him | | |
+| p connecting again at t3 makes p's entry the latest, and Bob is live on both | | |
 
 #### Scenario: Disconnect ends liveness
 - **WHEN** `disconnect(P)` is called after a prior `connect(P)`
@@ -111,21 +147,38 @@ Directory mutations performed on one device SHALL become visible on the identity
 ### Requirement: Concurrent edits resolve by last-writer-wins
 Concurrent mutations of the same key on different devices SHALL resolve on every device to the entry with the newest timestamp (pdn-store per-key LWW across authors), with equal timestamps broken deterministically by content hash.
 
+**Example:** Alice's phone p and laptop l publish a ticket at `tickets/data` concurrently, each with its own author.
+
+| p's entry | l's entry | every device reads |
+|---|---|---|
+| timestamp t1 | timestamp t2, above t1 | l's ticket |
+| timestamp t1 | timestamp t1 | the ticket whose content hash is larger, compared byte by byte |
+
 #### Scenario: Concurrent ticket updates converge
 - **WHEN** two devices concurrently publish a ticket under the same kind and then sync
 - **THEN** both devices resolve to the same single ticket
 
 ### Requirement: Retraction markers, granted issuer in the key
 
-A write-retraction verdict SHALL be recorded as a directory entry at `retractions/<issuer-hex>/<author-hex>/<path>` — the granted data store's issuer, the retracted entry's author, and the retracted entry's path. The payload SHALL carry the bounding timestamp, the writing device's node id, and the retracted entry's content hash and timestamp; a marker acts once its payload is readable, since the bound lives in it. Markers replicate between the identity's devices like every directory entry, and only the identity's own devices ever write them (Invariant 1). A marker SHALL be pruned when its retention window elapses — each device drops the markers it recorded once their entries age past the window, and reports their addresses so the caller can disarm what they armed — or, when the issuer's namespace binding is forgotten, each device drops every marker it recorded for that issuer; a marker at one path SHALL leave the markers at every other path standing, a longer path beginning with the same bytes included; a bare re-grant of write SHALL NOT prune it, and a newer own write at the marked path is not matched by it. The consuming behaviour — removal, ingest refusal, the event — is [write retraction](../write-retraction/spec.md); this store carries the record.
+A write-retraction verdict SHALL be recorded as a directory entry at `retractions/<issuer-hex>/<author-hex>/<path>` — the granted data store's issuer, the retracted entry's author, and the retracted entry's path. The payload SHALL carry the bounding timestamp, the writing device's node id, and the retracted entry's content hash and timestamp; a marker acts once its payload is readable, since the bound lives in it. Markers replicate between the identity's devices like every directory entry, and only the identity's own devices ever write them (Invariant 1). A device SHALL prune only the markers it recorded, since deletion is per directory author: once a marker's entry ages past the retention window, the device drops it and reports its address, so the caller can disarm what that marker armed; and when the grant binder unbinds the issuer's withdrawn grant, the device drops every marker it recorded for that issuer. Neither prune touches a sibling's markers: they stay listed until the sibling prunes them, the marker of a device that never runs again is pruned by no device, and the aged prune reports only the addresses it dropped itself. A marker at one path SHALL leave the markers at every other path standing, a longer path beginning with the same bytes included; a bare re-grant of write SHALL NOT prune it, and a newer own write at the marked path is not matched by it. The consuming behaviour — removal, ingest refusal, the event — is [write retraction](../write-retraction/spec.md); this store carries the record.
+
+**Example:** Bob's phone b1 records a verdict: Alice (issuer) refused b1's entry at `contact/phone`, timestamp t1 in microseconds.
+
+```
+key       retractions/<alice-hex>/<b1-author-hex>/contact/phone    the namespace's issuer, the entry's author, its path
+payload   {"bound":<t1>,                                            entries of that author and path at or below t1
+(JSON)     "decided_by":"<b1-node-id-hex>",                         the device that recorded the verdict
+           "content_hash":[<32 numbers, one per byte>],             the retracted payload's address in the blob store
+           "timestamp":<t1>}                                        the retracted entry's timestamp
+```
 
 #### Scenario: A marker round-trips between devices
 - **WHEN** one device of the identity writes a retraction marker and a sibling's directory replica syncs
 - **THEN** the sibling reads the marker with its bound, node id, content hash, and timestamp once the payload arrives
 
 #### Scenario: Pruning follows the grant binding
-- **WHEN** the granted namespace of an issuer with live markers is forgotten
-- **THEN** the directory carries no markers for that issuer afterwards
+- **WHEN** a device prunes an issuer's markers, as the grant binder's unbind does once the issuer's grant is withdrawn, while the device and a sibling both hold markers for that issuer
+- **THEN** every marker that device recorded for the issuer is dropped, nested paths included, and the sibling's marker for the issuer and the device's markers for another issuer stay listed, on both devices
 
 #### Scenario: Aged markers are pruned by the device that recorded them
 - **WHEN** a marker this device recorded is older than the retention window and another is younger
@@ -138,6 +191,15 @@ A write-retraction verdict SHALL be recorded as a directory entry at `retraction
 
 ### Requirement: The replica reports its namespace and waits for a sync session
 The directory SHALL expose the namespace of its replica, so a caller that imported it can name it to forget it, and SHALL offer a bounded wait for the first successful sync session of that replica which started after a given instant. The property waited on is "this replica has caught up with a peer" — a session that started and succeeded — not "some content arrived": polling contents cannot distinguish a replica that synced and found nothing new from one that never synced at all. A wait that elapses SHALL surface as a timeout, never as a hang. Importing a replica enrols it in the node's periodic reconcile pass with the ticket's contacts, and hosting the identity on it starts its first session ([identity-scoped replicas](../identity-scoped-replicas/spec.md)), so the wait needs no trigger of its own and a first exchange that fails is re-dialed within the wait's own budget. The wait watches the replica's events, and a watch left unread past its buffer drops them ([change subscription](../change-subscription/spec.md)): a session whose event it dropped goes unseen, and the wait then returns on the next session, one reconcile interval later at most.
+
+**Example:** a2 links into Alice; the wait gets what the dialogue leaves of the HTTP host's default 30 s link budget; reconcile interval 10 s.
+
+| session of Alice's directory replica on a2 | the wait |
+|---|---|
+| the first exchange with a1 fails | goes on waiting |
+| the next reconcile pass, within 10 s, re-dials a1 and succeeds | returns `Ok(())` |
+| that success's event dropped by a watch left unread | returns on the next session, within 10 s more |
+| no successful session before the budget runs out | fails with `CatchUpTimeout`, and link rolls back |
 
 #### Scenario: The wait returns on a successful session, not on content
 - **WHEN** a directory replica is imported and a sync session with a peer holding it starts after the given instant and completes successfully

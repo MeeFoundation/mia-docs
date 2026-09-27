@@ -92,7 +92,7 @@ The linking scenario tests drive the ceremony end to end: create on one runtime,
 
 ## More Information
 
-The dialogue holds a marked step for a proof of control over the identity, on the same terms as pairing's ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)).
+The dialogue carries no proof of control over the identity, on the same terms as pairing's: such a proof arrives with a root identifier that can carry one ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)), and the dialogue is the exchange that would carry it.
 
 The cells change leans on this shape twice. Joining a cell is this ceremony applied to a cell — a one-time secret on a dedicated ALPN, verified and burned before any state changes — so the shape outlives whatever becomes of connections. And the reply grows: alongside the store tickets, a linked device receives the identity's device-announcement secret, which is what lets it publish the identity's device list into every cell the identity belongs to.
 

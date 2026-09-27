@@ -89,7 +89,7 @@ Re-establishment, the recovery path the Consequences claim: a fresh invite betwe
 
 ## More Information
 
-The dialogue holds a marked step for a proof of control over the presented PdnId, which arrives with a root identifier that can carry one ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)).
+The dialogue carries no proof of control over the presented PdnId: such a proof arrives with a root identifier that can carry one ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)), and the dialogue is the exchange that would carry it.
 
 The cells change reuses this shape rather than competing with it: joining a cell is a one-time-secret dialogue on a dedicated ALPN, modelled on device linking, which is this decision applied to higher stakes. What cells leave open is whether pairing keeps a subject of its own, since a connection between two identities may stay as it is or become a cell of two. In the second case this decision is replaced by the join it shaped, and the record of what the exchange had to carry is what makes the replacement readable.
 

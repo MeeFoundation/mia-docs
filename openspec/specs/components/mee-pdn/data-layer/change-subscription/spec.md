@@ -8,7 +8,16 @@ What a subscription to a replica's events promises its consumer and costs the st
 
 ### Requirement: A subscriber never holds up the store
 
-A subscription to a replica's events SHALL NOT make the store wait for its subscriber. When the subscriber's buffer is full, the store SHALL drop the event and SHALL follow the last event the subscriber still receives with a lag notice; the subscriber reads the notice only after every event it stands for was emitted, so a subscriber that reads the replica again on the notice finds every entry those events reported. The sessions and the downloads a dropped event reported are not recorded anywhere and are lost. Only the store's own live engine subscribes with a delivery that waits for room, since what it does on an event — announcing a local write, queueing a download — has no other trigger; no interface outside the store offers that delivery. Without this, a subscriber that stops reading stops the store behind it: every replica of the identity stops answering, sessions to its siblings and its counterparties stall, and a caller holding a lock the subscriber waits on never gets its answer.
+A subscription to a replica's events SHALL NOT make the store wait for its subscriber. A subscription merges two buffers of 256 events each: one for the replica's inserts — an entry written on this device or arrived by sync — and one for the live events — a payload become readable, a session finished, a neighbor up or down. When either buffer is full, the store SHALL drop the event and SHALL follow the last event that buffer still delivers with a lag notice of that buffer's own; the subscriber reads a notice only after every event it stands for was emitted, so a subscriber that reads the replica again on the notice finds every entry those events reported. The guarantee holds per buffer: one burst can yield two lag notices, one from each buffer, and events of one buffer can arrive after the other buffer's notice. The sessions and the downloads a dropped event reported are not recorded anywhere and are lost. Only the store's own live engine subscribes with a delivery that waits for room, since what it does on an event — announcing a local write, queueing a download — has no other trigger; no interface outside the store offers that delivery. Without this, a subscriber that stops reading stops the store behind it: every replica of the identity stops answering, sessions to its siblings and its counterparties stall, and a caller holding a lock the subscriber waits on never gets its answer.
+
+**Example:** a1 holds a subscription to Alice's directory that it never reads; a2 connects 600 peers, one `connections/<peer-hex>` record each.
+
+| step | a1's store | a1's subscription |
+|---|---|---|
+| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`, and 64 on the RPC stream), drops the rest; the live buffer does not fill, since the 600 records share one payload |
+| a1 connects Bob | the write answers | — |
+| a1 reads the subscription at last | — | the inserts that fitted, then their `Lagged`, with the live events merged in, some of them after it |
+| a1 lists connections on the `Lagged` | all 601 records | a drop in either buffer after this read leaves a `Lagged` of that buffer's own |
 
 #### Scenario: A subscriber that stops reading holds up no sync
 
@@ -20,14 +29,24 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 - **WHEN** a node holds a subscription to a replica that it never reads, and a peer writes more entries of distinct content than the subscription buffers
 - **THEN** every entry and its content become readable on the node
 
-#### Scenario: Dropped events leave one notice behind
+#### Scenario: Dropped events leave one notice behind per buffer
 
-- **WHEN** a subscriber stops reading, and the store emits more events than its buffer holds
-- **THEN** the subscriber, reading again, receives the events that fitted and then one lag notice, and a drop after it has read that notice leaves a notice of its own
+- **WHEN** a subscriber stops reading, and the store emits more events into one of the subscription's two buffers than it holds
+- **THEN** the subscriber, reading again, receives that buffer's events that fitted and then one lag notice for them, with the other buffer's events merged in before or after it, and a drop in that buffer after the subscriber has read the notice leaves a notice of its own
 
-### Requirement: A change stream reports every change, a burst as one
+### Requirement: A change stream reports every change, dropped ones by a lag notice
 
-The change streams of the directory and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield a lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read.
+The change streams of the directory and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield each lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read for each of the two buffers the burst overflowed.
+
+**Example:** a2, Alice's second device, reads the `changes()` stream of her directory while a1 opens a connection to Bob.
+
+| `LiveEvent` on a2's replica | item | `get_ticket("connection-metadata/<bob-hex>/own")`, read again |
+|---|---|---|
+| `InsertRemote`: a1's `tickets/connection-metadata/<bob-hex>/own` | `Ok(())` | `Ok(None)`: the payload is still syncing |
+| `ContentReady`: that ticket's payload lands | `Ok(())` | `Ok(Some(ticket))` |
+| `InsertLocal`: a2 writes `connections/<carol-hex>` | `Ok(())` | unchanged |
+| `NeighborUp`, `NeighborDown`, `SyncFinished`, `PendingContentReady` | none | — |
+| `Lagged`: events dropped past a buffer, one per buffer | `Ok(())` | every change the dropped events reported |
 
 #### Scenario: A lag notice reads as a change
 
