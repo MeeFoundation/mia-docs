@@ -16,22 +16,36 @@ context: |
   - specs/code-practices/flaky-tests.md — a rare failure is a rare defect. Reproduce with statistics before fixing, and stress the affected scenarios after.
   - specs/code-practices/defect-reachability.md — a defect a host can trigger through the public surface of pdn-node, or a modified node can turn against honest nodes through what it sends, is fixed; one reached neither way may stay, recorded with its argument.
   - specs/code-practices/decision-priorities.md — what outweighs what when choosing between options. Weigh every decision, open question and recommendation by it. Don't cite it in the artifact: argue in substance, strongest option first.
+  - specs/code-practices/examples.md — a rule comes with one concrete example beside it, in every decision and every requirement: one case on real values, checked against the code, in the shape the case calls for. Left out only where it would be contrived.
 
   Docs style: each paragraph is one physical line (the renderer wraps it); numbers as digits with thousands separators; no invented abbreviations or notation; present tense, with no "for now", "legacy", or "until X lands"; platform terms keep their English names. Scenario headings are exactly four hashes — a wrong level drops the scenario from validation silently.
 
-# Per-artifact rules.
+# Per-artifact rules. Each item is a folded scalar: a plain one holding ": "
+# parses as a mapping, and openspec then drops the artifact's rules whole.
 rules:
   design:
-    - Choose each decision, and the recommendation an open question carries, by specs/code-practices/decision-priorities.md. Don't cite it: argue in substance, strongest option first.
-    - Walk specs/code-practices/operating-conditions.md and state which of those conditions change the outcome of this change. "None of them" is a legitimate answer and is worth writing down; a condition that does change the outcome belongs in Decisions or in Risks, not only in prose.
-    - A decision names what it rejected under one heading and one wording — "**Rejected alternatives:**", bold, nothing else ("Rejected:", "Alternatives considered", "Not chosen" are not used) — followed by a list, one alternative per item. The item says what the alternative was in the fewest words that identify it, and nothing more; anything substantial for or against it goes in a nested list under bold "**Pros:**" and "**Cons:**", each line present only when it has something substantial to say. An alternative with nothing substantial to say about it, for or against, is not listed; a decision with nothing rejected carries no block. The form exists so a design can be skimmed: a reader sees what was on the table and why it lost without reading prose.
-    - The text of a decision describes what was chosen and nothing else — no "not X", no "rather than Y", no case against what was not chosen; the alternatives and the case against them live only in the decision's Rejected alternatives block. A reader working to understand the decision, skimming or reading aloud, then holds in mind only what was chosen.
+    - >-
+      Choose each decision, and the recommendation an open question carries, by specs/code-practices/decision-priorities.md. Don't cite it: argue in substance, strongest option first.
+    - >-
+      Walk specs/code-practices/operating-conditions.md and state which of those conditions change the outcome of this change. "None of them" is a legitimate answer and is worth writing down; a condition that does change the outcome belongs in Decisions or in Risks, not only in prose.
+    - >-
+      A decision names what it rejected under one heading and one wording — "**Rejected alternatives:**", bold, nothing else ("Rejected:", "Alternatives considered", "Not chosen" are not used) — followed by a list, one alternative per item. The item says what the alternative was in the fewest words that identify it, and nothing more; anything substantial for or against it goes in a nested list under bold "**Pros:**" and "**Cons:**", each line present only when it has something substantial to say. An alternative with nothing substantial to say about it, for or against, is not listed; a decision with nothing rejected carries no block. The form exists so a design can be skimmed: a reader sees what was on the table and why it lost without reading prose.
+    - >-
+      The text of a decision describes what was chosen and nothing else — no "not X", no "rather than Y", no case against what was not chosen; the alternatives and the case against them live only in the decision's Rejected alternatives block. A reader working to understand the decision, skimming or reading aloud, then holds in mind only what was chosen.
+    - >-
+      Every decision carries an example per specs/code-practices/examples.md, after its text and before its Rejected alternatives block: one case on real values, checked against the code, in the shape the case calls for. It shows the chosen option alone; a rejected option's outcome under the same case is a Cons line of that option. An open question may lay its options side by side in one case. Leave the example out only where it would be contrived.
   specs:
-    - An operating condition that changes the outcome earns its own scenario. A condition deliberately out of scope is named in the proposal, not left unmentioned — an unmentioned condition reads as one nobody considered.
-    - Verify a scenario against the running code or its test before writing it down. A plausible formulation once claimed a zero-length write degenerates into deletion, while the engine rejects it (AttemptedToInsertEmptyEntry); each scenario corresponds to a test or a checked property of pdn-store.
-    - A delta that introduces a capability carries a `## Purpose`; archive seeds the main spec with it and writes a placeholder otherwise.
+    - >-
+      An operating condition that changes the outcome earns its own scenario. A condition deliberately out of scope is named in the proposal, not left unmentioned — an unmentioned condition reads as one nobody considered.
+    - >-
+      Verify a scenario against the running code or its test before writing it down. A plausible formulation once claimed a zero-length write degenerates into deletion, while the engine rejects it (AttemptedToInsertEmptyEntry); each scenario corresponds to a test or a checked property of pdn-store.
+    - >-
+      A delta that introduces a capability carries a `## Purpose`; archive seeds the main spec with it and writes a placeholder otherwise.
+    - >-
+      Every requirement carries an example per specs/code-practices/examples.md, after the requirement's text and before its first scenario: one case on real values, verified against the code as a scenario is, in the shape the case calls for. The scenarios stay the cases a test proves; the example shows the rule at work. A fenced block or a table there passes validate and survives archive unchanged. Leave the example out only where it would be contrived.
   tasks:
-    - Every scenario the deltas add needs a task that makes it real, and a way to tell it is not vacuous — a scenario that would pass with the mechanism removed asserts nothing.
+    - >-
+      Every scenario the deltas add needs a task that makes it real, and a way to tell it is not vacuous — a scenario that would pass with the mechanism removed asserts nothing.
 
 # Advisory guidance returned by `openspec instructions apply|archive`; the apply
 # and archive skills read it at run time.
