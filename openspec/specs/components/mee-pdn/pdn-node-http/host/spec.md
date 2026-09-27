@@ -40,7 +40,7 @@ The host SHALL expose `GET /ready` as a bounded check of the runtime: its coarse
 - **THEN** `/ready` returns non-success while `/live` returns HTTP 200
 
 ### Requirement: Debug requests have aggregate bounds
-The host SHALL accept at most 16 concurrent requests and at most 16 MiB per entry body. It SHALL return HTTP 503 when concurrency admission is full and HTTP 413 for an oversized body. HTTP 500 responses SHALL use stable generic public text while retaining the full cause chain only in server logs.
+The host SHALL accept at most 16 concurrent requests under `/debug/` and at most 16 MiB per entry body. `GET /live` and `GET /ready` stay outside that admission, so a burst of debug traffic cannot shed the probes an orchestrator acts on. It SHALL return HTTP 503 when concurrency admission is full and HTTP 413 for an oversized body. HTTP 500 responses SHALL use stable generic public text while retaining the full cause chain only in server logs.
 
 #### Scenario: Overload is shed
 - **WHEN** 16 requests are already admitted
