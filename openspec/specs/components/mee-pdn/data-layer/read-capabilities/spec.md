@@ -10,6 +10,16 @@ The minimal read grant that drives capability-filtered reconciliation ([subset r
 
 A read capability SHALL name an issuer, an audience, and the set of claims it grants read on within the issuer's data — and, per claim, whether write is granted alongside read. It SHALL be a single grant, not a delegation chain. Every granted claim SHALL grant read; write is optional per claim, mirroring UWill's flat command set (one delegation per claim, its commands beside it). Write enforcement is the ingest gate ([capability-gated ingest](../capability-gated-ingest/spec.md)); read enforcement stays the egress filter.
 
+**Example:** Alice (issuer) grants Bob `contact/email` read-only and `contact/phone` read-write in one `ReadGrant`, its JSON one field per line.
+
+```
+"issuer":   "<alice-hex>"
+"audience": "<bob-hex>"
+"claims":   [{"claim":"<ClaimId of contact/email, hex>","write":false},     read
+             {"claim":"<ClaimId of contact/phone, hex>","write":true}]      read and write
+notes/diary derives a ClaimId neither item holds: the grant covers neither read nor write there
+```
+
 #### Scenario: Issuing a read grant
 
 - **WHEN** an issuer grants an audience read on a claim
@@ -23,6 +33,15 @@ A read capability SHALL name an issuer, an audience, and the set of claims it gr
 ### Requirement: Claim identity is derived from the entry
 
 The domain layer mints no claim identities of its own: the `ClaimId` of an entry SHALL be derived deterministically from the issuer and the entry path via a domain-separated key-derivation hash (`claim_id_of` in `data-layer`), so the identity is stable under payload edits and computable from the entry key alone.
+
+**Example:** the `ClaimId` of Alice's entry at `contact/email`, as `claim_id_of` derives it.
+
+```
+hash       blake3 in key-derivation mode, context "pdn.claim-id.v0"
+input      Alice's PdnId (32 bytes), then the key "contact/email" (13 bytes); no separator, the PdnId being fixed-width
+output     the 32-byte digest
+payload    not an input: rewriting "alice@example.org" as "alice@work.example" keeps the ClaimId, and Bob's grant still covers it
+```
 
 #### Scenario: Identity survives value edits
 
@@ -38,6 +57,15 @@ The domain layer mints no claim identities of its own: the `ClaimId` of an entry
 
 Before a serving node filters what it reveals, it SHALL determine the caller's effective grants from the grants its identity recorded (its own replicas of the connection metadata stores), keyed by the caller's transport-authenticated node id resolved to an identity through the published device sets. It SHALL NOT trust capability material sent by the caller: the minimal grant is unsigned, so wire presentation is unverifiable and no presentation protocol exists until UWill.
 
+**Example:** Bob's phone b1 opens a session on Alice's data replica at a2, one of her devices a1 and a2; each store below is a2's own replica.
+
+| input | where a2 takes it |
+|---|---|
+| the caller's node id | b1, as the transport authenticated it |
+| b1 acting for Bob | the session names Bob; admitted as `devices/<b1-hex>` is in Bob's connection metadata store toward Alice |
+| Bob's claims | `grants/<alice-hex>` in Alice's connection metadata store toward Bob, when it names issuer Alice, audience Bob |
+| a grant just made on a1 | absent on a2 until that store replicates: a2 refuses the session, and a later session reveals the claims |
+
 #### Scenario: Evaluation precedes filtering
 
 - **WHEN** a peer reconciles a replica
@@ -51,6 +79,14 @@ Before a serving node filters what it reveals, it SHALL determine the caller's e
 ### Requirement: A grant's ticket carries exactly the granted authority
 
 The ticket published alongside a grant SHALL match the grant's commands as a whole: a grant carrying no write on any claim SHALL carry a read ticket (no namespace secret — the holder cannot produce a valid entry), and a grant carrying write on any claim SHALL carry a write ticket. The namespace secret is the transport interim of write authority: it lets the audience produce valid entries, and the scope of what the issuer keeps is the ingest gate's, judged per claim from this same grant.
+
+**Example:** Alice (issuer) grants Bob; the ticket published beside the grant, and Bob's phone b1 writing `contact/email` over it.
+
+| grant's claims | ticket | namespace secret | b1 writes `contact/email` |
+|---|---|---|---|
+| `contact/email` read | `ShareMode::Read` | no | fails on b1: `InsertError::ReadOnly` |
+| `contact/email` read, `contact/phone` read-write | `ShareMode::Write` | yes | offered; Alice's gate: `ValidationFailure::Unauthorized` |
+| `contact/email` read-write | `ShareMode::Write` | yes | kept by Alice |
 
 #### Scenario: Read-only audience cannot write by construction
 
@@ -84,6 +120,13 @@ Given a claim and a caller's effective grants, the mechanism SHALL decide read-a
 ### Requirement: Own-identity data needs no capability
 
 An identity's own device SHALL be read-authorized for all of that identity's data without any grant, composing with Invariant 1.
+
+**Example:** sessions on Alice's data replica at her laptop a2; a1 is listed at `devices/<a1-hex>` in Alice's directory and holds no grant.
+
+| entry | a1 (Alice's device) | b1 (Bob's, read grant on `contact/email`) | a3 (acts for Alice, not listed) | c1 (Carol's, outsider) |
+|---|---|---|---|---|
+| `contact/email` | revealed | revealed | session refused | session refused |
+| `notes/diary` | revealed | withheld | session refused | session refused |
 
 #### Scenario: A device reads its own identity's data
 

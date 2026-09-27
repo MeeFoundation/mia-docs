@@ -9,6 +9,17 @@ The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by app
 ### Requirement: The assembly accepts a supplied protocol handler
 `SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today pairing ([ADR-0011](../../../../architecture/adr/0011-pairing-over-raw-iroh.md)) and device linking ([ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
 
+**Example:** the ALPNs of a node pdn-node's `Runtime` spawns, and what a connection accepted under each reaches.
+
+| ALPN | reaches |
+|---|---|
+| `/iroh-bytes/4` | built in: blob transfer |
+| `/iroh-gossip/1` | built in: gossip |
+| `/iroh-sync/1` | built in: `DocsDispatch` reads the `Init` and hands the session to the identity it names |
+| `/pdn/pairing/0` | supplied: `PairingHandler`, given the raw bidirectional connection |
+| `/pdn/linking/0` | supplied: `LinkingHandler`, given the raw bidirectional connection |
+| any other | the dial fails, and no handler runs |
+
 #### Scenario: An extra protocol answers on its ALPN
 - **WHEN** node A spawns with a test echo handler under a test ALPN and node B dials A's address under that ALPN and sends bytes
 - **THEN** the bytes return over the same raw bidirectional connection, with no document-sync session involved
@@ -27,6 +38,14 @@ The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by app
 
 ### Requirement: ALPN registrations are unique
 The ALPNs of supplied protocols SHALL be distinct from the built-in protocols' ALPNs and from each other. A spawn presenting a collision SHALL fail with no node started and nothing bound — a supplied protocol silently replacing the sync stack must be impossible.
+
+**Example:** the supplied protocols handed to `SyncNode::spawn_with`, and its answer; a refusal comes before the storage directory is touched or a socket bound.
+
+| supplied ALPNs | answer |
+|---|---|
+| `/pdn/pairing/0`, `/pdn/linking/0` | a node serving both beside the three built-in ALPNs |
+| `/iroh-sync/1` | `Err(AlpnTaken)`: "protocol ALPN already taken: /iroh-sync/1" |
+| `/pdn/pairing/0`, `/pdn/pairing/0` | `Err(AlpnTaken)`: "protocol ALPN already taken: /pdn/pairing/0" |
 
 #### Scenario: A built-in ALPN is refused at spawn
 - **WHEN** a node spawns with a supplied protocol claiming the document-sync ALPN
@@ -50,11 +69,27 @@ All protocols — the built-in stack and every supplied handler — SHALL share 
 ### Requirement: A supplied handler's panic is contained
 A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHALL be caught, failing only that one connection, while the built-in protocols keep serving. (Under a `panic = "abort"` build no catch is possible; the spawn form's contract asks handlers not to panic.)
 
+**Example:** a1's handler under `/pdn-test/panic/0` panics after reading b1's bytes.
+
+| build | on a1 | on b1 |
+|---|---|---|
+| `panic = unwind` | `PanicGuarded` turns the panic into `AcceptError` "extra protocol handler panicked"; `/iroh-sync/1` serves on | that connection ends, maybe as a clean end-of-stream; a replica shared with a1 still converges |
+| `panic = abort` | the process aborts | every protocol of a1 is gone |
+
 #### Scenario: A panicking handler does not take down the node
 - **WHEN** node A spawns with a handler that panics mid-accept, and node B dials it and drives a stream
 - **THEN** that connection fails and node A still converges a replica with node B over the ordinary ticket flow
 ### Requirement: Shutdown stops every protocol side by side, and a late call fails
 The node's shutdown SHALL stop a supplied handler beside the built-in stack rather than before it: the router shuts every protocol down at once, the blob store and gossip among them. A supplied handler whose work in flight writes through the node's stores therefore SHALL be let finish by its owner before the node's shutdown is called — a wait inside the handler's own shutdown runs against stores already going away. A call into a replica store that reaches it after its shutdown began, including one already queued behind the shutdown, SHALL fail rather than wait: its caller would otherwise wait for as long as any handle to the store lives.
+
+**Example:** `Runtime::shutdown` in pdn-node, whose pairing and linking handlers write through the node's stores.
+
+| step | the stores |
+|---|---|
+| 1 serving halves of both ceremonies finish, up to `SHUTDOWN_SERVING_BUDGET` (10 s); one arriving later refuses | open |
+| 2 cleanup tasks finish, up to 10 s | open |
+| 3 `SyncNode::shutdown`: the reconcile pass stops, then the router shuts down every protocol at once, the blob store and gossip among them | going away |
+| 4 each identity's engine shuts down, and the storage lock is released | closed: a call queued behind a store's shutdown fails at once |
 
 #### Scenario: A request queued behind the store's shutdown fails
 - **WHEN** a request to a replica store is queued behind that store's shutdown
@@ -65,6 +100,15 @@ The node's shutdown SHALL stop a supplied handler beside the built-in stack rath
 The node SHALL read the [identity](../../../../architecture/language/mee-identity.md) an accepted sync connection names before the session reaches any replica, and SHALL hand the session to that hosted identity alone. A connection naming an identity the node does not host SHALL be refused indistinguishably from the replica not being hosted, and no hosted identity SHALL observe a session addressed to another.
 
 What the node reads before it knows whom a connection addresses SHALL be bounded. The first message names the namespace, the two identities and a first range whose two boundaries carry one key each, so the largest one an honest node sends is fixed by the longest key a replica holds, 8,192 bytes, and comes to about 16 KiB. A first message whose length prefix announces more than 32 KiB SHALL be refused on the prefix alone, before its body is read, so a caller that holds no ticket and no grant makes the node hold no more than that per connection. The session a classified caller goes on to run reads its later messages under the session's own ceiling, since one message of a first sync often carries a replica's whole content.
+
+**Example:** a session's first frame: a `u32` big-endian length prefix, then `Message::Init { namespace, identity, caller, message }` in postcard.
+
+| length prefix | the accepting node |
+|---|---|
+| about 16 KiB | the largest an honest node sends: its first range's two boundaries carry one 8,192-byte key each |
+| 32,768 (`MAX_OPENING_FRAME`) | reads the body, then dispatches to the identity the `Init` names |
+| 32,769 | refuses on the prefix, "received message that is too large: 32769"; no body read, no replica touched |
+| after the `Init` | frames up to 1,073,741,824 bytes (`MAX_MESSAGE_SIZE`, 1 GiB) |
 
 #### Scenario: A session reaches the hosted identity it names
 

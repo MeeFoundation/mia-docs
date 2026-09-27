@@ -9,6 +9,16 @@ How PDN addresses and authorizes claims with the `(about, issued_by)` namespace 
 ### Requirement: Claims are addressed by issuer and path, never by namespace
 Above `data-layer`, an entry SHALL be addressed by its issuer's `PdnId` and its `EntryPath`, and a claim in a grant by its `ClaimId`, derived from those two. No service of the runtime SHALL take a `pdn-store` namespace as an argument, and the `(about, issued_by)` pair SHALL NOT exist as an addressing coordinate — `about` is a field inside the claim. The runtime MAY hold a namespace id as the handle of a replica it opened — an identity's hosting record names its directory namespace, the grant binder records which namespace a grant's ticket bound — but never as the address of a claim.
 
+**Example:** Alice (issuer) grants Bob (read grant) her `contact/email`; the calls, each path shown as the `EntryPath` it carries.
+
+```
+Alice writes   data().write(alice, alice, "contact/email", b"x@example.org")
+Alice grants   connections().publish_grant(alice, bob, alice, [GrantedClaim { claim, write: false }]),
+               claim = claim_id_of(alice, "contact/email")
+Bob reads      data().read(bob, alice, "contact/email")
+no call takes a NamespaceId: Alice's namespace travels only inside the ticket of her grant record
+```
+
 #### Scenario: pdn-node addresses an entry
 - **WHEN** the data service writes, reads, or lists
 - **THEN** the call names an issuer and a path, and no namespace
@@ -24,12 +34,27 @@ Above `data-layer`, an entry SHALL be addressed by its issuer's `PdnId` and its 
 ### Requirement: Access is authorized per claim by the recorded grant
 Authorization SHALL be granted per claim through the issuer's recorded grant — the resource of the UWill format the grant grows into is one `ClaimId` ([uwill](../../pdn-layer/uwill.md)) — not by possession of a namespace key. Sharing and visibility granularity SHALL come from grants alone, with no parallel namespace-boundary mechanism.
 
+**Example:** Alice (issuer) wrote `contact/email`, `contact/phone` and `notes/diary`, and granted Bob read on `contact/email` alone; Dave imported the ticket carried by Alice's grant to Bob, with no grant of his own.
+
+| operation | Alice (issuer) | Bob (read grant) | Dave (ticket, no grant) | Carol (outsider) |
+|---|---|---|---|---|
+| read `contact/email` | the entry | the entry | `Ok(None)` | `UnknownIssuer` |
+| read `contact/phone` | the entry | `Ok(None)` | `Ok(None)` | `UnknownIssuer` |
+| list | all three | `contact/email` only | empty | `UnknownIssuer` |
+
 #### Scenario: granting access to one claim
 - **WHEN** an issuer grants a peer access to a single claim
 - **THEN** a grant naming that `ClaimId` is published, and no namespace-level grant is involved
 
 ### Requirement: One pdn-store namespace per issuer
 At the data layer, all of an issuer's claims (about any subject) SHALL live in one `pdn-store` namespace, and the data replica SHALL be keyed by the issuer `PdnId` within the identity that holds it. There SHALL be at most one data replica per issuer for one identity, not one per _(subject, issuer)_, and a node SHALL hold one replica of that namespace for each identity that acquired it — its issuer's own, and one per identity granted access to it.
+
+**Example:** Alice (issuer) wrote `contact/email`, `contact/phone` and `notes/diary`; she grants Bob `contact/email`, then widens the grant to `contact/phone`.
+
+| identity | its replicas of Alice's namespace | keyed by | entries in it |
+|---|---|---|---|
+| Alice | one | issuer Alice | all three |
+| Bob | one | issuer Alice | `contact/email`; after the widening, the same replica with `contact/phone` too |
 
 #### Scenario: two claims about different subjects
 - **WHEN** an issuer writes two claims about two different subjects
@@ -44,6 +69,14 @@ At the data layer, all of an issuer's claims (about any subject) SHALL live in o
 - **THEN** the node holds one replica of that namespace per identity, each keyed by the same issuer with stores of its own
 ### Requirement: The namespace is a data-layer replication bucket
 The `pdn-store` namespace SHALL retain only its iroh-docs roles — the set-reconciliation unit and the gossip topic — and SHALL NOT carry addressing or write-authority: a write ticket's namespace secret lets a device produce entries, and what the issuer keeps is judged per claim at ingest ([capability-gated ingest](../../data-layer/capability-gated-ingest/spec.md)). The namespace-to-issuer mapping SHALL be a `data-layer` internal (its registry), surfaced above only as the unknown-issuer error when an issuer resolves to nothing.
+
+**Example:** Bob's registry in `data-layer` once his grant binder imported Alice's namespace; `<alice-ns>` is that namespace's `NamespaceId`.
+
+| lookup | asked by | answers |
+|---|---|---|
+| issuer Alice → the replica of `<alice-ns>` | `data().read(bob, alice, …)`, write, list | that replica, posture `AudienceDevices` |
+| `<alice-ns>` → issuer Alice | a sync session naming `<alice-ns>` | whose records judge the session |
+| issuer Carol → nothing | `data().read(bob, carol, …)` | `UnknownIssuer`, all pdn-node sees of the map |
 
 #### Scenario: namespace carries no authority above data-layer
 - **WHEN** a claim is addressed or authorized

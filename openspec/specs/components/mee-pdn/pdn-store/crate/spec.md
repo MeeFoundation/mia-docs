@@ -22,6 +22,17 @@ The store SHALL be a member crate of the workspace at `crates/pdn-store`, resolv
 ### Requirement: The store's other configurations are checked
 The workspace build compiles the store under its default features alone. Its other configurations — every feature, no feature, rustdoc, and the featureless build for `wasm32-unknown-unknown` — SHALL be checked by a recipe of their own with warnings denied, under the store's own `[lints]` table rather than the workspace's, and the pipeline SHALL run that recipe on every proposed change in a job beside the workspace's rather than after it.
 
+**Example:** each configuration of the store against the recipe that compiles it.
+
+| configuration | `just check` | `just check-store` |
+|---|---|---|
+| default features | clippy | — |
+| `--all-features`, every target | — | clippy, `-Dwarnings` |
+| `--no-default-features`: lib, bins, tests | — | clippy, `-Dwarnings` |
+| rustdoc, `--all-features` | — | `cargo doc`, `RUSTDOCFLAGS=-Dwarnings` |
+| `wasm32-unknown-unknown`, `--no-default-features` | — | `cargo build`, `getrandom_backend="wasm_js"` |
+| pipeline job | `lint-test-wasm` | `store`, running beside `lint-test-wasm` |
+
 #### Scenario: A warning only the featureless build sees fails the store's check
 - **WHEN** code warns under `--no-default-features` and not under the default features
 - **THEN** `just check` passes and `just check-store` fails
@@ -37,9 +48,18 @@ The workspace build compiles the store under its default features alone. Its oth
 ### Requirement: The store's tests run with the workspace's, doctests included
 `just test` SHALL run the store's unit and integration tests under default features as it runs every crate's, and, given no selection, SHALL end with the workspace's doctests — nextest runs none, and the store's README example is one. A run narrowed by package or by filter is nextest's alone and skips the doctests. `just test-store` SHALL run the store's tests under the other two feature sets, then the doctests under every feature.
 
+**Example:** which run ends with the doctests, the store's README example among them.
+
+| command | nextest runs | then |
+|---|---|---|
+| `just test` | every crate's tests, the store's under default features | `cargo test --workspace --doc` |
+| `just test -p pdn-store` | the store's tests under default features | no doctests |
+| `just test -E 'test(sync_simple)'` | the tests the filter matches | no doctests |
+| `just test-store` | the store's tests, `--all-features` then `--no-default-features` | `cargo test -p pdn-store --all-features --doc` |
+
 #### Scenario: The store's tests are part of the default run
 - **WHEN** `just test` runs with no selection
-- **THEN** the store's unit tests and its `client`, `gc`, and `sync` binaries run under default features, its tests marked flaky are reported skipped, and the run ends with the doctests
+- **THEN** the store's unit tests and the tests of its `client`, `dispatch`, `gc`, and `sync` binaries run under default features — `util`, the module three of them share, builds as a fifth binary holding no test — its tests marked flaky are reported skipped, and the run ends with the doctests
 
 #### Scenario: A README example that stops compiling fails the run
 - **WHEN** the README's example no longer compiles
@@ -48,9 +68,18 @@ The workspace build compiles the store under its default features alone. Its oth
 ### Requirement: The tests marked flaky run nightly
 The store's tests marked `#[ignore = "flaky"]` SHALL stay out of every ordinary run and SHALL be repeated by the nightly workflow, selected by package and by the ignore mark alone, a failing iteration not cancelling the remaining ones.
 
+**Example:** `sync_restart_node` and `sync_big`, in `tests/sync.rs`, are the store's tests marked `#[ignore = "flaky"]`; `sync_restart_node` needs `fs-store`.
+
+| run | outcome |
+|---|---|
+| `just test` | both reported skipped |
+| `just test-store`, `--all-features` | both reported skipped |
+| `just test-store`, `--no-default-features` | `sync_big` reported skipped; `sync_restart_node` is not compiled |
+| nightly job `store-flaky` | `just stress -p pdn-store --run-ignored ignored-only --stress-count 10 --no-fail-fast`: 10 iterations of both; an iteration that fails leaves the rest running |
+
 #### Scenario: An ordinary run skips them
 - **WHEN** `just test` or `just test-store` runs
-- **THEN** the tests marked flaky are reported skipped and none of them runs
+- **THEN** none of the tests marked flaky runs, and each one the pass's feature set compiles is reported skipped: both under the default features and under every feature, `sync_big` alone under no feature, since `sync_restart_node` needs `fs-store`
 
 #### Scenario: The nightly hunt runs them to the end
 - **WHEN** the nightly workflow's store job runs

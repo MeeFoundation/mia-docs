@@ -9,6 +9,15 @@ An issuer's data store: the domain role in an identity's store set — alongside
 ### Requirement: Operations are addressed by issuer
 Writing, reading, listing, and sharing SHALL address a data store by its issuer's `PdnId`; the node resolves the issuer to the backing replica registered at creation or import. Addressing an issuer with no created or imported data store on the node SHALL be an error distinguishable from transport and storage failures.
 
+**Example:** a1 hosts Alice's data store and none of Carol's; requests through the HTTP host, addressed `<hosting identity>/<issuer>/<path>`.
+
+| request | response |
+|---|---|
+| `GET /debug/data/<alice-hex>/<alice-hex>/contact/email` | 200, body `alice@example.org` |
+| `GET /debug/data/<alice-hex>/<alice-hex>/notes/diary` | 404: no entry at `notes/diary` under `<alice-hex>` |
+| `GET /debug/data/<alice-hex>/<carol-hex>/contact/email` | 409: data namespace not bound on this node: `<carol-hex>` |
+| the first request, a1's replica store failing | 500: internal server error |
+
 #### Scenario: Write and read under an issuer
 - **WHEN** an entry is written under an issuer and read back under the same issuer
 - **THEN** the written payload is returned
@@ -19,6 +28,16 @@ Writing, reading, listing, and sharing SHALL address a data store by its issuer'
 
 ### Requirement: Entries are opaque payloads at validated paths
 An entry SHALL live at an `EntryPath`: a non-empty, slash-separated path of at most 16 components, each between 1 and 256 bytes. The path structure and its bounds are a `data-layer` contract, not an inherited one — the underlying pdn-store key is arbitrary bytes. The two halves of the contract have different weight. The component structure (non-empty, slash-separated) is load-bearing: prefix queries stand on it. The numeric bounds are carried over unchanged from the single-device prototype and only keep sync messages predictably sized; they MAY be raised or dropped at will — keys replicate as raw bytes, so nodes with different bounds still sync — while lowering them becomes a breaking migration once data exists. The payload SHALL be treated as opaque bytes by `data-layer` — interpretation belongs to the layers above. An empty payload is not representable as a stored value: pdn-store reserves zero-length entries as its deletion marker (a convention inherited from iroh-docs), hides them from reads, and rejects writing one — a zero-length write SHALL fail, storing nothing and deleting nothing. "Present but empty" SHALL be encoded by the layers above through a non-empty representation; a deletion operation remains absent from this layer's surface.
+
+**Example:** `EntryPath::new` at its bounds and just past them, then a zero-length payload.
+
+| input | outcome |
+|---|---|
+| 16 components of 256 bytes each, 4,111 bytes with slashes | `Ok`: the longest path |
+| 17 components | `Err`: too many components: 17 (max 16) |
+| `contact/` followed by a component of 257 bytes | `Err`: component too long: 257 bytes (max 256) |
+| `contact//email`, `/contact` or `contact/` | `Err`: empty component (leading, trailing, or double slash) |
+| a zero-length payload written at `contact/email` | `Err`: `InsertError::EntryIsEmpty`; the value stored there stays |
 
 #### Scenario: A valid path round-trips
 - **WHEN** an entry is written at a multi-component path within the bounds
@@ -34,6 +53,14 @@ An entry SHALL live at an `EntryPath`: a non-empty, slash-separated path of at m
 
 ### Requirement: Reads become available record-first
 Reading an entry SHALL return its payload only once the payload bytes have arrived: an entry whose record has synced but whose payload has not yet been fetched SHALL read as absent. Entry records and payloads travel independently, so "stored" precedes "readable"; consumers poll until the payload lands.
+
+**Example:** a1 writes `alice@example.org` (17 bytes) at `contact/email` under Alice; a2, her second device, syncs.
+
+| t | a2 holds | `read(alice, alice, contact/email)` | `list(alice, alice, None)` |
+|---|---|---|---|
+| t0 | nothing | `Ok(None)` | `[]` |
+| t1 | the entry, its payload not yet fetched | `Ok(None)` | `[contact/email, payload_len 17]` |
+| t2 | the payload too | `Ok(Some(b"alice@example.org"))` | `[contact/email, payload_len 17]` |
 
 #### Scenario: Record without payload reads as absent
 - **WHEN** an entry's record has synced to a device but its payload bytes have not yet been fetched
@@ -64,6 +91,13 @@ Writes performed on one device SHALL become visible on every device holding the 
 ### Requirement: Concurrent writes converge
 Concurrent writes to the same path on different devices SHALL resolve on every device to the entry with the newest timestamp (pdn-store per-key LWW across authors), with equal timestamps broken deterministically by content hash — so all devices converge to the same value, which is one of the written values.
 
+**Example:** a1 and a2, Alice's devices with an author each, write `contact/email` with no coordination, then sync; with equal timestamps both read the payload whose content hash (BLAKE3) is the greater.
+
+| device | payload | timestamp | both devices read, after sync |
+|---|---|---|---|
+| a1 | `alice@home.example` | 10:00:00.000100 | |
+| a2 | `alice@work.example` | 10:00:00.000200 | `alice@work.example`: the newer timestamp |
+
 #### Scenario: Contested path converges
 - **WHEN** two devices write different payloads at the same path with no coordination and then sync
 - **THEN** both devices eventually read the same payload, and it is one of the two written
@@ -71,12 +105,29 @@ Concurrent writes to the same path on different devices SHALL resolve on every d
 ### Requirement: A write affects only its own path
 A write SHALL affect only the entry at its own path: the entry replaces the earlier entry its author wrote at that path and leaves every other path standing on every replica, a longer path beginning with the same components or with the same bytes included. An entry arriving by sync SHALL be refused only by an entry of its author at its own path that is newer or equal.
 
+**Example:** a3 holds a1's entry at `contact`, dated 10:00:05; a1, a2, a3 are Alice's devices, one author each.
+
+| entry arriving at a3 over sync | dated | at a3 |
+|---|---|---|
+| a1's, at `contact` | 10:00:03 | refused: a1's own entry at `contact` is newer |
+| a1's, at `contact/email` | 10:00:01 | stored: the entry at `contact` is at another path |
+| a1's, at `contacts/emergency` | 10:00:01 | stored: sharing the bytes `contact` changes nothing |
+| a2's, at `contact` | 10:00:01 | stored beside a1's; a read of `contact` returns a1's, the newer |
+
 #### Scenario: A write at a shorter path leaves the longer ones standing
 - **WHEN** a device writes entries at `contact/email` and `contacts/emergency` under one issuer, and then an entry at `contact`
 - **THEN** listing that issuer yields all three paths, each reading the payload written at it, on that device and on the identity's other device once it syncs
 
 ### Requirement: The data store is shared by ticket
 A data store SHALL be shareable as a ticket, and importing that ticket SHALL register the replica under the issuer on the importing node, joining it into the replica's sync. A write ticket admits writing through any local author; a read ticket admits replication only. An import under an issuer that already resolves to another replica SHALL move the issuer onto the imported replica and forget the other one in the same act, so an issuer resolves to one replica for the identity that holds it, and a replica it no longer resolves to is neither reconciled nor kept. An import under an issuer that already resolves to the very replica the ticket names SHALL bind nothing and change nothing — its tracking, its serving posture and its swarm membership stay as they were.
+
+**Example:** Bob's node imports tickets under the issuer `alice`, one after another; N1 and N2 are two namespace ids.
+
+| ticket imported | `alice` resolves to | Bob's node holds and reconciles |
+|---|---|---|
+| N1 | N1 | N1 |
+| N2 | N2 | N2 alone: N1 is dropped in the same act |
+| N2 once more | N2 | N2, its tracking, serving posture and swarm membership untouched |
 
 #### Scenario: Import joins the replica
 - **WHEN** a node imports a data store from its ticket under the issuer
@@ -94,6 +145,14 @@ A data store SHALL be shareable as a ticket, and importing that ticket SHALL reg
 Registering a data store under an issuer SHALL have a counterpart: forgetting an issuer's data namespace stops reconciling its replica, drops it, and removes the issuer's registration together — so operations addressed to that issuer afterwards fail with the unknown-issuer error, exactly as before the import, rather than resolving to a dropped replica. Dropping the replica without removing the registration is not sufficient and SHALL NOT be the surface offered: the issuer would still resolve, and its operations would fail as storage errors instead of the distinguishable refusal this store's addressing requirement mandates.
 
 Forgetting an issuer is not, however, the rollback of an import: an issuer can already be bound when an import runs, and forgetting would then delete a replica that import never brought up — permanently, since dropping takes the entries with it. An import SHALL therefore report what it did, and be undoable by that report alone: undoing an import that bound a free issuer forgets the namespace, and undoing one that bound nothing does nothing. A rollback SHALL NOT destroy state that predates the act it rolls back; a replica the import itself moved its issuer away from is forgotten by the import, not by the rollback, and the rollback does not bring it back. This is the rollback path for an import that must not survive the operation that made it ([device-linking](../../pdn-node/device-linking/spec.md)).
+
+**Example:** an import of N1 under the issuer `alice` on Bob's node, undone by `undo_import_namespace` with its report; N0 and N1 are namespace ids.
+
+| `alice` before the import | `NamespaceImport` | the undo | afterwards |
+|---|---|---|---|
+| unbound | `bound: true` | `forget_namespace(alice)` | operations under `alice` fail with `UnknownIssuer` |
+| resolves to N1 | `bound: false` | nothing | `alice` resolves to N1, still held |
+| resolves to N0 | `bound: true` | `forget_namespace(alice)` | `UnknownIssuer`; N0, dropped by the import, stays gone |
 
 #### Scenario: Forgetting a namespace unregisters its issuer
 - **WHEN** a node imports the data namespace of an issuer, then forgets it

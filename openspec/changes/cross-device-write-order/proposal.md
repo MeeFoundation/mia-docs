@@ -2,14 +2,18 @@
 
 ## Why
 
-Every device of an identity writes with an author of its own: the store creates a random author on a node's first start, `provision_identity` takes it, and linking does not carry it over. The store keeps one entry per author at a key, so a device's write or delete replaces only its own author's entry and leaves every sibling's entry standing beside it. A read picks the entry with the newest timestamp across authors and only then drops it if it is empty (`single_latest_per_key`, whose selector keeps the strictly newer timestamp). The timestamp is the writing device's wall clock, with nothing tying it to the entries already at the key. The [connection metadata store](../../specs/components/mee-pdn/data-layer/connection-metadata-store/spec.md) states that rule — "Concurrent edits resolve by last-writer-wins", by the newest timestamp across authors — and states no assumption about clocks.
+Every device of an identity writes with an author of its own: each identity's store creates a random author the first time it opens on a device, under `provision_identity`, and a store on disk keeps it in the `default-author` file at that store's path; linking does not carry it over. The store keeps one entry per author at a key, so a device's write or delete replaces only its own author's entry and leaves every sibling's entry standing beside it. A read picks the entry with the newest timestamp across authors and only then drops it if it is empty (`single_latest_per_key`, whose `LatestPerKeySelector` compares the timestamp and then the content hash, so on equal timestamps the larger hash wins). The timestamp is the writing device's wall clock, with nothing tying it to the entries already at the key. The [connection metadata store](../../specs/components/mee-pdn/data-layer/connection-metadata-store/spec.md) states that rule — "Concurrent edits resolve by last-writer-wins", by the newest timestamp across authors — and states no assumption about clocks.
 
 A write made later on a device whose clock is behind therefore loses to an earlier write of a sibling. For a grant this is a withdrawal that does not withdraw. Alice has two devices; the phone's clock is right, the laptop's is five minutes behind. The phone publishes a grant for Bob at 12:00, and at 12:02 real time the laptop withdraws it through `ConnectionsService::withdraw_grant`:
+
+**Example:** the two entries at `grants/<alice>` after the laptop withdraws the grant.
 
 ```
 grants/<alice>   author phone    timestamp 12:00:00   grant       ← the read picks it: the newer timestamp
 grants/<alice>   author laptop   timestamp 11:57:00   tombstone   ← loses, although written later
 ```
+
+**Example:** what each party reads and is served after the withdrawal, against what the grant requirement asks.
 
 | after the withdrawal | Alice's phone (published) | Alice's laptop (withdrew) | Bob (audience) | what the grant requirement asks |
 |---|---|---|---|---|
@@ -17,7 +21,7 @@ grants/<alice>   author laptop   timestamp 11:57:00   tombstone   ← loses, alt
 | Bob's data session is served | yes | yes | — | no |
 | Bob reads Alice's data under the grant | — | — | yes | no |
 
-No error and no warning reaches anyone. The reverse holds too: a grant published again on a device whose clock is behind a sibling's tombstone never takes effect, and Bob loses access without explanation. The same holds for every record the identity's devices both write and delete at one key — a published device record (`withdraw_device`), a connection record (`disconnect`), and the directory's record of a cell once cells exist. The grant requirement of the connection metadata store promises that only the last published record is read, which a clock behind breaks.
+No error and no warning reaches anyone. The reverse holds too: a grant published again on a device whose clock is behind a sibling's tombstone never takes effect, and Bob loses access without explanation. The same holds for every other record the identity's devices both write and delete at one key: the pending-device record `pending-devices/<device>`, which the inviting device writes and the new device deletes when it confirms itself (`confirm_device`), and the directory's record of a cell once cells exist. A published device record and a connection record have deletes in data-layer, `withdraw_device` and `disconnect`, but nothing in pdn-node calls either, so no device deletes them. The grant requirement of the connection metadata store promises that only the last published record is read, which a clock behind breaks.
 
 Under [defect-reachability](../../specs/code-practices/defect-reachability.md) the withdrawal is reached by a host through the public surface of pdn-node — a withdrawal from any device of the identity — under an operating condition, [clocks that disagree](../../specs/code-practices/operating-conditions.md); it obliges a fix.
 
@@ -41,7 +45,7 @@ Nothing is decided. The change settles one question — what orders a device's w
 
 The first two options are exclusive: a monotonic timestamp and a version order two ways, and mixing them leaves each record kind ordered by a different rule. The third combines with either.
 
-Example on the withdrawal above, the laptop having seen the phone's grant before it withdraws:
+**Example:** the withdrawal above, the laptop having seen the phone's grant before it withdraws.
 
 | answer | the laptop's tombstone | `read_grant` after the withdrawal |
 |---|---|---|

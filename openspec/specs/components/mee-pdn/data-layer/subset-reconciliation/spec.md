@@ -10,6 +10,15 @@ Capability-filtered reconciliation — "subset-RBSR" — the read-side counterpa
 
 During reconciliation with a peer, a serving node SHALL compute range fingerprints, split boundaries, offers, and item transmissions over only the claims the peer is read-authorized for. A claim the peer is not authorized for SHALL NOT be fingerprinted, offered, or sent.
 
+**Example:** b1 (Bob's device) holds nothing and dials a1 (Alice's device); Bob's grant reads `contact/email`.
+
+```
+Alice's replica                contact/email, contact/phone, notes/diary
+a1's view for this session     contact/email
+b1's opening                   the whole replica, with the fingerprint of an empty set
+a1's reply                     one RangeItem over the whole replica, carrying contact/email alone
+```
+
 #### Scenario: Only the authorized subset is delivered
 
 - **WHEN** an issuer holds claims c1, c2, c3 and a peer is authorized for c1, c2
@@ -19,6 +28,14 @@ During reconciliation with a peer, a serving node SHALL compute range fingerprin
 
 The reconciliation transcript a peer observes SHALL depend only on the claims it is authorized for, so the existence of unauthorized claims is not revealed — no fingerprint or split boundary derived from them reaches the peer.
 
+**Example:** Alice's replica, one author: `contact/address`, `contact/email`, `contact/phone` (address, email, phone below); Bob's grant reads address and phone; b1 (Bob's device) holds address and opens with its fingerprint; a1 (Alice's device) replies; `[x, y)` runs from x to y, wrapping past the end.
+
+| a1 reads its replica | split at | a1's reply |
+|---|---|---|
+| email withheld | phone, address | `RangeItem [phone, address)`: phone; `RangeItem [address, phone)`: address |
+| email absent | phone, address | `RangeItem [phone, address)`: phone; `RangeItem [address, phone)`: address |
+| not filtered | email, address | `RangeFingerprint [email, address)` over email and phone; `RangeItem [address, email)`: address |
+
 #### Scenario: Existence of an unauthorized claim is hidden
 
 - **WHEN** an unauthorized claim c3 lies between authorized claims c2 and c4 in key order
@@ -27,6 +44,14 @@ The reconciliation transcript a peer observes SHALL depend only on the claims it
 ### Requirement: The filter runs in pdn-store on the read side
 
 Filtering SHALL run at reconciliation time inside `pdn-store`, per peer, distinct from the ingest gate at the `validate_entry` hook. It SHALL consume the caller's effective rights as an opaque per-session predicate over entries, assembled above the fork — `pdn-store` SHALL know neither the grant format nor the identity vocabulary. The ingest gate consumes the same session classification through its own predicate ([capability-gated ingest](../capability-gated-ingest/spec.md)): read on egress, write on ingest, independently.
+
+**Example:** a1 (Alice's device) accepts a session from b1 (Bob's); Bob's grant reads `contact/email` and `contact/phone`, and writes `contact/phone`.
+
+| key | `EntryFilter`, on what a1 holds | `SessionIngest`, on what b1 offers |
+|---|---|---|
+| `contact/email` | `true`: served | `ValidateOutcome::Reject` |
+| `contact/phone` | `true`: served | `ValidateOutcome::Accept` |
+| `notes/diary` | `false`: withheld | `ValidateOutcome::Reject` |
 
 #### Scenario: Read filter is independent of the ingest gate
 
@@ -60,6 +85,15 @@ A claim SHALL be filtered out before transmission, never retracted after — Inv
 
 A serving node SHALL resolve the caller's read rights when a reconciliation session is set up, for the identity the caller names in that session and for no other identity its node id resolves to, and that resolution SHALL govern the session for its whole lifetime. A grant widened, narrowed, or withdrawn while a session is under way SHALL NOT change what that session serves — it governs the sessions set up after it. The ingest gate resolves the same records at the same moment ([capability-gated ingest](../capability-gated-ingest/spec.md)), so the read and write halves of one session's decisions rest on one state. The bound this places on revocation is the point rather than a side effect: a withdrawal takes effect from the next session, and what the peer obtained while it was granted stays with it — Invariant 2 governs acquisition, not retention.
 
+**Example:** email, phone: the claims `contact/email` and `contact/phone` of Alice's replica; a1 is Alice's device, b1 Bob's.
+
+| t | Alice (issuer) | session S1, b1 → a1 | session S2, b1 → a1 |
+|---|---|---|---|
+| t0 | | set up: Bob reads email, phone | |
+| t1 | withdraws Bob's grant | still serves email and phone | |
+| t2 | | ends; b1 holds email, phone | |
+| t3 | | | refused with `AbortReason::NotFound`; b1 still reads email, phone |
+
 #### Scenario: A withdrawn grant refuses the next session and keeps delivered data
 
 - **WHEN** an issuer withdraws a peer's grant and afterwards writes the withdrawn claim again
@@ -78,6 +112,14 @@ A serving node SHALL resolve the caller's read rights when a reconciliation sess
 ### Requirement: A session serves a view frozen at session setup
 
 A node SHALL serve one reconciliation session from a store snapshot taken at session setup: every fingerprint, split boundary, offer, and item the session derives SHALL reflect the store as of that moment, so a write landing mid-session neither shifts the served view between rounds nor reaches the peer within the session — it travels on the next one. What one view buys is consistency inside a session, not a prerequisite of reconciliation: the engine converges over a drifting store too, because reconciliation is anti-entropy and what one session misses the next one carries — for as long as a session can finish, which the bound below qualifies, and for what the set gains rather than what it loses, which the requirement on removals below states. It buys agreement among the things a single session derives — a fingerprint and the items behind it describe the same claims, and a split boundary still partitions the set it was computed over when a later round returns to it — and it puts the data half of the session's decisions on the footing the rights half already stands on, since the caller's rights are resolved at session setup and hold for the session's lifetime. Opening the snapshot SHALL first commit the store's pending write batch, so every entry inserted before session setup is in the snapshot. Ingest SHALL stay on the live store: an entry the peer sends is judged against current state, so an older remote entry never overwrites a newer local write the snapshot predates. The check behind a rejection — whether the replica would newly store the refused entry — reads the live store for the same reason and a graver one: a rejection makes its sender destroy its own copy, so judged against the frozen view it would name an entry the replica took in after session setup and cost the sender data both sides hold ([capability-gated ingest](../capability-gated-ingest/spec.md)). The snapshot SHALL be released when the session ends, on every exit path — completion, refusal, failure, and cancellation alike — and a session that neither completes nor fails is ended by the bound below, so no snapshot outlives its session and no session runs without end.
+
+**Example:** a1 (Alice's device) serves session S1 to b1 (Bob's); S1's snapshot is taken at setup, and a1 then takes in a newer `contact/email`.
+
+| read inside S1 | reads from | sees the newer `contact/email` |
+|---|---|---|
+| `get_first`, `get_range`, the fingerprints | the snapshot | no: the next session serves it |
+| `put`, when b1 offers an older `contact/email` | the live store | yes: the older entry is not inserted |
+| `would_insert`, before echoing a rejection | the live store | yes: a refused re-offer of it draws no rejection |
 
 #### Scenario: A mid-session write travels on the next session
 
@@ -103,6 +145,17 @@ A node SHALL serve one reconciliation session from a store snapshot taken at ses
 
 Reconciliation converges over a drifting store because what one session misses the next one carries, and that holds for what a set gains: a later session offers an entry an earlier one did not have. It does not hold for what a set loses. A session serves rows that a removal took out after its setup, and the next session carries no news of the removal — only the absence of what was removed, which a peer already holding it cannot tell from a set it is ahead on. What carries a removal is therefore the artefact the removal leaves behind, and every removal SHALL leave one whose reach covers every peer the removed rows can reach. A delete leaves an empty entry at the deleted key, which replicates as any entry does; it replaces its author's older entry at that key and SHALL NOT be replaced in turn by an older entry at that key, whichever side of a session offers first, so a replica that still holds the deleted entry converges on the delete instead of handing the entry back. A retraction leaves a marker in the directory of the identity whose author wrote the retracted entry, which replicates to that identity's devices and arms them to remove the entry and refuse its re-ingest ([write retraction](../write-retraction/spec.md)). The reach that marker has to cover is bounded by what serves the replica: a granted replica is served only to devices of the grant's audience identity and to the issuer, so a retracted entry never reaches a grantee of another identity, whose devices the marker does not reach, and a co-located identity granted by the same issuer holds a replica of its own, which the entry never entered. A removal that would leave no such artefact SHALL instead end the open sessions of its namespace, because nothing else would converge on it. A frozen view therefore delays a removal by at most one session's lifetime and cannot lose it.
 
+**Example:** Bob's grant reads `contact/email` and writes `contact/phone` of Alice's replica, held on a1 (Alice's device), b1 and b2 (Bob's).
+
+```
+delete     a1 deletes Alice's entry at contact/email
+  leaves   an empty entry by Alice's author at contact/email: len 0, stamped at the delete
+  spreads  as any entry does, to b1 and b2 under the grant; an older contact/email offered back is not inserted
+retract    Alice's gate refuses b1's entry at notes/diary, and b1 retracts it
+  leaves   retractions/<alice-hex>/<bob-author-hex>/notes/diary in Bob's directory
+  spreads  to b2 through Bob's directory; b2 removes the entry if it holds one and refuses its re-ingest
+```
+
 #### Scenario: A retraction inside a session is served for the rest of it
 
 - **WHEN** a writer retracts its own refused entry while a session it serves is exchanging rounds
@@ -124,6 +177,13 @@ A reconciliation session SHALL be bounded as a whole, and a session reaching tha
 
 A session cut short at the bound loses what it had not delivered, not what it had: entries already ingested are stored, and later sessions carry the rest. That holds while a session delivers something. It does not hold for a set whose transfer cannot finish inside the bound, because a message is ingested whole or not at all and a node holding nothing of a replica receives the served set as a single message: a cut then delivers nothing, the next session starts over, and reconciliation does not converge at all rather than converging slowly. Raising the bound moves that threshold rather than removing it; removing it wants a limit on the size of a transmitted set, which this layer does not yet impose.
 
+**Example:** a2, Alice's new device, holds nothing of her replica, so a1 serves its 10,000 entries, about 2.8 MB, as one message; `SYNC_SESSION_TIMEOUT` is 300 s.
+
+| link | the message takes | outcome |
+|---|---|---|
+| 75 kbit/s | about 299 s | lands inside the bound: 10,000 entries stored |
+| 37.5 kbit/s | about 597 s | cut at 300 s with nothing stored; every later session starts over and is cut the same way |
+
 #### Scenario: A stalled session is ended and its pair reconciles again
 
 - **WHEN** a peer holds a session open without carrying it to completion
@@ -137,6 +197,16 @@ A session cut short at the bound loses what it had not delivered, not what it ha
 ### Requirement: The gossip topic carries no content
 
 A replica's gossip topic SHALL carry only content-free announcements, never entries. A local insert SHALL broadcast a content-free author-head digest (a sync report) to neighbors; the entry itself SHALL NOT be broadcast, and an entry received over gossip SHALL be dropped, never inserted. Content SHALL flow only over the classified reconciliation an announcement triggers — the receiver, seeing it has news, pulls, and re-announces to its own neighbors after pulling (the cascade). Because the topic id equals the namespace id and topic membership is unauthorized, a subscriber that knows the id therefore obtains only activity metadata (author heads, timing), never keys, hashes, or values — and for a data namespace, the reconciliation the announcement triggers is gated, so an unresolvable subscriber obtains nothing at all. (The content hash a fetch-hint announcement carries, and the blob channel behind it, are a separate, deferred gap.)
+
+**Example:** a1 and a2 are Alice's devices; a1 writes `contact/email`, and the topic of her replica, whose id is the namespace id, carries this.
+
+```
+message:     Op::SyncReport(SyncReport { namespace, heads })
+encoded as:  75 bytes: 02 (Op variant 2), the 32-byte namespace id, 29 (length 41), then heads
+heads:       one pair: the write's timestamp, an 8-byte varint, and Alice's 32-byte author id, after a count of 1
+not in it:   the key contact/email, its content hash, its value; a2 pulls them over the reconciliation the message triggers
+received:    an Op::Put carrying an entry is dropped, never inserted
+```
 
 #### Scenario: An own device converges through the announcement, not a pushed entry
 
@@ -180,6 +250,15 @@ A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a gr
 
 A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. The replica is held for one identity, and the session names it; the caller's named identity is resolved in that identity's own directory, so no other identity hosted on either node takes part in the decision.
 
+**Example:** b1 (Bob's device) holds Alice's replica under her grant to Bob; b2 is Bob's other device, d1 a device of Dave, a second identity on b1's node.
+
+| caller | grant record `grants/<alice-hex>` on b1 | b1 serves |
+|---|---|---|
+| b2, listed in Bob's directory | audience Bob, claim `contact/email` | `contact/email`, filtered as a1 filters it |
+| b2, listed in Bob's directory | withdrawn: a tombstone | nothing: `AbortReason::NotFound` |
+| b2, listed in Bob's directory | audience Carol | nothing: `AbortReason::NotFound` |
+| d1, listed in Dave's directory only | audience Bob, claim `contact/email` | nothing: `AbortReason::NotFound` |
+
 #### Scenario: A sibling catches up while the issuer is offline
 
 - **WHEN** a device of the audience identity opens a granted replica and requests a sync from a sibling device that holds the replica and a live local grant record, with every device of the issuer offline
@@ -202,7 +281,17 @@ A node holding a granted replica SHALL serve a sync session for it to a caller t
 
 ### Requirement: A granted replica reconciles with siblings as well as the issuer
 
-A granted replica's tracked contacts SHALL admit devices of the audience identity and of the issuer alike, each paired with the identity it is dialed as — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records. Setting SHALL replace the previous list, so a device absent from the new derivation stops being dialed by the periodic reconcile pass and the before-access nudge; both SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
+A granted replica's tracked contacts SHALL admit devices of the audience identity and of the issuer alike, each paired with the identity it is dialed as — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records: the devices the issuer published in the connection whose grant bound the replica, the audience identity's own devices listed in its directory, and the ticket's addressing for the published devices it names, this node left out. A derivation that yields at least one device SHALL replace the previous list, so a device absent from it stops being dialed by the periodic reconcile pass and the before-access nudge. A derivation that yields none — the issuer's published device set reads empty, as it does before its records replicate, or every device derived is this node — SHALL leave the previous list in place, so once every derived device is gone the last list set, or the ticket's, goes on being dialed. Both the pass and the nudge SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
+
+**Example:** b1 holds Alice's replica for Bob; a1 and a2 are Alice's devices, b2 Bob's other one; (a1, as Alice) is a `Contact`; peers the engine recorded itself are left out.
+
+| step | tracked contacts on b1 | next pass and nudge dial |
+|---|---|---|
+| import from Alice's ticket, minted on a1 | (a1, as Alice) | a1 |
+| re-derived before Alice's device records reach b1 | unchanged: (a1, as Alice) | a1 |
+| re-derived: Alice publishes a1, a2; Bob's directory has b2 | (a1, as Alice), (a2, as Alice), (b2, as Bob) | a1, a2, b2 |
+| re-derived: Alice's published set lists a1 alone | (a1, as Alice), (b2, as Bob) | a1, b2 |
+| re-derived: Alice's published set lists no device | unchanged: (a1, as Alice), (b2, as Bob) | a1, b2 |
 
 #### Scenario: The reconcile pass dials a sibling contact
 
@@ -218,9 +307,20 @@ A granted replica's tracked contacts SHALL admit devices of the audience identit
 
 - **WHEN** a granted replica held for one identity dials a contact derived from that identity's device records
 - **THEN** the session names that identity as the caller, and a device of a co-located identity is not among the contacts of this replica
+
 ### Requirement: Unauthorized callers are refused uniformly
 
 A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's directory and the local grant record; every other caller SHALL be refused.
+
+**Example:** callers ask a1 (Alice's device) to sync; Dave holds the ticket of Alice's data replica and no grant, Carol holds nothing.
+
+| caller and request | a1's answer on the wire |
+|---|---|
+| Carol, for Alice's data replica | `00 00 00 02 02 00` |
+| Dave, for Alice's data replica | `00 00 00 02 02 00` |
+| anyone, for a namespace a1 does not host | `00 00 00 02 02 00` |
+| anyone, naming an identity a1's node does not host | `00 00 00 02 02 00` |
+| decoded: frame length 2 (`u32` big-endian), `Message` variant 2 = `Abort`, `AbortReason` variant 0 = `NotFound` | |
 
 #### Scenario: A ticket holder without a grant learns nothing
 

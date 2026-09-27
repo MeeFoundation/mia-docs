@@ -8,6 +8,15 @@ Only a caller the node has classified and allowed reaches those later messages: 
 
 The ceiling cannot simply come down. The reconciliation does not split a message by size: when one side of a first sync holds nothing, the other side sends every entry of the range in one message, so an honest message grows with the replica it carries. A lower ceiling alone would stop the first sync of every replica larger than it.
 
+**Example:** Bob's phone b1 (read grant on Alice's store) in a session with her laptop a1; a frame is a 4-byte big-endian length prefix, then the body.
+
+| frame | length prefix | a1 |
+|---|---|---|
+| the `Init` | `00 00 80 01` (32,769) | refuses it on the prefix: `MAX_OPENING_FRAME` is 32,768 |
+| a later frame | `00 2A B9 80` (2,800,000) | reads it whole: about a first sync of 10,000 entries in one message |
+| a later frame | `40 00 00 00` (1,073,741,824) | holds every byte that arrives and answers nothing, until the last byte or the session's 300 s (`SYNC_SESSION_TIMEOUT`) run out |
+| a later frame | `40 00 00 01` (1,073,741,825) | refuses it on the prefix: `MAX_MESSAGE_SIZE` is 1,073,741,824 |
+
 Measured against a running node on the first message, before that message had a ceiling of its own: a message announced at 1 GiB grew the receiving node's resident memory in step with the bytes that arrived, about 523 MiB for 512 MiB sent, and the node answered nothing while the message was still incomplete. Later messages go through the same reader.
 
 Under [defect-reachability](../../specs/code-practices/defect-reachability.md) this lever is reachable over the network: the rule names a modified node's sync sessions and their messages among the things it sends, and memory spent without bound as a denial of service. That obliges a fix. One option below instead amends that rule, and choosing it is part of this change.
@@ -23,6 +32,14 @@ Nothing is decided. The change settles one question — how large a message a se
 - The reconciliation splits its messages by size, so no honest message passes a bound of a few MiB, and the session ceiling comes down to that bound. This changes the fork's reconciliation, and a first sync of a large replica takes more messages.
 - A node-wide budget for the bytes held in unfinished messages, across every session of every hosted identity, past which a session is aborted. This bounds the sum without touching the reconciliation, but an honest large first sync can be aborted while other sessions are in flight, and the budget has to be sized for each kind of device.
 - The ceiling stays at 1 GiB, and the memory a classified caller makes the node spend is recorded as inside the trust boundary, the stance the cells change takes for the storage a member fills. This amends defect-reachability, which counts the messages of sync sessions among a modified node's levers, and the amendment covers every later finding of the same kind.
+
+**Example:** b1 announces a later frame at 1,073,741,824 bytes; beside it runs an honest first sync of a replica of 100,000 entries, about 28,000,000 bytes in one message today.
+
+| option | b1's frame | the honest first sync |
+|---|---|---|
+| messages split, ceiling down (4 MiB as a sample bound) | refused on its prefix | at least 7 messages of up to 4 MiB each |
+| a node-wide budget | held until the bytes in unfinished messages across the node reach the budget, then its session is aborted | one message of 28,000,000 bytes, aborted if it and the sessions beside it pass the budget |
+| the ceiling stays, recorded as inside the trust boundary | held, up to 1,073,741,824 bytes for up to 300 s | one message of 28,000,000 bytes |
 
 Whichever option is taken applies to both directions of a session: the answers a dialed peer sends are read under the same ceiling as the messages of a caller.
 

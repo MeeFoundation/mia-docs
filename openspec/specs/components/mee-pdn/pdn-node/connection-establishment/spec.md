@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How two identities become [connected](../../../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../../data-layer/private-metadata-store/spec.md) and the exchanged [connection metadata pair](../../data-layer/connection-metadata-store/spec.md). The exchange is bearer-level for now: the KERI proof of control over a presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both peers must be online — pending invitations are future work.
+How two identities become [connected](../../../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../../data-layer/private-metadata-store/spec.md) and the exchanged [connection metadata pair](../../data-layer/connection-metadata-store/spec.md). The exchange is bearer-level: a presented `PdnId` is asserted, not proven, since the dialogue carries no proof of control over it (ADR-0008, ADR-0011). Both peers must be online at once: an invite is answered only by a running inviter, and nothing holds an invitation for a peer that is offline.
 
 ## Requirements
 
@@ -10,6 +10,17 @@ How two identities become [connected](../../../../architecture/language/connecti
 The connections service SHALL mint an invite for a hosted identity: a fresh random one-time secret (32 bytes from the operating-system generator) with a short lifetime (a default with an invite-time override), held pending on the inviting runtime, and a self-contained invite payload carrying a format version, the inviter's node address, the secret, and the inviting identity's `PdnId`. The payload SHALL carry no ticket and no identity proof. Minting an invite for an identity the runtime does not host SHALL be refused with no pending state created.
 
 Suggestion (non-normative, host-side UX). Because the secret is one-time and short-lived, a consumed or expired invite is recovered only by minting a fresh one — never by re-presenting the same secret, which the inviter burns before replying (see the verify-and-burn requirement below). A host that displays an invite (a QR code, say) is therefore suggested — not required — to rotate the displayed invite to a freshly minted one well before its lifetime elapses (for the 120-second default, on the order of every 60 seconds), and to refresh it once a pairing completes, so a scanner always captures a live, unburned secret. The protocol neither mandates nor observes this rotation.
+
+**Example:** Alice, hosted on device a1, calls `invite(Alice, None)` at t = 0.
+
+| `InvitePayload` field | value |
+|---|---|
+| `version` | `0` (`INVITE_FORMAT_VERSION`) |
+| `inviter_addr` | a1's `EndpointAddr`: its endpoint id and the addresses the scanner dials |
+| `secret` | 32 bytes from the operating-system generator, fresh for this invite |
+| `inviter` | Alice's `PdnId` |
+| pending on a1 | secret → Alice, expiring at t = 120 s (the default lifetime), in memory only |
+| not in the payload | a `DocTicket`, a `PdnIdentityProof`: `InvitePayload` has no field for either |
 
 #### Scenario: The payload carries no bearer material
 - **WHEN** an invite is minted for a hosted identity
@@ -27,6 +38,17 @@ Suggestion (non-normative, host-side UX). Because the secret is one-time and sho
 Establishment SHALL dial the invite payload's node address under the dedicated pairing ALPN and run one raw bidirectional exchange: the scanner presents the secret, its own `PdnId`, its node address, and a read ticket to its own connection metadata store toward the inviter; the inviter — after the verify-and-burn below — answers with the read ticket to its own store toward the scanner. A payload whose format version the scanner does not speak SHALL be refused before dialing. Establishing on behalf of an identity the scanning runtime does not host SHALL be refused before dialing.
 
 The round-trip SHALL be bounded by a fixed ceiling: `establish` names no budget of its own, so the ceiling is a constant — generous against any live exchange, finite so a dialed inviter that never answers costs the caller the ceiling, surfaced as its own typed outcome distinct from the refusal, and never the transport's idle timeout.
+
+**Example:** Bob on device b1 establishes from Alice's invite minted on a1; each message is a `u32` little-endian length, then postcard, at most 65,536 bytes.
+
+```
+b1 → a1   a connection to the invite's inviter_addr on ALPN /pdn/pairing/0
+b1 → a1   PairingRequest { version: 0, secret, scanner: Bob, scanner_addr: b1, ticket: read ticket to Bob's store toward Alice }
+a1        verify_and_burn(secret) → Alice, then records Bob and assembles its half of the pair
+a1 → b1   PairingResponse { ticket: read ticket to Alice's store toward Bob }
+b1        closes the connection with reason "done", then records Alice and assembles its half
+ceiling   no PairingResponse within 15 s (ESTABLISHMENT_DIALOGUE_TIMEOUT): establish fails with EstablishmentTimeout
+```
 
 #### Scenario: A hung inviter costs the caller the ceiling and nothing more
 - **WHEN** the dialed inviter accepts the pairing dialogue, reads the request, and never answers
@@ -47,6 +69,15 @@ The round-trip SHALL be bounded by a fixed ceiling: `establish` names no budget 
 ### Requirement: The secret is verified and burned atomically, before any state
 On a presented secret the inviter SHALL atomically check-and-burn against its pending set: present and unexpired → burned and the dialogue proceeds; expired, already burned, or unknown → refused. The check SHALL precede every state change, so a refused attempt leaves no observable state on the inviter: no replica created, no ticket issued, no connections entry, no directory entry. An unpresented secret SHALL expire at the end of its lifetime and thereafter be refused. A refused presentation SHALL NOT burn a live pending invite (a guess cannot extinguish a ceremony in progress), and refusals SHALL be uniform — the dialer cannot distinguish wrong from expired from already burned.
 
+**Example:** a1 minted Alice's secrets S and S2 at t = 0, each with the default 120 s lifetime; W was never minted.
+
+| presented | pending on a1 before | a1 answers | pending on a1 after |
+|---|---|---|---|
+| W at t = 10 s | S, S2 | the one refusal: close, code 0, no reason | S, S2 |
+| S at t = 20 s | S, S2 | `PairingResponse` | S2 |
+| S at t = 30 s | S2 | the one refusal | S2 |
+| S2 at t = 130 s | S2 | the one refusal | nothing: expired S2 is removed |
+
 #### Scenario: A second presentation of the same secret is refused
 - **WHEN** establishment completed against an invite and a second establish presents the same secret
 - **THEN** the second attempt is refused, and the inviter's stores are exactly as the first establishment left them
@@ -60,7 +91,20 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: Establishment records the connection for both identities, on all their devices
-On a completed dialogue each side SHALL record the counterparty among the connections records of its private-metadata directory, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory replicates, and a linked device opens the pair from the directory's tickets on demand.
+On a completed dialogue each side SHALL record the counterparty among the connections records of its private-metadata directory, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory replicates, and a linked device opens the pair from the directory's tickets by itself, at the connection armer's next sweep of its directory.
+
+**Example:** Bob (b1) establishes from Alice's invite on a1, and Alice has a second device a2; `<alice>`, `<bob>`: `PdnId`s in hex; `<a1>`, `<a2>`: endpoint ids in hex.
+
+```
+Alice's directory, written by a1, replicated to a2
+  connections/<bob>                          one byte 01, the connection marker
+  tickets/connection-metadata/<bob>/own      write ticket to Alice's store toward Bob
+  tickets/connection-metadata/<bob>/peer     read ticket to Bob's store toward Alice, b1's address added
+Alice's store toward Bob
+  devices/<a1>                               one byte 01, written by a1 as it assembles the pair
+  devices/<a2>                               one byte 01, written by a2 once it opens the pair from the two tickets
+Bob's directory                              the same three keys, naming <alice>
+```
 
 #### Scenario: Both sides list each other
 - **WHEN** runtime B establishes with an invite from runtime A
@@ -73,6 +117,16 @@ On a completed dialogue each side SHALL record the counterparty among the connec
 ### Requirement: Re-establishment converges, whichever side invites
 A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's directory holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
 
+**Example:** Alice (a1) and Bob (b1) connected from Alice's invite; later Alice establishes from a fresh invite Bob mints; both sides act alike.
+
+| state | outcome |
+|---|---|
+| own store toward the other | the cached pair's replica; on a device with no cache, the one the directory's own-kind ticket names |
+| peer store | the received ticket names the cached peer replica, so it is reused |
+| directory | the connection record and both tickets rewritten under the same keys |
+| `connections().list` | Alice's lists Bob once, Bob's lists Alice once |
+| metadata replicas | 2 per side before, 2 per side after |
+
 #### Scenario: Establishing twice yields one connection
 - **WHEN** A and B establish, and later establish again from a fresh invite
 - **THEN** each lists the other exactly once, and each side's own metadata store is the same replica both times
@@ -82,7 +136,17 @@ A fresh invite between identities that already share establishment state — a c
 - **THEN** the outcome converges identically — one connection, the same metadata pair, no duplicates
 
 ### Requirement: A refused establishment is legible to the dialer's caller
-Establishment SHALL report a refusal by the inviter to its own caller as a refusal, distinguishable from a failure to reach or complete the dialogue. The refusal SHALL carry no reason: it says that the inviter was reached and said no, and nothing about which of wrong, expired, or already burned applied — the uniformity the dialer's peer sees is unchanged. A caller — a host, a test, or an application — SHALL be able to make the distinction without inspecting human-readable error text.
+Establishment SHALL report to its own caller three failed outcomes of the dialogue, each as a type of its own: the inviter unreachable, when nothing at the invite's address accepts the pairing ALPN and no request goes out; the timeout, when the dialogue's ceiling passes with the exchange still in flight; and the refusal, when the dialogue reached the inviter and ended without an answer. The refusal SHALL cover every such ending alike: the inviter refusing the secret, the connection dying after the request is sent, and the inviter failing while it answers all reach the dialer as the dialogue closing with no response, so the refusal says that the inviter was reached and no answer came back, not that the inviter said no. The refusal SHALL carry no reason, and nothing in it separates wrong, expired, or already burned, so the inviter's refusals stay uniform. A caller — a host, a test, or an application — SHALL be able to tell the three outcomes apart without inspecting human-readable error text. Any other failure — the request failing to go out over a connection that was reached, or a step on the dialer's own node failing — carries none of the three types.
+
+**Example:** Bob on b1 calls `establish(Bob, payload)` and tells the outcome by `err.downcast_ref::<T>()`, never by its text.
+
+| what happened at the invite's address | `T` that matches |
+|---|---|
+| the secret is wrong, expired, or already burned | `EstablishmentRefused`, one value for all three |
+| the connection dies after the request went out, or a1 fails while answering | `EstablishmentRefused`, the same value |
+| nothing there accepts the pairing ALPN | `InviterUnreachable` |
+| the inviter read the request and gave no answer in 15 s | `EstablishmentTimeout` |
+| opening the stream or sending the request fails on a reached connection | none of the three |
 
 #### Scenario: A refusal is not a transport failure
 - **WHEN** establishment presents a secret that has already been burned, and separately when it dials an address where no inviter answers
@@ -91,9 +155,19 @@ Establishment SHALL report a refusal by the inviter to its own caller as a refus
 #### Scenario: The refusal names no reason
 - **WHEN** establishment is refused for a wrong secret, for an expired one, and for an already burned one
 - **THEN** all three report the same refusal, carrying nothing that separates the three cases
+
 ### Requirement: Two identities of one node establish through the same dialogue
 
-Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and the connection's metadata pair SHALL be two replicas — one held for each identity — that converge without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
+Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and each of the metadata pair's two stores SHALL be held twice on the node — created for the identity that writes it and imported for the identity that reads it — four replicas in all, each store's two replicas converging inside the node without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
+
+**Example:** Alice and Bob are both hosted on node n1, and Bob establishes from Alice's invite with no other node reachable.
+
+| part | on n1 |
+|---|---|
+| transport | `inviter_addr` names n1's own endpoint id, which iroh refuses to dial: a pipe inside n1 buffering 65,540 bytes each way |
+| dialogue | the same `PairingRequest`, `verify_and_burn` and assembly as between two nodes |
+| Alice's store toward Bob | held twice on n1: for Alice, who writes it, and for Bob, who reads it; the two sync inside n1 |
+| Bob's store toward Alice | held twice on n1: for Bob, who writes it, and for Alice, who reads it; the two sync inside n1 |
 
 #### Scenario: Two identities of one node connect and exchange a grant
 
@@ -113,6 +187,16 @@ Two identities hosted on one node SHALL establish a connection through the dialo
 ### Requirement: A stop lets the serving half in flight finish
 
 The runtime's shutdown SHALL let the serving half of every pairing dialogue in flight — one answering another node, and one answering another identity of the same node over the in-process pipe — finish within a fixed budget, before it stops anything that serving half writes through: the replica stores, the blob store, gossip. A stop that landed between the burn of the secret and the commit of the connection would leave the invite spent and the connection half assembled, with nothing to retry it. The wait SHALL come before the node's own protocols shut down, because those shut down side by side and a wait inside one of them runs against stores already going away. A dialogue that would begin after the wait SHALL be refused before its secret is verified, so nothing burns. The scanning half is the host's own call and is not waited for: a host awaits its `establish` before it stops the runtime.
+
+**Example:** Bob on b1 establishes from Alice's invite while a1's runtime shuts down; the budget is `SHUTDOWN_SERVING_BUDGET`, 10 s.
+
+| step | a1's serving half | a1's `Runtime::shutdown` |
+|---|---|---|
+| 1 | reads the `PairingRequest`, holding one permit | |
+| 2 | | begins: waits for every permit, 10 s at most |
+| 3 | `verify_and_burn`, writes the connection record and the pair's tickets, sends `PairingResponse`, returns its permit | |
+| 4 | | the wait ends; the node stops its replica stores, blob store, gossip |
+| 5 | a dialogue arriving now is closed before `verify_and_burn`: its secret is not burned | |
 
 #### Scenario: A stop waits for the serving half of a dialogue from another node
 

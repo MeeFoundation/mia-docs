@@ -9,6 +9,16 @@ The cross-identity channel of a [connection](../../../../architecture/language/c
 ### Requirement: Each direction of a connection lives in a dedicated replica
 A connection between identities A and B SHALL be served by two dedicated pdn-store replicas: one issued by A toward B and one issued by B toward A. Each SHALL be separate from every data store, from the private-metadata directory, and from every other connection's metadata stores; no domain `NamespaceId` is allocated — the store handle returned at creation or import is how the replica is addressed. Metadata stores of several connections and several identities SHALL coexist on one node without sharing a replica.
 
+**Example:** Alice is connected to Bob and to Carol: the tickets her directory holds, each to a replica of its own.
+
+| key in Alice's directory | the replica it opens |
+|---|---|
+| `tickets/data` | Alice's data store, write ticket |
+| `tickets/connection-metadata/<bob-hex>/own` | Alice → Bob, write ticket |
+| `tickets/connection-metadata/<bob-hex>/peer` | Bob → Alice, read ticket |
+| `tickets/connection-metadata/<carol-hex>/own` | Alice → Carol, write ticket |
+| `tickets/connection-metadata/<carol-hex>/peer` | Carol → Alice, read ticket |
+
 #### Scenario: Creating the store allocates a dedicated replica
 - **WHEN** a node creates a connection metadata store
 - **THEN** a fresh pdn-store replica is created for it, reached through the returned store handle, and no domain `NamespaceId` is allocated
@@ -24,6 +34,13 @@ A connection between identities A and B SHALL be served by two dedicated pdn-sto
 ### Requirement: The pair assembles as own plus peer
 At each side of a connection the metadata pair SHALL consist of `own` — the replica this identity issues, created by it — and `peer` — the counterpart's replica, imported from the read ticket received at establishment. The same replica is `own` at its issuer and `peer` at the counterparty: entries written into `own` SHALL become readable in the counterpart's `peer` through standard pdn-store sync. Importing the read ticket SHALL bind the local replica to the issuing namespace immediately — the pair is structurally complete when assembly ends, and `peer`'s content converges asynchronously.
 
+**Example:** the connection between Alice and Bob, seen from both sides: two replicas, each `own` at its issuer and `peer` at the counterparty.
+
+| replica | at Alice's devices | at Bob's devices |
+|---|---|---|
+| Alice → Bob | `own`: created by Alice, her grants written here | `peer`: imported from the read ticket, read whole |
+| Bob → Alice | `peer`: imported from the read ticket, read whole | `own`: created by Bob, his grants written here |
+
 #### Scenario: A write to own is read from the counterpart's peer
 - **WHEN** identity A writes a grant entry into its `own` store toward B
 - **THEN** B eventually reads that entry in its `peer` store of the same connection
@@ -34,6 +51,14 @@ At each side of a connection the metadata pair SHALL consist of `own` — the re
 
 ### Requirement: The issuer writes; the counterparty reads the whole store; others observe nothing
 Write access SHALL be bounded by the store's write ticket, which circulates only through the issuing identity's private-metadata directory — so only the issuer's devices write. Read access SHALL be bounded by the read ticket handed to the counterparty at establishment; the counterparty reads the replica whole — it is the store's entire audience, and no per-entry filtering applies inside it. The replica's namespace identifier and tickets SHALL travel nowhere beyond the establishment dialogue and the two identities' directories, so to any other party the store is not observable — its existence included. (Tickets are bearer tokens today, as in Invariant 1; identity-bound access lands with UWill.)
+
+**Example:** the store Alice → Bob: a1 created it, a2 opened it from Alice's directory; Carol is connected to Alice, not to Bob.
+
+| operation | a1 (Alice) | a2 (Alice) | Bob (read ticket) | Carol (outsider) |
+|---|---|---|---|---|
+| write a record | allowed | allowed | denied: `InsertError::ReadOnly`, no entry made | denied: holds no replica |
+| read the store | allowed | allowed | allowed, whole | denied: holds no replica |
+| learn its namespace id or ticket | yes | yes | yes | no |
 
 #### Scenario: A linked device of the issuer writes a grant
 - **WHEN** the issuer's second device opens `own` from the directory's write ticket and writes a grant entry
@@ -49,6 +74,15 @@ Write access SHALL be bounded by the store's write ticket, which circulates only
 
 ### Requirement: Grants are keyed by data-store issuer
 A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex chars of the granted data store's issuer `PdnId`), carrying a capability scoped to an exact claim set — naming, per claim, whether write is granted alongside read — together with the data store's ticket. Every grant is capability-scoped: there is no grant that conveys a whole store without naming its claims. In one directional store at most one grant SHALL exist per issuer at any moment: publishing replaces the record wholesale, and withdrawal SHALL be one tombstone over that one record — so no ordering of separate entries, locally or across replicating devices, can ever expose a grant other than the last one published, and mixed rights can never be observed half-withdrawn. A grant record that is absent, whose payload has not yet replicated, or whose payload a build cannot decode SHALL be treated as no grant — never inferred from absence or from partial state. The reading side SHALL nevertheless be able to tell a decided absence — no record at all, or a record granting someone else — from a record whose content is simply not readable yet, because a caller deciding whether it may *write* needs opposite answers for the two, and one of them is a window a republication opens routinely. The ticket's mode follows the record as a whole: a grant carrying no write on any claim ships a read ticket (no namespace secret, so the grantee cannot write at all), a grant carrying write on any claim ships a write ticket. The capability's own `issuer` and `audience` bind the grant to its subject: a record SHALL be honored only over the data of the issuer and toward the audience its capability names, never on the record's position alone. This binds both sides — the serving side classifying a caller, and the audience side reading what was granted to it. On the reading side position is least sound of all: the counterparty writes this store, so the key a record sits under is the counterparty's word too, and a record read on its key alone would let one counterparty direct this node's handling of a third identity's data. Capability payloads inside the record SHALL otherwise be treated as opaque bytes at this layer.
+
+**Example:** Alice (issuer) grants Bob (audience) in her store Alice → Bob; every act lands on the one key `grants/<alice-hex>`.
+
+| record at `grants/<alice-hex>` | ticket inside | `read_grant(alice, bob)` on Bob's device |
+|---|---|---|
+| published: `contact/email` read | read | `Granted` |
+| republished: `contact/email` read, `contact/phone` write | write | `Granted`: the new record alone, the old one replaced |
+| withdrawn: one tombstone | — | `None` |
+| a record whose capability names Carol as its audience | any | `None`: it grants someone else |
 
 #### Scenario: A grant round-trips
 - **WHEN** the issuer publishes a grant carrying a data-store ticket and the counterparty reads it after sync
@@ -87,11 +121,20 @@ A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex char
 
 ### Requirement: Each side publishes its device set into its directional store
 
-An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>` records in every connection-metadata store it issues, with the directory's device-record semantics (marker payload, LWW, tombstone on revocation), and SHALL keep them current as devices are linked and revoked — so the counterparty can resolve a transport-authenticated node id to this identity. The identity is authoritative over its own device set; the records widen no access beyond what the connection already grants.
+An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>` records in every connection-metadata store it issues — so the counterparty can resolve a transport-authenticated node id to this identity — each record carrying the marker payload `01` and resolving per key by last-writer-wins, as the directory's device records do. Each device SHALL publish its own record when it opens the pair: at establishment, and on a device linked later when it opens the pair from its directory's tickets, so the set grows as devices are linked. The data layer SHALL withdraw a record as a tombstone at its key (`withdraw_device`) and SHALL re-assert one by writing it anew whatever the set holds (`publish_device`); the runtime calls neither, so a record it published stays published. The identity is authoritative over its own device set; the records widen no access beyond what the connection already grants.
 
-Publication on opening the pair SHALL be assert-once: a device asserts its record only when the set carries no record of it at all — a live record is left untouched, and a *withdrawn* record (tombstone) is never re-asserted as a side effect of opening. Re-asserting a withdrawn device is a deliberate publication act, distinct from opening. Without this, every pair opening would re-sign the record with a fresh wall-clock timestamp, and a revoked-but-still-running device would out-bid any tombstone the moment it next touched the connection. Revoking a withdrawn device's ability to write into the store is not provided: the device still holds the write ticket, and the tombstone is an agreement the identity's honest devices keep.
+Publication on opening the pair SHALL be assert-once: a device asserts its record only when the set carries no record of it at all — a live record is left untouched, and a *withdrawn* record (tombstone) is never re-asserted as a side effect of opening. Re-asserting a withdrawn device is a deliberate publication act, distinct from opening. Without this, every pair opening would re-sign the record with a fresh wall-clock timestamp, and a withdrawn device that still runs would out-bid the tombstone the moment it next opened the pair. Nothing takes away a withdrawn device's ability to write into the store: the device still holds the write ticket, and the tombstone is an agreement the identity's honest devices keep.
 
 The reading side SHALL surface only device records that resolve into endpoint ids. The key a record sits under is the counterparty's word, and roughly half of all 32-byte strings decompress into no curve point; a record that does not resolve SHALL be withheld exactly as an unreadable grant payload is — it withholds itself, never the set. This boundary is what lets every consumer of the published set convert it into endpoint ids without error handling; without it one garbage record would freeze the whole derived contact set of every audience sharing the granted replica.
+
+**Example:** a1, a2 are Alice's devices, one author each; the record `devices/<a2-hex>` in her store Alice → Bob, as Bob reads it; the calls are the data layer's, and the runtime makes only `ensure_device_published`.
+
+| step | record at `devices/<a2-hex>` | in Bob's `published_devices()` |
+|---|---|---|
+| a2 opens the pair: `ensure_device_published` | written by a2, payload `01` | yes |
+| a1 withdraws it: `withdraw_device` | a tombstone, newer | no |
+| a2, still running, opens the pair again | unchanged: the tombstone is a record | no |
+| a1 re-asserts it: `publish_device` | written again, newest | yes |
 
 #### Scenario: Devices published at establishment
 
@@ -119,11 +162,19 @@ The reading side SHALL surface only device records that resolve into endpoint id
 - **THEN** the published set contains the resolvable device and omits the unresolvable record
 
 ### Requirement: Grant reads wait for content
-Reading a grant SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not SHALL read as absent, and a later read (after the payload lands) SHALL return the grant. Entry records and payloads travel independently; consumers poll, as they do for the directory's tickets.
+Reading a grant SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not SHALL read as not yet readable (`GrantRead::Unreadable`), which is no grant in force and no decided absence either — only a missing record, a withdrawn one, or one granting someone else reads as absent (`GrantRead::None`) — and a later read, after the payload lands, SHALL return the grant. A caller that asks only whether a grant is in force (`GrantRead::granted`) sees neither answer as a grant. Entry records and payloads travel independently; consumers poll, as they do for the directory's tickets.
 
-#### Scenario: Record without payload reads as absent
+**Example:** b1, Bob's device, polls its `peer` store from Alice while her grant arrives.
+
+| t | b1 holds at `grants/<alice-hex>` | `read_grant(alice, bob)` | `.granted()` |
+|---|---|---|---|
+| t0 | nothing | `GrantRead::None` | `None` |
+| t1 | the entry, its payload not yet fetched | `GrantRead::Unreadable` | `None` |
+| t2 | the payload too | `GrantRead::Granted(…)` | `Some((cap, ticket))` |
+
+#### Scenario: Record without payload reads as not yet readable
 - **WHEN** a grant entry's record has synced to the counterparty but its payload bytes have not yet been fetched
-- **THEN** reading that grant returns absent, and a later read returns the grant
+- **THEN** reading that grant reports it as not yet readable rather than absent, and a later read returns the grant
 
 ### Requirement: Mutations replicate across both identities' devices
 Entries written into `own` on one of the issuer's devices SHALL become visible on the issuer's other devices (each holding `own` through the directory's write ticket) and on the counterparty's devices (each holding `peer` through the directory's read ticket) via standard pdn-store sync, with no additional transport.
@@ -134,6 +185,13 @@ Entries written into `own` on one of the issuer's devices SHALL become visible o
 
 ### Requirement: Concurrent edits resolve by last-writer-wins
 Concurrent writes to the same key from different devices of the issuer SHALL resolve on every replica to the entry with the newest timestamp (pdn-store per-key last-writer-wins across authors), with equal timestamps broken deterministically by content hash.
+
+**Example:** a1 and a2, Alice's devices with an author each, act on `grants/<alice-hex>` in her store Alice → Bob before they sync.
+
+| device | act | timestamp | every device of Alice and Bob reads, after sync |
+|---|---|---|---|
+| a1 | republishes: `contact/email` read | 10:00:00.000100 | |
+| a2 | withdraws: one tombstone | 10:00:00.000200 | no grant: the tombstone is newer |
 
 #### Scenario: Concurrent grant updates converge
 - **WHEN** two devices of the issuer concurrently update the same grant key and then sync

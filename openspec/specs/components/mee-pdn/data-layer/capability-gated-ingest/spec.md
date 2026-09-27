@@ -10,6 +10,17 @@ The write-side counterpart of [subset reconciliation](../subset-reconciliation/s
 
 On a replica data-bound to an identity the node hosts, an entry arriving over sync SHALL be admitted only when the session peer resolves as a device of the issuer, or the entry's derived claim identity is in the write set of the sender identity's recorded grant. An admitted entry is persisted; a refused entry SHALL be dropped before persisting, leaving the replica unchanged. A capability refusal SHALL be signalled back to the sender on the reconciliation reply, carrying the refused entry's identity, so the writer can retract it at once; the refused entry is still not remembered, so a lost signal self-heals as reconciliation re-offers it in a later session. Only a capability refusal SHALL be signalled. Every other reason the gate keeps an entry out — a live retraction marker, a peer whose session it cannot resolve, its own records unreadable — SHALL refuse silently, because a signalled refusal makes the sender destroy its own entry, and none of those reasons is a verdict on that sender's authority. A rejection SHALL name only an entry the replica would newly store: an entry it already holds was admitted when it arrived, so refusing that one is silent however the grant reads now. Two things bring such an entry back to the gate, and both work the same way: the session's view hides an entry the replica holds, so the sender reads the two sets as divergent and re-offers what the issuer keeps. Narrowing a grant hides it because the entry leaves the egress filter; a session snapshot hides it when the entry lands after session setup ([subset reconciliation](../subset-reconciliation/spec.md)). Signalling in either case would destroy the sender's copy of data both sides hold, so the check behind a rejection SHALL read the replica's live state, never the session's frozen view. The writer-side discipline is [write retraction](../write-retraction/spec.md). Local inserts are not gated: the issuer's own writes carry its authority.
 
+**Example:** Alice (issuer) on a1, a2; Bob on b1, b2, granted `contact/email` read, `contact/phone` read and write; `contact/address` had write until Alice dropped it.
+
+| entry arriving at a1 over sync | `ValidateOutcome` | what the sender learns |
+|---|---|---|
+| from a2, at `notes/diary` | `Accept` | nothing: a1 stores it |
+| from b1, at `contact/phone` | `Accept` | nothing: a1 stores it |
+| from b1, at `contact/email` | `Reject` | `Rejected(RejectId { author, key, timestamp, content_hash })`: b1 retracts it |
+| from b1, at `contact/address`, stored by a1 before the drop | `Reject` | nothing: a1 already holds it |
+| from b2 when a1 dials it, b2's device record not at a1 | `Drop` | nothing: b2 re-offers it in a later session |
+| a1's own write, at any path | not gated | — |
+
 #### Scenario: A write on a write-granted claim is admitted
 
 - **WHEN** an audience granted read-write on a claim writes that claim and reconciles with a device of the issuer
@@ -49,6 +60,16 @@ On a replica data-bound to an identity the node hosts, an entry arriving over sy
 
 The caller's write set SHALL be computed at session setup from the issuer's recorded grants toward the identity the caller names — the same resolution and the same records the read side uses — and SHALL hold for that session's lifetime. It SHALL be recorded per identity as well as per replica and caller, so a node hosting several identities granted by one issuer is admitted, in each session, exactly what the identity named there was granted.
 
+**Example:** Alice (issuer) on a1; Bob on b1, granted `contact/phone` read and write until Alice narrows it to read.
+
+| t | Alice | session S1, b1 → a1 | session S2, b1 → a1 |
+|---|---|---|---|
+| t0 | | set up: write set `contact/phone` | |
+| t1 | narrows Bob's grant on a1 | | |
+| t2 | | b1's entry at `contact/phone`: `Accept` | |
+| t3 | | | set up: write set empty |
+| t4 | | | b1's newer entry at `contact/phone`: `Reject` |
+
 #### Scenario: Rights are read at session setup
 
 - **WHEN** a grant's write set changes after a session has started
@@ -81,6 +102,13 @@ A session peer resolving as a device of the issuer SHALL be admitted in full. Th
 
 The fork SHALL hold no key longer than 8,192 bytes, in any replica. A local write at a longer key SHALL be refused to its caller, and an entry at a longer key arriving over sync SHALL be dropped silently whatever the sender's grant covers, as the base validation drops an entry with a bad signature, while the session goes on with the rest. The longest key the platform writes is a retraction marker, `retractions/<issuer-hex>/<author-hex>/<path>` with a path at its longest, 4,253 bytes. The bound is what keeps the first message a replica sends small: that message carries the replica's first key twice, and a peer reads it before anything classifies the caller ([node assembly](../node-assembly/spec.md)), so a replica holding a longer key would send a first message every peer refuses, and its sync would stop for every holder.
 
+**Example:** a2, Alice's second device, is admitted in full, so the key's length alone decides at a1; a1's first message then carries at most two keys of 8,192 bytes, under the 32,768-byte ceiling (`MAX_OPENING_FRAME`) a peer reads it with.
+
+| key length (bytes) | a1 writes it locally | a2 offers it to a1 over sync |
+|---|---|---|
+| 8,192 | stored | stored |
+| 8,193 | refused: `ValidationFailure::KeyTooLong` | dropped silently, no rejection; the session goes on |
+
 #### Scenario: A local write at a key over the bound is refused
 
 - **WHEN** a device writes an entry whose key is 8,193 bytes long
@@ -94,6 +122,15 @@ The fork SHALL hold no key longer than 8,192 bytes, in any replica. A local writ
 ### Requirement: Admitted writes compete by last-write-wins within a stated window
 
 An admitted entry SHALL compete with the issuer's own entries by per-path last-write-wins across authors. The fork admits entries dated up to 10 minutes ahead of the receiving clock and refuses anything beyond, so a write-granted audience can date an entry forward and hold the path against the issuer's same-clock writes for up to 10 minutes — the accepted window; the issuer's recourse is withdrawing the grant and outwaiting or outwriting the pinned timestamp.
+
+**Example:** Bob (write grant on `contact/phone`) dates his entries forward on b1; a1 is Alice's (issuer) device.
+
+| a1's clock | entry at `contact/phone` | timestamp | a1 reads `contact/phone` as |
+|---|---|---|---|
+| 12:00:00 | b1's, arriving over sync | 12:10:00 | b1's: exactly 10 minutes ahead, admitted |
+| 12:00:00 | b1's next, arriving | 12:10:01 | b1's still: more than 10 minutes ahead, dropped (`TooFarInTheFuture`) |
+| 12:05:00 | Alice's, written on a1 | 12:05:00 | b1's still: 12:05:00 is older than 12:10:00 |
+| 12:10:30 | Alice's, written on a1 | 12:10:30 | Alice's: the pinned timestamp has passed |
 
 #### Scenario: The newest admitted entry wins on every device
 
