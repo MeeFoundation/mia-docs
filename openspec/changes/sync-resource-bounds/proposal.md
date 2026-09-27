@@ -8,15 +8,13 @@ Only a caller the node has classified and allowed reaches those later messages: 
 
 The ceiling cannot simply come down. The reconciliation does not split a message by size: when one side of a first sync holds nothing, the other side sends every entry of the range in one message, so an honest message grows with the replica it carries. A lower ceiling alone would stop the first sync of every replica larger than it.
 
-Before classification the lever is the number of connections. Each connection whose first message is still incomplete holds at most 32 KiB for up to 300 seconds (`SYNC_SESSION_TIMEOUT`), and the endpoint does not limit how many incoming connections it accepts, so the memory held is what one connection holds times the number of connections a peer opens.
-
 Measured against a running node on the first message, before that message had a ceiling of its own: a message announced at 1 GiB grew the receiving node's resident memory in step with the bytes that arrived, about 523 MiB for 512 MiB sent, and the node answered nothing while the message was still incomplete. Later messages go through the same reader.
 
-Under [defect-reachability](../../specs/code-practices/defect-reachability.md) both levers are reachable over the network: the rule names a modified node's sync sessions and their messages, and the timing and number of its connections, among the things it sends, and memory spent without bound as a denial of service. That obliges a fix. One option under each question below instead amends that rule, and choosing it is part of this change.
+Under [defect-reachability](../../specs/code-practices/defect-reachability.md) this lever is reachable over the network: the rule names a modified node's sync sessions and their messages among the things it sends, and memory spent without bound as a denial of service. That obliges a fix. One option below instead amends that rule, and choosing it is part of this change.
 
 ## What Changes
 
-Nothing is decided. The change settles two questions — how large a message a session holds after its first, and how many connections a node holds before it has classified them — and then specifies and builds the answer. The options for each are listed under Open Questions, and none of them is chosen.
+Nothing is decided. The change settles one question — how large a message a session holds after its first — and then specifies and builds the answer. The options are listed under Open Questions, and none of them is chosen.
 
 ## Open Questions
 
@@ -28,20 +26,13 @@ Nothing is decided. The change settles two questions — how large a message a s
 
 Whichever option is taken applies to both directions of a session: the answers a dialed peer sends are read under the same ceiling as the messages of a caller.
 
-### How many connections a node holds before it has classified them
-
-- A limit on incoming connections, per endpoint and per remote node, in the endpoint's configuration. The node assembly exposes no such setting, and its values have to fit a node that hosts several identities and serves all their devices and counterparties at once.
-- A budget for the first message shorter than the session's 300 seconds, since an honest first message follows right after the stream opens. This shortens how long each connection is held, not how many there are, and the budget has to survive an unstable connection.
-- The count is left to the transport. What the node's own code holds per connection before classification, 32 KiB, is of the same order as the transport's own state for that connection, so the number of connections is the transport's to bound. This amends defect-reachability in the same way, since the rule names the number of a modified node's connections as a lever.
-
-The two questions are independent: any answer to one combines with any answer to the other.
-
 ## Operating conditions
 
 Three conditions change the outcome of any option. Several identities on one node share one process, so a bound per session multiplies by the sessions of every hosted identity. A device with little memory is where the bound matters most, and any budget has to be sized for it. An unstable connection stretches the arrival of an honest message, and any bound on time has to allow for it. A restart plays no part: nothing a session holds survives it.
 
 ## Out of Scope
 
+- What a connection costs before the node has classified its caller: the number of connections a node holds and the bytes the transport buffers for each. That is the subject of the unclassified-connection-bounds change.
 - The ceiling on the first message and the bound on key length. Both are in place, in the [node assembly](../../specs/components/mee-pdn/data-layer/node-assembly/spec.md) and [capability-gated ingest](../../specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md) specs.
 - The storage a peer the node syncs with makes it spend by publishing entries. Those are the peer's own writes, replicated by design, and the cells change records the platform's stance for a cell's members.
 
@@ -52,5 +43,4 @@ None is settled. Every option touches `components/mee-pdn/data-layer/node-assemb
 ## Impact
 
 - **`crates/pdn-store`**: the session ceiling in `net/codec.rs`, and the assembly of reconciliation messages in `ranger.rs` if messages are split.
-- **`crates/data-layer`**: the node assembly, if a limit on connections becomes part of the endpoint's configuration.
 - **`specs/code-practices/defect-reachability.md`**: if an option amends it.
