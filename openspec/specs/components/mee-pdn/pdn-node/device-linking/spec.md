@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from the pairing ALPN because the stakes differ (a whole-directory write ticket versus per-connection read tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its store set, which is what every later device is brought up onto. The dialogue hands the newcomer that store set directly — write tickets to the identity's [directory](../../data-layer/private-metadata-store/spec.md) and its [data store](../../data-layer/data-store/spec.md), minted from the inviter's local replicas and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter writes the newcomer's device record itself before replying. The exchange is bearer-level for now: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both devices must be online — pending linking invites, device removal, and revocation are future work.
+How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from the pairing ALPN because the stakes differ (a whole-directory write ticket versus per-connection read tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its store set, which is what every later device is brought up onto. The dialogue hands the newcomer that store set directly — write tickets to the identity's [directory](../../data-layer/private-metadata-store/spec.md) and its [data store](../../data-layer/data-store/spec.md), minted from the inviter's local replicas and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter registers the newcomer as pending before replying, the newcomer confirming itself once the tickets are in hand. The exchange is bearer-level for now: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both devices must be online — pending linking invites, device removal, and revocation are future work.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: The inviter registers the newcomer as pending before replying
-After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
+After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. A pending record whose device never confirms SHALL expire 24 hours after it was written, whatever restarts or re-imports happen meanwhile, so an abandoned attempt leaves nothing that outlives it; the [private metadata store](../../data-layer/private-metadata-store/spec.md) holds how its creation time is kept and when cleanup runs. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
 
 #### Scenario: The newcomer is registered on the inviting device
 - **WHEN** runtime B completes the linking dialogue against runtime A
@@ -77,6 +77,14 @@ After the burn, the inviter SHALL write the newcomer's device record into its ow
 - **WHEN** a linking dialogue fails after the burn and the registration, and the same device later links with a fresh invite
 - **THEN** the public linking service completes the second link, the identity remains hosted, the device is confirmed exactly once, and no pending registration remains
 
+#### Scenario: Abandoned pending registrations expire
+- **WHEN** pending registrations remain unconfirmed for 24 hours across re-import or restart
+- **THEN** cleanup tombstones them and none enters the confirmed device set
+
+#### Scenario: Confirmation wins before expiry
+- **WHEN** a pending device confirms before 24 hours pass
+- **THEN** it enters the confirmed set exactly once and its pending record is removed
+
 ### Requirement: Post-verification local failures are observable
 The inviter SHALL preserve uniform remote refusal after a linking secret is verified, but SHALL record every storage or ticket-minting failure after the secret burns as a typed local diagnostic.
 
@@ -90,8 +98,6 @@ A device that has imported the directory and its identity's data namespace SHALL
 The confirmation SHALL be written only after the newcomer's own hosting is durably recorded, and never before it. What a device writes into the directory replicates to every other device of the identity, and no rollback reaches it there — so a link that published before it committed could fail locally and still leave the identity naming a device that hosts nothing, with no operation anywhere able to take that name back. A confirmation that fails after the commit SHALL NOT fail the link and SHALL NOT be rolled back: the device is hosted and recorded, and it SHALL write the record itself whenever it finds its identity's directory without it — which is also how a device that was interrupted between the two comes back whole.
 
 The confirmed set is written by the devices themselves, each holding the directory's write ticket, and the newest write at a key is the one that reads back. Removal therefore cannot be expressed as the absence of a device's record: any device may write its own record again — and a device recovering its own hosting has reason to — after which the removal is simply gone, with nothing left to say it ever happened. Device revocation, when it is designed, SHALL be a record of its own, which a device consults before writing its own record and obeys, rather than the deletion of the record it revokes.
-
-Every pending registration SHALL carry a durable creation time. An unconfirmed registration SHALL expire after 24 hours and cleanup SHALL tombstone it; legacy marker-only records SHALL receive a creation time when observed. A post-burn storage or ticket-mint failure SHALL retain the uniform remote refusal while producing a typed local diagnostic.
 
 #### Scenario: A completed link leaves the newcomer confirmed
 - **WHEN** runtime B links into an identity hosted on runtime A
@@ -108,14 +114,6 @@ Every pending registration SHALL carry a durable creation time. An unconfirmed r
 #### Scenario: A link that cannot be recorded leaves nothing on the identity
 - **WHEN** a link fails because the dialing device cannot write the identity's hosting record
 - **THEN** it hosts nothing, the identity's directory never names it, and a later link from the same device succeeds and is named
-
-#### Scenario: Abandoned pending registrations expire
-- **WHEN** pending registrations remain unconfirmed for 24 hours across re-import or restart
-- **THEN** cleanup tombstones them and none enters the confirmed device set
-
-#### Scenario: Confirmation wins before expiry
-- **WHEN** a pending device confirms before 24 hours pass
-- **THEN** it enters the confirmed set exactly once and its pending record is removed
 
 ### Requirement: Cancellation cleanup precedes retry
 After importing replicas, a cancelled linking attempt SHALL retain its reservation until rollback completes. Runtime shutdown SHALL wait up to 10 seconds for tracked linking and establishment cleanup, and cleanup owned by an older attempt SHALL NOT remove state committed by a later retry.
