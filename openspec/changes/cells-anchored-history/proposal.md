@@ -76,6 +76,17 @@ KERI's own shape for an anchored record is an Authentic Chained Data Container (
 | witnessing | counts: every honest device accepted it | admitted on the commitment of the member device that relayed it | shows against the commitments made to the original |
 | none | counts | admitted | replaces the original |
 
+### How the last owner who lost every device returns
+
+The last owner losing every device writes no event: the owner stays listed and nobody acts as one, which cells accept until KERI arrives and for good where the identity's KERI backup is lost too. KERI's pre-rotated keys restore control of the identity on a new device, which signs its device statement under the rotated key in the announcement key's slot; the owner's chain holds no left event, so the role stands. The directory that held the cell's tickets is lost with the devices, so the return needs a path by which any member hands the cell's tickets to a device of an identity proven through KERI, writing no joined event, since a join makes a plain member. Open: which member's device hands the tickets over, and what it checks of the proof.
+
+**Example:** Alice, the one owner of "Family", loses her phone a1 and her laptop a2 in one fire; Bob and Carol are plain members.
+
+| with KERI | the cell afterwards |
+|---|---|
+| Alice restores her identity on a new phone a4 with her pre-rotated keys; a4 signs its device statement under the rotated key, and Bob's phone hands a4 the cell's tickets without writing a joined event | Alice acts as an owner again |
+| Alice's KERI backup is lost too | Alice stays listed as the one owner, and nobody acts as one |
+
 ## Operating conditions
 
 An unstable connection is what puts the gap within reach of ordinary timing: an entry reaches a device the narrowing has not yet reached, and any member device relays it from there. Clocks do not close it: an entry's timestamp is set by its author, and a key event log proves order, not time, so a point stays a position in a chain under every option. Placing a logged event against a wall-clock time takes evidence from outside the log: a witness's signed and dated record of the log's state shows that an event happened no later than that date, while that an event happened after a given time rests on its author's word alone ([ToIP dossier specification, issue 35](https://github.com/trustoverip/kswg-dossier-specification/issues/35)); a cell has no witnesses, so it keeps relative order only. A capability-bound write does not close it alone either, since an entry signed under a since-revoked capability poses the same question.

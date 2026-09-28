@@ -241,7 +241,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' admission rule; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a cell that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a cell leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the cell then has no owner. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' admission rule; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 **Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its cell id.
 
@@ -250,6 +250,7 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 | `act(Bob, Wedding, Kick(Alice-work))` | a typed error, nothing written |
 | `act(Erin, Wedding, Kick(Erin))` | a typed error, nothing written |
 | `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the kicked event has reached, and learn of the kick from the membership store |
+| `act(Erin, Wedding, Leave)` | a typed error, nothing written: Erin is the one owner, and the cell has other members |
 | `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `cells/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; the record store forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, the membership store kept as the cell's tombstone, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
 
 #### Scenario: An owner kicks a member
@@ -271,6 +272,16 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 
 - **WHEN** owner A attempts to kick itself
 - **THEN** the attempt is refused with a typed error, and every member still lists A as a member and an owner
+
+#### Scenario: The last owner does not leave a cell with other members
+
+- **WHEN** A, the one owner of a cell whose members are A, B and C, attempts to leave, then promotes B and attempts to leave again
+- **THEN** the first attempt is refused with a typed error and every member still lists A as a member and the one owner, and the second is written, leaving B the one owner
+
+#### Scenario: The last two owners leaving at once leave the cell without an owner
+
+- **WHEN** A and C, a cell's only owners, leave while disconnected from each other, and plain member B's device then reconciles with both
+- **THEN** B's device lists no owner, B reads and appends to the cell's mergeable-documents, and B's kick of a member and promotion of itself are refused with a typed error
 
 #### Scenario: A member leaves
 

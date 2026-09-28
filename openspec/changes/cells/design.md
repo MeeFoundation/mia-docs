@@ -95,7 +95,7 @@ every member device folds the same, whatever order the entries arrived in: Alice
   - **Cons:** the store orders entries by namespace, author, key, so a key prefix is a filter across every author's partition, not a range — reconciling it is subset-rbsr, whose fingerprint (`SessionStore::get_fingerprint`) walks every entry per round, on every session, before any record is judged; a cached fingerprint tree does not help a prefix.
 - One role log for the whole cell under a single sequence.
   - **Pros:** orders events across members.
-  - **Cons:** neither the record gate (D22) nor the membership gate (D23) needs that order; two events at one number still need a tie-break (B10).
+  - **Cons:** neither the record gate (D22) nor the membership gate (D23) needs that order; two events at one number resolve by precedence (D38).
 - Membership state and role as last-writer-wins values.
   - **Cons:** a flip's order against another flip, or against a record, would rest on the timestamp the author sets (D13).
 
@@ -194,7 +194,7 @@ above it:  what the bytes say about Tom, and whatever the application derives fr
 
 ### D11. A cell has owners
 
-The creator is the cell's first owner — its founding event (D23). An owner promotes any member to owner, and an owner is demoted only by another owner — no other act takes ownership from a member that stays one. An owner kicks any other member out of the cell — an owner or a plain member alike: a member that is no owner kicks nobody, so an owner is kicked only by another owner. The invite act, a kick and a demotion always have a subject other than their actor, on the writing device and at the gate alike (D23). Inviting stays every member's act — a newcomer always joins as a plain member, and only an owner's promotion makes it an owner — and leaving stays the member's own (D13). A member that joins again is a plain member until an owner promotes it anew, whatever role it held before. Ownership is a role inside membership: an owner is a member, and losing ownership does not touch membership. Editing is every member's (D6), and no role deletes a record (D14). Members become owners and stop being owners repeatedly over a cell's life — an operating condition, not an edge case. The owner set lives in the membership store as promoted and demoted events in each member's sequence (D3, D21); the edges of the role are B10.
+The creator is the cell's first owner — its founding event (D23). An owner promotes any member to owner, and an owner is demoted only by another owner — no other act takes ownership from a member that stays one. An owner kicks any other member out of the cell — an owner or a plain member alike: a member that is no owner kicks nobody, so an owner is kicked only by another owner. The invite act, a kick and a demotion always have a subject other than their actor, on the writing device and at the gate alike (D23). Inviting stays every member's act — a newcomer always joins as a plain member, and only an owner's promotion makes it an owner — and leaving stays the member's own (D13), except that the one owner of a cell with other members leaves only once another member is an owner: its leave is refused on the writing device with a typed error until it promotes one, while the one member of a cell leaves as any member does. The refusal runs on the writing device, so the last two owners leaving at once, disconnected from each other, each still see the other and both leave: the cell then stays without an owner — its members read and edit, nobody kicks a member or promotes one — and a new cell is the way out. The last owner losing every device leaves the same state: no event is written, the owner stays listed and nobody acts as one, until recovery through the identity arrives with KERI, and for good where a KERI backup is lost too; the application encourages every shared cell to keep at least two owners. A member that joins again is a plain member until an owner promotes it anew, whatever role it held before. Ownership is a role inside membership: an owner is a member, and losing ownership does not touch membership. Editing is every member's (D6), and no role deletes a record (D14). Members become owners and stop being owners repeatedly over a cell's life — an operating condition, not an edge case. The owner set lives in the membership store as promoted and demoted events in each member's sequence (D3, D21).
 
 **Example:** roles in "Family" over its first year.
 
@@ -208,12 +208,28 @@ The creator is the cell's first owner — its founding event (D23). An owner pro
 | 6 | Alice invites Carol again | member | owner | member |
 | After step 4 Alice kicks and demotes nobody, and Bob, the one owner, can neither demote nor kick himself. | | | | |
 
+**Example:** leaves by the last owners of "Family", where Bob is a plain member.
+
+| leaves | on every member device afterwards |
+|---|---|
+| Alice, the one owner, leaves | refused on her phone with a typed error; she promotes Bob, and then her leave is written |
+| Alice and Carol, the two owners, leave the same evening, their phones disconnected from each other | both leaves stand and the cell has no owner: Bob reads and edits, and his kick of anyone or promotion of himself is refused; a new cell is the way out |
+| Alice, the one owner, loses her phone a1 and her laptop a2 in one fire | Alice stays listed as the one owner, and nobody acts as one |
+
 **Rejected alternatives:**
 
 - Equal-rank membership, no roles.
   - **Cons:** no repair channel — membership states nobody may fix (D14).
+- The last owner's leave allowed, a member becoming an owner by rule.
+  - **Cons:** ownership appears without an owner's promotion; and every member joins at its own sequence 1, so the rule needs an order among members that no event gives — the lowest `PdnId`, say, which means nothing.
+- The last two owners' concurrent leaves each completing only once another owner's device has acknowledged it.
+  - **Cons:** the two leaves wait on each other, and an owner whose devices never come online again blocks the other's leave for good.
+- An owner silent past a bound losing the role to the longest-standing member.
+  - **Cons:** silence is measured by time, which the fold never reads (D23), so each device would judge the bound by its own clock and devices would disagree on when.
+- A member becoming an owner by rule when concurrent leaves empty the owner set.
+  - **Cons:** ownership appears without an owner's promotion, and the rule needs an order among members that no event gives.
 - An invite, a kick or a demotion of oneself.
-  - **Cons:** an invite of oneself readmits a departed member with no current member's act; a kick of oneself is a leave that bypasses whatever guard the last owner's leave gets (B10) and keeps both stores on the member's devices; a demotion of oneself lets the last owner empty the owner set (D14).
+  - **Cons:** an invite of oneself readmits a departed member with no current member's act; a kick of oneself is a leave that bypasses the refusal the last owner's leave meets and keeps both stores on the member's devices; a demotion of oneself lets the last owner empty the owner set (D14).
 
 ### D13. Acting on a record does not depend on its member's membership state
 
@@ -229,7 +245,7 @@ The rights to act on a record are the same whether the member that placed it in 
 
 ### D14. Every reachable membership state is repairable by owners
 
-No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves the cell's membership in a state its owners cannot repair from inside, and a mergeable-document spoiled by edits is repaired by further edits. Recreating the cell — a new store, re-invited members, re-uploaded content — is never the only way out of a membership state. A record placed stays: no member and no owner deletes or replaces one, so a claim or an immutable-document placed by mistake, a member's junk and a departed member's records stay for every member for as long as the cell lives. The converse holds too: no operation deletes a cell for every member, owners included — a cell ends by its members leaving, each forgetting its own copy of the records and keeping the membership store as the cell's tombstone (D36), and a device that holds the record store keeps it anyway (Invariant 2). The cell after its last leave — every member's chain ending in a left or kicked event — needs no form of its own: every former member's devices hold the tombstone, and no record store is left to observe. Every rule in this design is measured against this invariant; the act that could strand it — the last owner gone — is the open edge (B10).
+No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves the cell's membership in a state its owners cannot repair from inside, and a mergeable-document spoiled by edits is repaired by further edits. Recreating the cell — a new store, re-invited members, re-uploaded content — is never the only way out of a membership state. A record placed stays: no member and no owner deletes or replaces one, so a claim or an immutable-document placed by mistake, a member's junk and a departed member's records stay for every member for as long as the cell lives. The converse holds too: no operation deletes a cell for every member, owners included — a cell ends by its members leaving, each forgetting its own copy of the records and keeping the membership store as the cell's tombstone (D36), and a device that holds the record store keeps it anyway (Invariant 2). The cell after its last leave — every member's chain ending in a left or kicked event — needs no form of its own: every former member's devices hold the tombstone, and no record store is left to observe. Every rule in this design is measured against this invariant; two edges strand it, both of which D11 accepts: the last two owners leaving at once, and the last owner losing every device.
 
 **Example:** states "Family" reaches and how its owner Alice repairs each from inside; Bob and Carol are plain members.
 
@@ -238,7 +254,7 @@ No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves t
 | Bob filled the shopping list with junk operations | any member appends operations that take the junk out |
 | Carol, kicked, left claims nobody wants | none: a record placed stays |
 | Bob was promoted by mistake | Alice demotes him |
-| Alice, the one owner, loses every device | none: nobody acts as an owner, the edge B10 leaves open |
+| Alice, the one owner, loses every device | none: nobody acts as an owner, an edge D11 accepts |
 
 ### D15. Authorship is forged by no one
 
@@ -355,7 +371,7 @@ Every member device holds both stores whole and holds their write tickets; write
 
 ### D21. The key layout of both stores
 
-The membership store: `member/<pdnid>/<seq>/<kind>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<aseq>` the actor's own sequence at the time (D23), so the gate reads the kind and the actor's point from the key as it reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, until B10's tie-break. The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is the writer's author key, the writer's membership sequence and the writer's own operation sequence, so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). A record's identity is its key without that trailing sequence, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The gate reads from the key what it enforces (D10): the member and the record's kind; it reads from the entry only its author. Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
+The membership store: `member/<pdnid>/<seq>/<kind>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<aseq>` the actor's own sequence at the time (D23), so the gate reads the kind and the actor's point from the key as it reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, and resolve by precedence (D38). The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is the writer's author key, the writer's membership sequence and the writer's own operation sequence, so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). A record's identity is its key without that trailing sequence, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The gate reads from the key what it enforces (D10): the member and the record's kind; it reads from the entry only its author. Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
 
 **Example:** keys in the two stores of "Family" and what the gate reads from each; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted.
 
@@ -400,7 +416,7 @@ The reference proves that the entry is after the named event, not that it is bef
 
 ### D23. A membership event names its actor's sequence, and the store verifies from the founding event
 
-Every membership event names, in its key (D21), the sequence of its actor's own events at the time of acting, and is judged against the actor's chain folded up to that point: a joined event needs the actor a member other than its subject, a promoted event an owner, a kicked or demoted event an owner other than its subject, a left event the subject itself; the founding event — the creator's first, self-authored, making the creator a member and an owner at once (D11) — needs only to derive the cell id (D25) and is the root every verification ends at. The writing device picks both numbers from what it holds: the event goes at the sequence after the highest it holds in the subject's chain, and names as its actor's point the highest sequence it holds in the actor's own chain; two actors disconnected from each other can therefore write at one sequence of one subject, the case B10 settles. The verdict is a function of the event set and the cell id alone, so every device reaches the same membership from the same events whatever order they arrived in, and a device holding nothing — a newcomer's, a freshly linked one — verifies the whole store from the founding event in its first session, whatever order the entries arrive in. Within a session the gate defers what it cannot yet judge and re-judges it once what it depends on is admitted: an event until the device holds its actor's chain up to the point it names, a device statement until the event that carries its member's announcement key, and an entry whose author only a deferred statement lists until that statement is admitted; so a session that brings a dependency brings what depends on it, and what a session cannot resolve is offered again by the next (D19). The date in an entry is written by its author and shown to people; the gate never reads it, now or later — order is the sequence, and an anchored log (D34) proves order, not dates.
+Every membership event names, in its key (D21), the sequence of its actor's own events at the time of acting, and is judged against the actor's chain folded up to that point: a joined event needs the actor a member other than its subject, a promoted event an owner, a kicked or demoted event an owner other than its subject, a left event the subject itself; the founding event — the creator's first, self-authored, making the creator a member and an owner at once (D11) — needs only to derive the cell id (D25) and is the root every verification ends at. The writing device picks both numbers from what it holds: the event goes at the sequence after the highest it holds in the subject's chain, and names as its actor's point the highest sequence it holds in the actor's own chain; two actors disconnected from each other can therefore write at one sequence of one subject, which D38 resolves. The verdict is a function of the event set and the cell id alone, so every device reaches the same membership from the same events whatever order they arrived in, and a device holding nothing — a newcomer's, a freshly linked one — verifies the whole store from the founding event in its first session, whatever order the entries arrive in. Within a session the gate defers what it cannot yet judge and re-judges it once what it depends on is admitted: an event until the device holds its actor's chain up to the point it names, a device statement until the event that carries its member's announcement key, and an entry whose author only a deferred statement lists until that statement is admitted; so a session that brings a dependency brings what depends on it, and what a session cannot resolve is offered again by the next (D19). The date in an entry is written by its author and shown to people; the gate never reads it, now or later — order is the sequence, and an anchored log (D34) proves order, not dates.
 
 What the reference proves is, as for records (D22), that the event is after the actor's named point, not before the point at which the actor lost the state the event needs; an act a narrowed member writes under its old point counts (D34).
 
@@ -596,7 +612,7 @@ Every session on a cell's store names, as every session under identity-scoped re
 
 ### D34. A member's own history is taken on its word
 
-Cells serve load testing first, and the defence of a cell against a member's device that contradicts its own member's history rests on anchored signatures over the platform's key event logs, which cells do without. Without them both stores take on the member's word what a member's devices write as that member — records under its name and acts in any member's chain — in four ways: an act or a record naming a point in the member's chain after which the member lost the state it names — a demoted owner acting as an owner, a kicked member placing a record — counts, since a reference proves only that the entry is after the point it names (D22, D23); an entry the member's own author writes at a key it wrote before replaces the earlier one wherever it is the newer, the store keeping one entry per author at a key; two events the member's devices write at one point of a chain stand side by side, resolved as B10 resolves two owners' events at one point; and two entries of one of the member's claims or immutable-documents — from two of its devices at one key, or under two membership sequences — stand side by side, and a read of the record returns the one with the newest timestamp. What stays refused is what no state of the member's own ever allowed: a record under another member's name, an entry by an author that resolves to no member's device, an act naming a point at which its actor lacks the state the act needs, a device statement not signed by the member's announcement key, a founding event that does not derive the cell id. Every reachable membership state stays repairable against honest members' acts (D14); a member's device that contradicts its member's history undoes an owner's repair as often as the owner makes it. These paths are specified by what honest devices do, and no scenario and no test pins what the gate does with a member's contradictions. The defect a modified member device reaches through them obliges a fix, as every lever a modified node has against honest nodes does; the fix is deferred, this decision is its record, and a review reports none of it anew. The deferral holds while no cell carries data people depend on: it ends before connections go (D30).
+Cells serve load testing first, and the defence of a cell against a member's device that contradicts its own member's history rests on anchored signatures over the platform's key event logs, which cells do without. Without them both stores take on the member's word what a member's devices write as that member — records under its name and acts in any member's chain — in four ways: an act or a record naming a point in the member's chain after which the member lost the state it names — a demoted owner acting as an owner, a kicked member placing a record — counts, since a reference proves only that the entry is after the point it names (D22, D23); an entry the member's own author writes at a key it wrote before replaces the earlier one wherever it is the newer, the store keeping one entry per author at a key; two events the member's devices write at one point of a chain stand side by side, resolved by precedence as two owners' events at one point are (D38); and two entries of one of the member's claims or immutable-documents — from two of its devices at one key, or under two membership sequences — stand side by side, and a read of the record returns the one with the newest timestamp. What stays refused is what no state of the member's own ever allowed: a record under another member's name, an entry by an author that resolves to no member's device, an act naming a point at which its actor lacks the state the act needs, a device statement not signed by the member's announcement key, a founding event that does not derive the cell id. Every reachable membership state stays repairable against honest members' acts (D14); a member's device that contradicts its member's history undoes an owner's repair as often as the owner makes it. These paths are specified by what honest devices do, and no scenario and no test pins what the gate does with a member's contradictions. The defect a modified member device reaches through them obliges a fix, as every lever a modified node has against honest nodes does; the fix is deferred, this decision is its record, and a review reports none of it anew. The deferral holds while no cell carries data people depend on: it ends before connections go (D30).
 
 **Example:** in "Family", Alice demoted Bob, an owner since his sequence 2, at his sequence 3, and kicked Carol at her sequence 2; Bob's phone b1 and Carol's phone c1 are modified.
 
@@ -682,14 +698,57 @@ The node runs blob collection over its one blob store, whose single protect call
 - A collection per identity.
   - **Cons:** the blob store is one per node, so one identity's run would remove a payload a co-located identity's replica still references.
 
+### D38. Events at one point of one chain resolve by precedence, the narrowest first
+
+Two owners disconnected from each other can write at one sequence of one subject (D23), and a member's own devices can too (D34). Every such event persists, and the fold takes effect with the one that ranks highest: kicked, then left, then demoted, then promoted, then joined. The winner is applied to the subject's state before that sequence, so a promotion that wins at a point where the subject is no member is a transition of no member and changes nothing, and the same event written twice counts once. The order runs from the narrowest state to the widest: a kick and a leave take the member out, a kick recording an owner's act; a leave outranks a demotion, since a member that left has forgotten the record store (D36) and would otherwise stay listed while holding none of the records; a demotion outranks a promotion. A wrong kick is undone by an invite, and a wrong demotion by a promotion. Where a left and a kicked event share a point, the kicked event is the departure a tombstone's past follows (D36). The rule reads the event set alone, so every device reaches the same membership whatever order the events arrived in, and no author's key decides.
+
+**Example:** events at Bob's sequence 5 in "Family", where Alice and Carol are owners, each written while its writer was disconnected from the other.
+
+| events at Bob's sequence 5 | Bob on every member device |
+|---|---|
+| Alice promotes him, Carol kicks him | kicked; a member invites him again if the kick was wrong |
+| Carol demotes him, an owner, while Bob leaves | no member: the leave outranks the demotion |
+| Alice and Carol both promote him | an owner, the promotion counted once |
+
+**Rejected alternatives:**
+
+- The lower author key wins.
+  - **Cons:** deterministic and meaningless: the luck of a key decides whether a member is an owner or out.
+- Both applied in author-key order.
+  - **Cons:** the same luck in another form: a promotion beside a demotion ends at the event of the higher key.
+- The fork left unresolved, the member in the conservative state until a later event supersedes both.
+  - **Cons:** a later event names its actor's point, not a branch of the subject's chain, so nothing ever settles the fork, and choosing the conservative state is a precedence all the same.
+- A demotion outranking a leave.
+  - **Cons:** a member demoted and leaving at one point stays listed as a plain member while its devices hold nothing but the tombstone.
+
+### D39. A demotion that would leave a cell without an owner is ignored
+
+Two owners disconnected from each other can demote each other at once: two events on two subjects, each valid at its actor's named point, and together they empty the owner set, which a fold walking one member's chain at a time does not see. The fold therefore runs one guard over all chains. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold takes those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and ignores every one that would remove the last of them; the subject of an ignored demotion stays an owner. The guard reads the event set alone, so every device reaches the same owners, and a member whose demotion it ignored is demoted again by an owner's later act. An owner set emptied by leaves or by a lost device is outside it, as D11 accepts.
+
+**Example:** owners Alice and Carol, disconnected from each other, demote each other in "Family", where Bob is a plain member; Carol's `PdnId` sorts below Alice's.
+
+| demotion, in the guard's order | the former owners it has not yet removed | on every member device |
+|---|---|---|
+| Carol demotes Alice | Alice, Carol | stands: Carol remains |
+| Alice demotes Carol | Carol | ignored: it would remove the last of them |
+| Carol is the one owner. | | |
+
+**Rejected alternatives:**
+
+- A member that cannot be demoted — the creator as a root owner.
+  - **Cons:** a role no act takes away, against D11.
+- The owner set left empty.
+  - **Cons:** nobody kicks a member or promotes one again, and the cell has no repair from inside (D14).
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
 - [A kicked member keeps both stores' write tickets and topic ids] → honest devices refuse it the record store, serve it the membership store only up to its kick (D36), and drop the entries it authors under a sequence at which it was no longer a member; an entry it authors afterwards under an earlier sequence, a membership act among them, passes (D34); it retains what it received and still sees content-free announcements; real expulsion under bearer tickets is a new cell, accepted while cells serve load testing (D20, D28).
-- [Membership is a multi-writer set] → its events order by per-member sequence numbers, never by timestamp (D3, D21); two owners' concurrent events on one member at one sequence — a kick beside a promotion or a demotion — need a tie-break (B10); a member-signed founding chain gives membership a root but no total order.
+- [A cell can be left without an owner] → the last two owners leaving at once, disconnected from each other, both leave, since the refusal of the last owner's leave runs on each writing device; accepted: the members read and edit, nobody kicks or promotes, and a new cell is the way out (D11); the last owner losing every device leaves the same state until recovery through the identity arrives with KERI, and for good where a KERI backup is lost too (D11).
+- [Membership is a multi-writer set] → its events order by per-member sequence numbers, never by timestamp (D3, D21); two owners' concurrent events on one member at one sequence — a kick beside a promotion or a demotion — resolve by precedence, the narrowest first (D38); a member-signed founding chain gives membership a root but no total order.
 - [Authorship is a transport-level binding] → author keys are held per hosted identity on a device (ADR-0013); the binding of an author key to a member is what the member publishes under its announcement key (D16), verifiable by anyone holding the join statement; an honest gate enforces it; a modified member device can forge locally but cannot pass honest gates under the name of a member it does not host, while a node acts as every identity it hosts, holding the secrets of each (threat model); what it can still do under its own name after departing is D34. Signed claims come with KERI.
 - [Range fingerprints are linear scans] → a record store with 100 writers is never quiescent, so every catch-up session scans it per round; a cached fingerprint tree in pdn-store is the fix, outside this change, and the membership store's convergence does not wait for it (D3).
-- [A member's own history is taken on its word] → a departed or demoted member's new entries under its old point pass in both stores through any member device that relays them, a member's device rewrites the entries its author wrote, and two events of one member at one point stand as B10 resolves them; accepted while cells serve load testing, untested, its fix deferred (D22, D23, D34).
+- [A member's own history is taken on its word] → a departed or demoted member's new entries under its old point pass in both stores through any member device that relays them, a member's device rewrites the entries its author wrote, and two events of one member at one point stand as D38 resolves them; accepted while cells serve load testing, untested, its fix deferred (D22, D23, D34).
 - [Dates in entries are self-asserted] → written and shown, never judged (D3, D22, D23); order is the sequence, and "provably before" is the anchored log D34 waits for.
 - [The membership store only grows] → events are never deleted; a member's sequence is a handful of events over a cell's life, and the store stays tiny beside the records (D3).
 - [Storage per device grows with every cell] → records and their payloads replicate to every member device, and no quota bounds a cell; load tests measure it.
@@ -710,65 +769,4 @@ Additive: no existing store, ticket, grant or record changes shape — the direc
 
 Grouped; each names its options and, where the team leans somewhere, the leaning — none is decided; a question answered since its posing leaves the list, its answer recorded as a decision.
 
-### B. Membership
-
-- B10. Ownership at the edges. Every rule here has to be one every device reaches from the events alone, in any arrival order, never from timestamps (D3, D23).
-  - Two owners' events at one point of one subject — a promoted and a kicked event at B's sequence 5. A concurrent promotion and kick of one member is this case.
-    - (a) Narrowing wins: among the events at one point, the most restrictive state takes effect — kicked over demoted over left over promoted over joined. A concurrent kick and promotion leave B kicked, and a re-invite undoes it if it was wrong. Fail-closed, the gate's own habit, and no author's key decides. **Leaning.**
-    - (b) The lower author key wins: deterministic, meaningless, luck of the key.
-    - (c) Both stand and the fold applies them in author-key order: (b) in another form, since a promotion after a kick is a transition of no member and is ignored.
-    - (d) The fork stands unresolved, and B's state is the conservative one until a later event supersedes both: a later event names its actor's point, not a branch of B's chain, so nothing ever picks a branch.
-  - The last owner leaving a one-owner cell that has other members.
-    - (a) Refused with a typed error until the owner promotes another member. Explicit; a one-member cell's owner leaves by forgetting, and the cell ends with it, D14 having no subject left to protect. **Leaning.**
-    - (b) Allowed, the member with the lowest join sequence becoming an owner by rule: repairability kept, but ownership appears without an owner's hand, against D11. Sequences are per member, and every member joins at its own sequence 1, so the rule needs an order every device derives alike from the events — the lowest `PdnId` among the plain members, say — and names none yet.
-  - Mutual demotion — owners A and C demote each other at once. Two events on two subjects, each valid at its actor's named point, no collision at one number, and the owner set empties; a fold that walks one member's chain at a time cannot see a cell-wide count.
-    - A fold-time guard over all chains: a demotion that would leave the cell with no owner is ignored, and when two would jointly do so, the one whose actor has the lower key stands. **Leaning.**
-    - A member that cannot be demoted — the creator as a root owner, which D11 rejects.
-  - The same event twice at one point from two owners — two promoted events of B at sequence 5: the same transition, applied once.
-  - The last two owners leaving at once, while disconnected from each other. The refusal of the second case runs on the writing device, and each device still sees the other owner, so both left events stand and the owner set empties. Ignoring one of them does not help: that member has forgotten the record store and would stay an owner who holds none of the records.
-    - (a) An owner's leave completes only once another owner's device has acknowledged it, so two concurrent leaves wait on each other; an owner that is never online again blocks the other's leave.
-    - (b) When the owner set empties through concurrent left events, the member with the lowest join sequence becomes an owner by rule: against D11, as in the second case, but only for this race; it needs the order the second case's (b) needs.
-    - (c) Accepted: the cell stays without an owner — members read and edit, nobody kicks a member — and a new cell is the way out, against D14 for this edge.
-  - The last owner losing every device. No event is written, the owner stays listed, and nobody acts as an owner.
-    - (a) Recovery through the identity: KERI's pre-rotated keys restore control of the identity on a new device, which signs its device statement under the rotated key in the announcement key's slot (D16); the owner's chain holds no left event, so the role stands. The directory holding the cell's tickets is lost with the devices, so this also needs a path by which any member hands the cell's tickets to a device of an identity proven through KERI, writing no joined event — a rejoin makes a plain member (D11).
-    - (b) An owner silent past a bound loses the role to the longest-standing member: silence is measured by time, which the fold never reads (D23), so no device derives this from the events alone.
-    - (c) Accepted, as in the concurrent leave: the application encourages every shared cell to keep at least two owners.
-
-**Example:** two owners' events at one point: in "Family", Alice promotes Bob at his sequence 5 while Carol, an owner too and disconnected from her, kicks him at the same sequence, and both events reach every member device.
-
-| option | Bob on every member device |
-|---|---|
-| (a) narrowing wins | kicked; a member invites him again if the kick was wrong |
-| (b) the lower author key wins | an owner if a1's author key sorts below c1's, kicked otherwise |
-| (c) both, in author-key order | kicked in either order, since a promotion after a kick is a transition of no member; a promotion beside a demotion would end at the higher key's event, the reverse of (b) |
-| (d) the fork stands | kicked, the conservative state, until an event at his sequence 6 supersedes both; which of the two his sequence 5 holds is never settled |
-
-**Example:** the last owner leaving: Alice, the one owner of "Family", leaves while Bob and Carol are plain members.
-
-| option | Alice's leave | the cell afterwards |
-|---|---|---|
-| (a) refused until another owner exists | `act` with `Leave` fails on a1 with a typed error; Alice promotes Bob, then leaves | Bob the one owner |
-| (b) allowed, an owner by rule | Alice's left event is written | the member with the lowest join sequence an owner with no owner's act; Bob and Carol each joined at their own sequence 1, so the rule needs an order it does not name |
-
-**Example:** mutual demotion: owners Alice and Carol, disconnected from each other, demote each other in "Family", where Bob is a plain member; Carol's key sorts below Alice's.
-
-| option | once both demotions reach every member device |
-|---|---|
-| a fold-time guard | Carol's demotion of Alice stands, its actor having the lower key, and Alice's demotion of Carol is ignored: Carol the one owner |
-| a member that cannot be demoted | Alice, the creator, is a root owner: Carol's demotion of her is ignored, and Alice's demotion of Carol stands: Alice the one owner |
-
-**Example:** the last two owners leaving at once: owners Alice and Carol leave "Family" the same evening, their phones disconnected from each other; Bob is a plain member.
-
-| option | the cell afterwards |
-|---|---|
-| (a) a leave completes once another owner's device acknowledges it | each leave waits on the other owner's device; if no device of Carol's comes online again, Alice's leave never completes |
-| (b) an owner by rule when concurrent leaves empty the owner set | Bob an owner by rule |
-| (c) accepted | no owner: Bob reads and edits, nobody kicks a member, and a new cell is the way out |
-
-**Example:** the last owner losing every device: Alice, the one owner of "Family", loses her phone a1 and her laptop a2 in one fire; Bob and Carol are plain members, Bob the longer-standing.
-
-| option | the cell afterwards |
-|---|---|
-| (a) recovery through the identity | Alice restores her identity on a new phone a4 with KERI's pre-rotated keys; a4 signs its device statement under the rotated key, and a member hands a4 the cell's tickets without writing a joined event; Alice acts as an owner again |
-| (b) an owner silent past a bound loses the role | past the bound Bob becomes an owner, each device judging the bound by its own clock, so devices disagree on when |
-| (c) accepted | Alice stays listed as the owner, and nobody acts as one |
+None remain.
