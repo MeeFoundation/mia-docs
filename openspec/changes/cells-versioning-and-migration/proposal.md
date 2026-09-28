@@ -4,11 +4,11 @@
 
 Every device reads every entry of a cell by the one set of rules its build holds: nothing in either store, nor the fold over the membership store, names a version ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). A build that reads entries otherwise — a new event kind, a new record kind, a fold that resolves differently — reads the cells it finds by its own rules too, and an entry an older build does not understand is kept and used by nothing, as every entry outside the key layout is. Devices of one cell on two such builds then reach two memberships and two sets of readable records from the same entries: one serves a member the other refuses, one reads a record the other hides, and neither can tell. While cells run inside the company alone, a cell that splits is recreated and its content lost; this change lands before a cell carries data people outside the company depend on.
 
-**Example:** Alice's phone a1 runs a later build than Carol's phone c1, and writes two entries into "Family" that the later build adds; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<lease>`: the id of Bob's lease scan.
+**Example:** Alice's phone a1 runs a later build than Carol's phone c1, and writes two entries into "Family" that the later build adds; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<lease>`: the id of Bob's lease scan.
 
 | entry a1 writes | a1 | c1 |
 |---|---|---|
-| `member/<bob>/3/suspended/1`: Alice suspends Bob's editing at his sequence 3 | Bob's operations naming his sequence 3 not counted | an entry outside the key layout, kept and used by nothing: the operations counted |
+| `member/<bob>/3/suspended/<alice>/1`: Alice suspends Bob's editing at his sequence 3 | Bob's operations naming his sequence 3 not counted | an entry outside the key layout, kept and used by nothing: the operations counted |
 | an empty entry at `by/<bob>/immutable-document/<lease>`, deleting Bob's lease scan | the scan gone | an entry outside the key layout: the scan read as before |
 
 ## What Changes
@@ -27,7 +27,7 @@ Nothing is decided. The change settles how a cell's entries and the fold over th
 
 | option | where the version sits | a1, on the later build, and c1, on the earlier |
 |---|---|---|
-| each entry | `member/<bob>/3/suspended.2/1`: version 2 | a1 counts none of Bob's operations naming his sequence 3; c1 answers unknown for them |
+| each entry | `member/<bob>/3/suspended.2/<alice>/1`: version 2 | a1 counts none of Bob's operations naming his sequence 3; c1 answers unknown for them |
 | each cell | the founding event of "Family", naming version 1 | a1 writes no suspension into "Family": a suspension takes a new cell of version 2 |
 | the folded membership | the digest two devices compare | the digests differ, and each device goes on reading its own |
 
@@ -37,7 +37,7 @@ Nothing is decided. The change settles how a cell's entries and the fold over th
 - Refuses to reconcile the cell until it is updated: simple, and a person whose phone updates late loses the cell meanwhile.
 - Keeps it and ignores it, as entries outside the key layout are ignored: the split of Why.
 
-**Example:** c1, on the earlier build, meets `member/<bob>/3/suspended.2/1`.
+**Example:** c1, on the earlier build, meets `member/<bob>/3/suspended.2/<alice>/1`.
 
 | option | c1 lists Bob as | Bob's operation naming his sequence 3, on c1 | c1 syncs "Family" |
 |---|---|---|---|

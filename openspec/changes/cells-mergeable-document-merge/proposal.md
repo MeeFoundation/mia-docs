@@ -2,14 +2,14 @@
 
 ## Why
 
-A cell stores a mergeable-document as its operations: every edit is an entry of its own at `by/<pdnid>/mergeable-document/<id>/<op>`, `<op>` naming the writer's author key, the writer's membership sequence and the writer's own operation sequence, so two writers' operations never share a key ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). The platform admits the operations of every member, holds them, reconciles and relays them whole among member devices, and hands them back through the cells service's `read_ops`, each with its writer, as opaque bytes ([pdn-node cells](../../specs/components/mee-pdn/pdn-node/cells/spec.md)). What a document reads as — its operations merged into one state — nothing computes: no operation encoding is defined, and neither the platform nor a host merges. Storage, sync and admission are what load testing needs; a person editing a note needs the document.
+A cell stores a mergeable-document as its operations: every edit is an entry of its own at `by/<pdnid>/mergeable-document/<id>/<op>`, `<op>` naming the writer, its author key, its membership sequence and its own operation sequence, so two writers' operations never share a key ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). The platform admits the operations of every member, holds them, reconciles and relays them whole among member devices, and hands them back through the cells service's `read_ops`, each with its writer, as opaque bytes ([pdn-node cells](../../specs/components/mee-pdn/pdn-node/cells/spec.md)). What a document reads as — its operations merged into one state — nothing computes: no operation encoding is defined, and neither the platform nor a host merges. Storage, sync and admission are what load testing needs; a person editing a note needs the document.
 
 **Example:** Bob, on his phone b1, and Carol, on her phone c1, disconnected from each other, edit the shopping list under Alice's name, which reads "milk".
 
 | | on every member device once they sync |
 |---|---|
-| Bob replaces "milk" with "oat milk" | an entry naming b1's author, Bob's sequence 1 and b1's operation 4 |
-| Carol removes the line "milk" | an entry naming c1's author, Carol's sequence 1 and c1's operation 2 |
+| Bob replaces "milk" with "oat milk" | an entry naming Bob, b1's author, Bob's sequence 1 and b1's operation 4 |
+| Carol removes the line "milk" | an entry naming Carol, c1's author, Carol's sequence 1 and c1's operation 2 |
 | `read_ops` | both entries, each with its writer, as opaque bytes |
 | what the list reads as | computed by nothing: "oat milk", an empty list and both lines are each a merge some rule could choose |
 

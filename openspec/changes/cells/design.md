@@ -71,19 +71,19 @@ Membership rests on the cell: a member joins on one member's invitation and sees
 
 ### D3. One cell is two stores: the membership store and the record store
 
-A cell is served by two stores, each a pdn-store namespace addressed through the cell id and held as a replica of its own by every member identity on each device that hosts it — a node hosting two members holds each store twice, and the two copies converge inside the process (ADR-0013). The **membership store** is the cell's authority: who is a member, with what role, on which devices. It holds, per member, one append-only sequence of **membership events** — joined (the join statement of D16, binding the member to its announcement key), left, kicked, promoted, demoted — each an immutable entry under its own key with the sequence number inside the signed bytes, and the member's device-list statements (D16), each version an immutable entry of its own. Honest devices overwrite and delete nothing in the membership store — what a member's own device does to its member's entries is D34 — a kick is an event, not a deletion, and the store holds no tombstones. The **record store** is what the authority governs: the records — claims, mergeable-documents and immutable-documents (D4). The fold reads the membership store into the membership every device serves sessions by and the record view reads records by, walking each member's events in sequence order: a join makes it a member and a plain one, a promotion an owner, a demotion a plain member again, a leave or a kick no member, a later join a plain member again — a member that joins again joins as a newcomer does (D11); the author-to-member map comes from the join events and the device statements by highest version. By sequence, never by timestamp, so the order in which the events arrived does not matter; each event names its actor's sequence and is verified against the actor's chain at that point (D23). Membership state and role are events in one sequence, so that the flips a member goes through — promoted and demoted (D11), leaving and rejoining (D13) — order unambiguously against each other and, later, against records (D22), without trusting the timestamp the author sets (D13). A member's sequence is a small key event log of its membership state in the cell — the slot KERI fills. The two shapes — the act a device writes and the event a chain holds — are defined in the cell stores spec. Each store is the authorization unit (who may sync it), the swarm topic and the reconciliation unit, exactly the roles ADR-0009 keeps for a namespace, and ADR-0009's case against a shared namespace — a set that is never quiescent, and work spent on entries the filter discards — does not apply inside a cell, since every member wants every entry and nothing is discarded; the two stores share the audience — every member device — and differ in what they are: the membership store governs, the record store is governed, as the grants in a connection metadata store govern a data store. The price is a second store per cell — a topic, a ticket, and a replica with its reconcile pass for every member identity a device hosts — a fixed cost per cell, which load tests measure.
+A cell is served by two stores, each a pdn-store namespace addressed through the cell id and held as a replica of its own by every member identity on each device that hosts it — a node hosting two members holds each store twice, and the two copies converge inside the process (ADR-0013). The **membership store** is the cell's authority: who is a member, with what role, on which devices. It holds, per member, one append-only sequence of **membership events** — joined (the join statement of D16, binding the member to its announcement key), left, kicked, promoted, demoted — each an immutable entry under its own key with the sequence number inside the signed bytes, and the member's device-list statements (D16), each version an immutable entry of its own. Honest devices overwrite and delete nothing in the membership store — what a member's own device does to its member's entries is D34 — a kick is an event, not a deletion, and the store holds no tombstones. The **record store** is what the authority governs: the records — claims, mergeable-documents and immutable-documents (D4). The fold reads the membership store into the membership every device serves sessions by and the record view reads records by, walking each member's events in sequence order: a join makes it a member and a plain one, a promotion an owner, a demotion a plain member again, a leave or a kick no member, a later join a plain member again — a member that joins again joins as a newcomer does (D11); a member's devices come from its join event and its device statements (D16), and an entry counts only when its author is among the devices of the member its key names (D43). By sequence, never by timestamp, so the order in which the events arrived does not matter; each event names its actor's sequence and is verified against the actor's chain at that point (D23). Membership state and role are events in one sequence, so that the flips a member goes through — promoted and demoted (D11), leaving and rejoining (D13) — order unambiguously against each other and, later, against records (D22), without trusting the timestamp the author sets (D13). A member's sequence is a small key event log of its membership state in the cell — the slot KERI fills. The two shapes — the act a device writes and the event a chain holds — are defined in the cell stores spec. Each store is the authorization unit (who may sync it), the swarm topic and the reconciliation unit, exactly the roles ADR-0009 keeps for a namespace, and ADR-0009's case against a shared namespace — a set that is never quiescent, and work spent on entries the filter discards — does not apply inside a cell, since every member wants every entry and nothing is discarded; the two stores share the audience — every member device — and differ in what they are: the membership store governs, the record store is governed, as the grants in a connection metadata store govern a data store. The price is a second store per cell — a topic, a ticket, and a replica with its reconcile pass for every member identity a device hosts — a fixed cost per cell, which load tests measure.
 
-**Example:** the two stores of "Family" once Alice has created it on a1 and invited Bob, Bob has placed a claim from b1, and Alice has promoted him; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted; a membership key ends in the actor's sequence, and `…` stands for the founding event's.
+**Example:** the two stores of "Family" once Alice has created it on a1 and invited Bob, Bob has placed a claim from b1, and Alice has promoted him; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted; a membership key ends in the actor and the actor's sequence, and `…` stands for the founding event's.
 
 ```
 membership store
-member/<alice>/1/founded/…      Alice's founding event: Alice a member and an owner
-member/<alice>/devices/1        Alice's device statement, version 1: a1
-member/<bob>/1/joined/1         Alice's invite act at her sequence 1, Bob's join statement inside: Bob a plain member
-member/<bob>/devices/1          Bob's device statement, version 1: b1
-member/<bob>/2/promoted/1       Alice's promotion of Bob at her sequence 1: Bob an owner
+member/<alice>/1/founded/<alice>/…    Alice's founding event: Alice a member and an owner
+member/<alice>/devices/1              Alice's device statement, version 1: a1
+member/<bob>/1/joined/<alice>/1       Alice's invite act at her sequence 1, Bob's join statement inside: Bob a plain member
+member/<bob>/devices/1                Bob's device statement, version 1: b1
+member/<bob>/2/promoted/<alice>/1     Alice's promotion of Bob at her sequence 1: Bob an owner
 record store
-by/<bob>/claim/<id>/1           Bob's claim, written at his sequence 1
+by/<bob>/claim/<id>/1                 Bob's claim, written at his sequence 1
 
 every member device folds the same, whatever order the entries arrived in: Alice an owner, Bob an owner
 ```
@@ -104,7 +104,7 @@ every member device folds the same, whatever order the entries arrived in: Alice
 
 A **record** is what a member places into a cell, of one of three kinds chosen when it is placed. A **claim** is an assertion by an issuer about a subject — a driver's license, a parent's statement of a child's blood type. A **mergeable-document** is content the members edit — a note. An **immutable-document** is content placed once — a file. Every member reads every record: inside a cell there is no narrower audience, and "share with Carol and Dave but not Bob" is a different cell (D9). A claim and an immutable-document differ in what the record is — an assertion or content — and an immutable-document and a mergeable-document in mutability (D17); no two kinds differ in payload format: payloads stay opaque below pdn-layer, and a record's kind picks how its entries are laid out and who writes them, not what they contain. Membership events and device statements are the cell's bookkeeping, not records in this sense.
 
-**Example:** three records in "Family", one of each kind; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted; `<op>`: the writer's author key, membership sequence and operation sequence.
+**Example:** three records in "Family", one of each kind; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted; `<op>`: the writer's `PdnId`, its author key, membership sequence and operation sequence.
 
 | record | kind | written by | its entries |
 |---|---|---|---|
@@ -138,9 +138,9 @@ A mergeable-document is edited by every member — each operation is an entry si
 
 | operation | its `<op>` names | on every member device |
 |---|---|---|
-| Bob adds "milk" | b1's author, Bob's sequence 1, b1's operation 1 | read as Bob's |
-| Carol adds "eggs" before the kick | c1's author, Carol's sequence 1, c1's operation 1 | read as Carol's, on a device that catches up after the kick too |
-| Carol adds "cake" naming her sequence 2 | c1's author, Carol's sequence 2, c1's operation 2 | held and read by none: at her sequence 2 Carol is no member |
+| Bob adds "milk" | Bob, b1's author, Bob's sequence 1, b1's operation 1 | read as Bob's |
+| Carol adds "eggs" before the kick | Carol, c1's author, Carol's sequence 1, c1's operation 1 | read as Carol's, on a device that catches up after the kick too |
+| Carol adds "cake" naming her sequence 2 | Carol, c1's author, Carol's sequence 2, c1's operation 2 | held and read by none: at her sequence 2 Carol is no member |
 
 **Rejected alternatives:**
 
@@ -259,7 +259,7 @@ No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves t
 
 ### D15. Authorship is forged by no one
 
-A record's authorship is cryptographic — the author signature on its entries — and no role weakens it: a member edits another member's mergeable-document and an owner kicks another member, and each such entry carries its actor's own signature, so a mergeable-document's history reads who wrote what, and every act in a cell reads as the signed act of its actor. Where a record sits — the member under whose name it is placed — and who wrote each entry in it are two different things, and only the second is a statement about authorship. The binding of author keys to members stays what the member publishes (D16), and each hosted identity writes with its own author (ADR-0013), so an author key names one member on one device; signed claims per the KERI roadmap strengthen the same property.
+A record's authorship is cryptographic — the author signature on its entries — and no role weakens it: a member edits another member's mergeable-document and an owner kicks another member, and each such entry carries its actor's own signature, so a mergeable-document's history reads who wrote what, and every act in a cell reads as the signed act of its actor. Where a record sits — the member under whose name it is placed — and who wrote each entry in it are two different things, and only the second is a statement about authorship. Which authors write for a member stays what the member publishes (D16), each hosted identity writes with its own author (ADR-0013), and every entry names in its key the member it is written as, its author counting only among that member's devices (D43); signed claims per the KERI roadmap strengthen the same property.
 
 **Example:** entries in "Wedding" written from Alice's tablet a3, which hosts Alice-leisure and Alice-work, both members, and from Erin's phone e1, Erin being the cell's owner.
 
@@ -275,7 +275,7 @@ Each identity holds a device-announcement key pair, minted with the identity. Th
 
 A statement is self-contained proof, so who writes it into the store does not matter: the fold counts an entry in the membership device area by the embedded signature against the announcement key from the join statement, once its payload has arrived (D41), never by the entry's author. A freshly linked device therefore registers itself — it holds the write ticket and the announcement secret, writes the next version, the member's device list with itself added, into its local replica of every cell the identity is a member of, and ordinary sync spreads it through the identity's own devices, which serve the new device by the identity's own directory before any statement lists it (D32), and from them through any member, with no waiting on another member being online. Before syncing a cell replica, each of the identity's devices checks that the member's device list names it with the author its identity writes with there, and when it does not, writes the next version: that list with itself added. The sweep heals an interrupted fan-out, a cell joined after a linking, a device linked before the join, and a version a sibling wrote from a view that missed this device; only the device itself knows the author it writes with, so only it puts itself back (D32).
 
-Resolution is by the statement's version, never by entry timestamp: statements coexist, one key per version (D21), and the member's device list is the union of every validly signed statement at the highest version a device holds — two siblings that each link a device while out of reach of each other both write the next version, under two authors, and both new devices are listed. The classifier builds the author-to-member map from that list. The union names no device the announcement key did not sign, and it follows from the statements alone, whatever order they arrived in and whoever wrote them. A device writes only a version above the highest its replica holds, so a lagging sibling neither displaces a newer list nor is displaced while it catches up. A second statement at one version from the same author replaces the first, the store keeping one entry per author at a key; an honest device never writes one, so it is the member's own contradiction, which D34 takes on its word. The list only grows — a running device puts itself back — so taking a device off it takes a new announcement key, the rotation KERI brings. A statement that never left a dying device dies with the device it described; the converged list is the surviving devices' own. The announcement key with its versioned statements is the slot KERI's key event log fills later: KERI replaces the key, not the scheme.
+Resolution is by the statement's version, never by entry timestamp: statements coexist, one key per version (D21), and the member's device list is the union of every validly signed statement at the highest version a device holds — two siblings that each link a device while out of reach of each other both write the next version, under two authors, and both new devices are listed. The fold and the record view check an entry's author against the list of the member its key names (D43). The union names no device the announcement key did not sign, and it follows from the statements alone, whatever order they arrived in and whoever wrote them. A device writes only a version above the highest its replica holds, so a lagging sibling neither displaces a newer list nor is displaced while it catches up. A second statement at one version from the same author replaces the first, the store keeping one entry per author at a key; an honest device never writes one, so it is the member's own contradiction, which D34 takes on its word. The list only grows — a running device puts itself back — so taking a device off it takes a new announcement key, the rotation KERI brings. A statement that never left a dying device dies with the device it described; the converged list is the surviving devices' own. The announcement key with its versioned statements is the slot KERI's key event log fills later: KERI replaces the key, not the scheme.
 
 **Example:** Bob links his laptop b2 while Alice's devices and Carol's phone c1 are offline; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
 
@@ -336,11 +336,11 @@ A mergeable-document is content whose concurrent edits are meant to be kept — 
 
 A session between two member devices reconciles the membership store to convergence first, folds it, and only then reconciles the record store; both by plain, unfiltered reconciliation — no capability filter (subset-rbsr) runs on either store between member devices, and none on the record store for any peer. The one narrowed session is a former member's, on the membership store alone: it takes and keeps the departure's past — the departure event and every entry it depends on — and nothing written after it, while the record store is refused to it as a store not hosted (D32, D36). Two members hosted on one node reconcile inside the process in the same order: an announced write, a dialed contact and the periodic pass each reconcile the membership store before the record store, and the pass opens both when either store of either identity has moved. The order serves the record store's session by the membership the same pair of sessions brings: a newcomer whose joined event reaches the serving device in the membership store's session is served the record store in the session after it, and a member whose departure that session brings is refused the record store at once (D32). What the record store holds does not depend on the order: it holds every entry a member device's session carries (D42), and the record view reads each by the membership folded over everything the device holds, so a record that reaches a device ahead of the membership event authorizing its author reads once that event arrives.
 
-**Example:** Carol's phone c1 holds neither Dave's joined event nor Dave's first claim, and sessions with Bob's phone b1, which holds both; `<dave>`: 64 lowercase hex chars of Dave's `PdnId`; `<id>`: the id `put_record` minted; `…`: the key's actor sequence.
+**Example:** Carol's phone c1 holds neither Dave's joined event nor Dave's first claim, and sessions with Bob's phone b1, which holds both; `<bob>`, `<dave>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted; Dave joined on Bob's invitation, and `…` is Bob's sequence.
 
 | step of the session | c1 |
 |---|---|
-| 1. the membership store reconciled to convergence | takes `member/<dave>/1/joined/…` and, after it, `member/<dave>/devices/1`, listing d1 |
+| 1. the membership store reconciled to convergence | takes `member/<dave>/1/joined/<bob>/…` and, after it, `member/<dave>/devices/1`, listing d1 |
 | 2. the membership folded | Dave a member at his sequence 1, writing on d1 |
 | 3. the record store reconciled | takes `by/<dave>/claim/<id>/1` from d1's author, which the record view reads at Dave's sequence 1 at once |
 
@@ -372,18 +372,18 @@ Every member device holds both stores whole and holds their write tickets; what 
 
 ### D21. The key layout of both stores
 
-The membership store: `member/<pdnid>/<seq>/<kind>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<aseq>` the actor's own sequence at the time (D23), so the fold reads the kind and the actor's point from the key as the record view reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, and resolve by precedence (D38). The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is the writer's author key, the writer's membership sequence and the writer's own operation sequence, so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). A record's identity is its key without that trailing sequence, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The record view reads from the key what it enforces (D10): the member and the record's kind; it reads from the entry only its author. Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
+The membership store: `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<actor>` the actor's `PdnId` and `<aseq>` its own sequence at the time (D23, D43), so the fold reads the kind, the actor and the actor's point from the key as the record view reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, and resolve by precedence (D38). The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is the writer's `PdnId`, its author key, its membership sequence and its own operation sequence (D43), so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). A record's identity is its key without that trailing sequence, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The record view reads from the key what it enforces (D10): the member, the record's kind and, for an operation, its writer; it reads from the entry only its author, which counts only among the devices of the member the key names (D43). Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
 
 **Example:** keys in the two stores of "Family" and what the fold and the record view read from each; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted.
 
 ```
 membership store
-member/<carol>/1/joined/2                   Carol's sequence 1, joined; b1's author resolves the actor to Bob, acting at his sequence 2
+member/<carol>/1/joined/<bob>/2             Carol's sequence 1, joined by Bob at his sequence 2, from b1, one of Bob's devices
 member/<carol>/devices/1                    Carol's device statement, version 1
 record store
 by/<carol>/claim/<id>/1                     a claim under Carol's name, written at her sequence 1
 by/<carol>/immutable-document/<id>/1        an immutable-document, its one entry
-by/<carol>/mergeable-document/<id>/<op>     one operation; <op>: b2's author, Bob's sequence 2, that author's operation 7
+by/<carol>/mergeable-document/<id>/<op>     one operation; <op>: Bob, b2's author, Bob's sequence 2, that author's operation 7
 ext/anything                                fits neither layout: kept, used by nothing (D27)
 ```
 
@@ -425,12 +425,12 @@ What the reference proves is, as for records (D22), that the event is after the 
 
 | arrives | needs | verdict on c2 |
 |---|---|---|
-| `member/<alice>/1/founded/…` | to derive the cell id c2 holds, and a signature under the announcement key it names | counts |
+| `member/<alice>/1/founded/<alice>/…` | to derive the cell id c2 holds, and a signature under the announcement key it names | counts |
 | `member/<alice>/devices/1`, listing a1 | a signature under the announcement key of Alice's founding event | counts |
-| `member/<bob>/1/joined/1`, by a1's author | Alice a member at her sequence 1 | counts |
+| `member/<bob>/1/joined/<alice>/1`, by a1's author | Alice a member at her sequence 1 | counts |
 | `member/<bob>/devices/1`, listing b1 | a signature under the announcement key in Bob's joined event | counts |
-| `member/<carol>/1/joined/2`, by b1's author | Bob a member at his sequence 2 | held, not yet counting: c2 holds Bob's chain up to 1 |
-| `member/<bob>/2/promoted/1`, by a1's author | Alice an owner at her sequence 1 | counts, and Carol's joined event with it, in this session |
+| `member/<carol>/1/joined/<bob>/2`, by b1's author | Bob a member at his sequence 2 | held, not yet counting: c2 holds Bob's chain up to 1 |
+| `member/<bob>/2/promoted/<alice>/1`, by a1's author | Alice an owner at her sequence 1 | counts, and Carol's joined event with it, in this session |
 | c2 lists Alice and Bob as owners and Carol as a plain member, as every member device does. A device statement arriving before the event that carries its key counts once that event is held, the same way. | | |
 
 **Rejected alternatives:**
@@ -744,11 +744,11 @@ Two owners disconnected from each other can demote each other at once: two event
 
 No entry of either store, no fold and no folded membership carries a version: every device reads every entry of a cell by the one set of rules its build holds, and a build that reads entries otherwise — a new event kind, a new record kind, a fold that resolves differently — reads the cells it finds by its own rules as well. Devices of one cell on two such builds can then reach two memberships and two sets of readable records from the same entries, and a cell that splits so is recreated, its content lost. This holds while cells run inside the company alone and a lost cell costs nothing beyond itself; it ends before a cell carries data people outside the company depend on. The `v1` in the context strings of D16 and D25 keeps the signatures a key makes apart and names no rules; the invite's format version is the one the pairing and linking payloads carry.
 
-**Example:** a later build adds an act that suspends a member's editing, and Alice's phone a1, on that build, suspends Bob at his sequence 3, writing `member/<bob>/3/suspended/1`; Carol's phone c1 runs the build this design describes; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
+**Example:** a later build adds an act that suspends a member's editing, and Alice's phone a1, on that build, suspends Bob at his sequence 3, writing `member/<bob>/3/suspended/<alice>/1`; Carol's phone c1 runs the build this design describes; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`.
 
 | | a1 | c1 |
 |---|---|---|
-| `member/<bob>/3/suspended/1` | Bob suspended from his sequence 3 | an entry outside the key layout: kept, used by nothing (D27) |
+| `member/<bob>/3/suspended/<alice>/1` | Bob suspended from his sequence 3 | an entry outside the key layout: kept, used by nothing (D27) |
 | Bob's operation on the shopping list naming his sequence 3 | not counted | counted |
 | The two devices read the shopping list differently for good; the cell is recreated on one build. | | |
 
@@ -784,7 +784,7 @@ The membership fold reads a membership entry's payload once the payload has arri
 
 Either store of a cell holds every entry a session carries from a caller it serves — a member device's session whole, a former member's over its departure's past (D36) — bounded by what pdn-store drops on its own: a key over 8,192 bytes, a timestamp more than 10 minutes ahead, an entry whose signature does not verify. No entry is judged at ingest by its author, its key or the membership, and nothing waits there. What an entry counts for follows from the whole set a device holds, whatever order its entries arrived in: the membership fold counts an event when its actor held the state it needs at the point it names, precedence and the guard over demotions included (D23, D38, D39), and the record view reads a record's entry when its author is a device of the member it is written as, that member a member at the sequence the entry names (D5, D6, D17, D22). Every member device therefore holds the same entries, and every list and read follows from them alone; a forged entry — one under another member's name, or an act its actor's role does not allow — is held and relayed by every member device and counts on none. A session is served by the membership as of its setup (D32). For a cell, an entry that counts against its author's state is what an entry admitted past the ingest gate is for a data replica: the defect a review names.
 
-**Example:** in "Family", Alice and Carol are owners and Bob a plain member since his sequence 1; disconnected from each other, Alice promotes Bob and Carol kicks him, both at his sequence 2; Bob's phone b1 takes the promotion first and invites Dave, writing `member/<dave>/1/joined/2`; Alice's laptop a2 takes the promotion, then Dave's joined event, then the kick, and Carol's phone c1 takes the kick and the promotion, then Dave's joined event; `<dave>`: 64 lowercase hex chars of Dave's `PdnId`.
+**Example:** in "Family", Alice and Carol are owners and Bob a plain member since his sequence 1; disconnected from each other, Alice promotes Bob and Carol kicks him, both at his sequence 2; Bob's phone b1 takes the promotion first and invites Dave, writing `member/<dave>/1/joined/<bob>/2`; Alice's laptop a2 takes the promotion, then Dave's joined event, then the kick, and Carol's phone c1 takes the kick and the promotion, then Dave's joined event; `<bob>`, `<dave>`: 64 lowercase hex chars of each `PdnId`.
 
 | | a2 | c1 |
 |---|---|---|
@@ -798,6 +798,26 @@ Either store of a cell holds every entry a session carries from a caller it serv
 - Admission by what no later event reverses — a key that fits a layout and an author that resolves to a member's device.
   - **Pros:** a forgery under another member's name stops at the first honest device that resolves its author.
   - **Cons:** an author resolves only once its statement's payload has arrived (D41), so a freshly linked device's first entries are dropped and offered again by a later session.
+
+### D43. An act names its actor, and an operation its writer, in its key
+
+A membership act's key names its actor beside the actor's sequence — `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — and an operation's `<op>` names its writer beside the author that signed it (D21); a claim's and an immutable-document's key names its member already. The fold and the record view read the member an entry is written as from its key, and count the entry only when its author is among that member's devices as the member's own statements list them (D16). The members' statements say which authors write for each member and never decide who wrote an entry, so an author that a second member's statement lists as well counts, under that second member's name, only what its device wrote there — nothing, since only its device holds it — and no entry reads as anyone but the member its key names.
+
+**Example:** Bob's modified phone b1 writes version 2 of Bob's device statement, listing b1 and the author Alice writes with on her phone a1, signed by Bob's announcement key, and Alice then appends an operation to the shopping list from a1; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `<a1-author>`: 64 lowercase hex chars of the author she writes with on a1.
+
+| on Carol's phone c1 | |
+|---|---|
+| Bob's statement | counts: it lists what Bob's key signed |
+| Alice's operation, its `<op>` naming `<alice>` and `<a1-author>` | read as Alice's: `<a1-author>` is among Alice's devices |
+| an operation naming Bob as its writer beside `<a1-author>` | would read as Bob's, and only a1 can sign one, which it never does |
+
+**Rejected alternatives:**
+
+- The author countersigning its listing: each device in a statement carrying a signature by the author it lists, over the cell id and the member's `PdnId`.
+  - **Pros:** each author resolves to one member, and keys keep their length.
+  - **Cons:** a signature per listed device, verified by the fold and carried into every later version, for what the member's name in the key settles with no check at all.
+- The writer resolved from the author, the defence deferred with a member's own history (D34).
+  - **Cons:** it touches entries other members wrote: a member's modified device reads another member's edits as its own member's, and an owner's kick by a plain member's role.
 
 ## Risks / Trade-offs
 
@@ -830,22 +850,6 @@ Additive: no existing store, ticket, grant or record changes shape — the direc
 
 Each question below leaves a part of the design without a rule an implementation can follow, or with a rule another decision contradicts; each names its options, strongest first, and none is decided. A question answered since its posing leaves the list, its answer recorded as a decision.
 
-### Q3. Whether an entry names its writer
-
-The fold reads an act's actor, and the record view an operation's writer, from the entry's author, through the map the members' device statements build, and the fold counts a statement by its signature under its member's announcement key alone: nothing in a statement proves that its member writes with the authors it lists. A modified member device can list, in its own member's statement, the author another member writes with; that author then resolves to two members, and which of them an operation or an act is read as is left open — another member's edit read as the modified device's member's, an owner's kick judged by a plain member's role. This touches entries another member wrote, so it lies outside what a member's own history takes on its word (D34).
-
-- The key names the writer. An act's key names its actor beside the actor's sequence, and an operation's key its writer beside the author, and the fold and the record view check the author against that member's statements alone, as the record view already does for a claim or an immutable-document under its member's name. A listing of another member's author then counts nothing that author's devices did not write under that member's name, and no entry reads as anyone but the member it names; each act's and operation's key grows by 64 characters.
-- The author countersigns its listing. Each device in a statement carries a signature by the author it lists, over the cell id and the member's `PdnId`, made by the device that adds itself and copied into every later version, and the fold counts no statement whose countersignature fails: a member lists no author it does not hold, and each author resolves to one member.
-- Deferred with the defence against a member's own devices, recorded as D34 records its paths.
-
-**Example:** Bob's modified phone b1 writes version 2 of Bob's device statement, listing b1 and the author Alice writes with on her phone a1, signed by Bob's announcement key; Alice then appends an operation to the shopping list from a1.
-
-| option | Bob's statement on every honest member device | Alice's operation in `read_ops` on Carol's phone c1 |
-|---|---|---|
-| the key names the writer | counts: it lists what Bob's key signed, and a1's author writes nothing under Bob's name | its key names Alice, whose statement lists a1's author: read as Alice's |
-| the author countersigns | counts for nothing: a1's author signed no listing under Bob's `PdnId` | read as Alice's |
-| deferred | counts | read as Alice's or as Bob's, whichever the map keeps |
-
 ### Q4. What binds a member to its announcement key
 
 A member's device statements verify under the announcement key its join statement carries, and the join statement is signed by the joining device — but nothing says what that signature covers or under which key, and the fold's check of a joined event reads its actor alone, so no device verifies it. A member's chain can also hold several joined events, one per return, and nothing says which one's key the statements verify under when two carry different keys. An honest device never writes that, since an identity holds one announcement key pair, minted with it; a modified member device can: it invites a departed member again under a key of its own, writes a statement for it under that key, and places records and acts under the departed member's name at its new sequence — a record under another member's name, which counts for nothing under the design (D34).
@@ -853,9 +857,9 @@ A member's device statements verify under the announcement key its join statemen
 - The first key binds, and the join statement proves it. The join statement is a signature by the newcomer's announcement secret over a fixed prefix, the cell id, the newcomer's `PdnId` and its announcement key; the fold verifies it on every joined event; and a joined event whose key differs from the one the member's first joined or founding event carries counts for nothing. A member then returns only under its own key, through a join statement only its own devices can sign.
 - The inviter's word, as D26 takes a newcomer's `PdnId`. The join statement goes, the key of the member's latest joined event verifies its statements, and a departed member readmitted under another key by a modified member device is accepted with the rest of the join's gap until KERI.
 
-**Example:** Carol left "Family" at her sequence 2; Bob's modified phone b1 writes an invite act for Carol at her sequence 3 carrying an announcement key b1 minted, a statement for Carol listing b1 under that key, and a claim under Carol's name naming her sequence 3; `<carol>`: 64 lowercase hex chars of Carol's `PdnId`; `…`: Bob's sequence; `<id>`: an id b1 minted.
+**Example:** Carol left "Family" at her sequence 2; Bob's modified phone b1 writes an invite act for Carol at her sequence 3 carrying an announcement key b1 minted, a statement for Carol listing b1 under that key, and a claim under Carol's name naming her sequence 3; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `…`: Bob's sequence; `<id>`: an id b1 minted.
 
-| option | `member/<carol>/3/joined/…` on every honest member device | `by/<carol>/claim/<id>/3` |
+| option | `member/<carol>/3/joined/<bob>/…` on every honest member device | `by/<carol>/claim/<id>/3` |
 |---|---|---|
 | the first key binds | counts for nothing: its key is not the one Carol's first joined event carries, and no join statement under Carol's key signs it | read by none: Carol is no member at her sequence 3 |
 | the inviter's word | counts: Carol a plain member again | read as Carol's |
@@ -891,16 +895,30 @@ The inviting device writes the newcomer's joined event before the newcomer holds
 
 ### Q7. How the keys' segments are encoded
 
-The layouts of D21 name their segments and leave their encoding open: a founding event's actor sequence is written `…` everywhere, an operation's `<op>` holds three values in the place the layout draws as one segment, and neither the text form of a number, the scope of a writer's operation sequence nor the form of the id `put_record` mints is stated. A record's identity is its key without the trailing segment, so how many segments `<op>` takes decides where a mergeable-document's identity ends. Whatever Q3 adds to a key takes the same form.
+The layouts of D21 name their segments and leave their encoding open: a founding event's actor sequence is written `…` everywhere, an operation's `<op>` holds four values — the writer's `PdnId`, the author key, the membership sequence and the operation sequence — in the place the layout draws as one segment, and neither the text form of a number, the scope of a writer's operation sequence nor the form of the id `put_record` mints is stated. A record's identity is its key without the trailing segment, so how many segments `<op>` takes decides where a mergeable-document's identity ends.
 
-- One text form throughout. Every number is decimal with no leading zeros; a founding event's actor sequence is 0, the creator holding no point of its chain before its first event; `<op>` is one segment, the writer's author key as 64 lowercase hex characters, its membership sequence and its operation sequence joined by `.`; the operation sequence counts one author's operations on one mergeable-document from 1; and a record id is 16 random bytes, written as 32 lowercase hex characters, the size of the cell id. The keys read as this design prints them, and the fold parses every number it orders, since the store orders keys byte by byte and `10` sorts before `9`.
-- `<op>` as three segments. Every segment of every key holds one value, and a record's identity becomes the key without its last three segments for a mergeable-document and without its last one otherwise, so the cut depends on the kind.
+- One text form throughout. Every number is decimal with no leading zeros; a founding event's actor sequence is 0, the creator holding no point of its chain before its first event; `<op>` is one segment, the writer's `PdnId` and author key as 64 lowercase hex characters each, its membership sequence and its operation sequence joined by `.`; the operation sequence counts one author's operations on one mergeable-document from 1; and a record id is 16 random bytes, written as 32 lowercase hex characters, the size of the cell id. The keys read as this design prints them, and the fold parses every number it orders, since the store orders keys byte by byte and `10` sorts before `9`.
+- `<op>` as four segments. Every segment of every key holds one value, and a record's identity becomes the key without its last four segments for a mergeable-document and without its last one otherwise, so the cut depends on the kind.
 - Numbers as fixed-width big-endian hex, 16 characters for a 64-bit number. Keys sort in number order under the store's byte order, which the fold does not need, since it reads a member's chain whole; every key holding a number grows, and no key reads as the examples print it.
 
-**Example:** two keys of "Family" under each option — Alice's founding event, and Bob's operation 7 from his phone b1 on the shopping list Alice placed, written at his membership sequence 2; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `<list>`: the list's record id; `<b1-author>`: 64 lowercase hex chars of the author Bob writes with on b1.
+**Example:** two keys of "Family" under each option — Alice's founding event, and Bob's operation 7 from his phone b1 on the shopping list Alice placed, written at his membership sequence 2; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<list>`: the list's record id; `<b1-author>`: 64 lowercase hex chars of the author Bob writes with on b1.
 
 | option | Alice's founding event | Bob's operation |
 |---|---|---|
-| one text form throughout | `member/<alice>/1/founded/0` | `by/<alice>/mergeable-document/<list>/<b1-author>.2.7` |
-| `<op>` as three segments | `member/<alice>/1/founded/0` | `by/<alice>/mergeable-document/<list>/<b1-author>/2/7` |
-| fixed-width numbers | `member/<alice>/0000000000000001/founded/0000000000000000` | `by/<alice>/mergeable-document/<list>/<b1-author>.0000000000000002.0000000000000007` |
+| one text form throughout | `member/<alice>/1/founded/<alice>/0` | `by/<alice>/mergeable-document/<list>/<bob>.<b1-author>.2.7` |
+| `<op>` as four segments | `member/<alice>/1/founded/<alice>/0` | `by/<alice>/mergeable-document/<list>/<bob>/<b1-author>/2/7` |
+| fixed-width numbers | `member/<alice>/0000000000000001/founded/<alice>/0000000000000000` | `by/<alice>/mergeable-document/<list>/<bob>.<b1-author>.0000000000000002.0000000000000007` |
+
+### Q8. Whether a listed device vouches for its listing
+
+A member's device statement lists node ids beside authors, and every member device dials the listed nodes as that member's contacts (D7); the fold counts a statement by its announcement signature alone, so a member's modified device can list any node id — a node outside the cell among them — and every member device dials it as that member on every reconcile pass. The node dialed refuses a session it does not host, and the dials go on; with address lookup bound, a node id reaches any node on the network. The dialed node is outside the cell, so this is not what every member is trusted with (D28).
+
+- The listed device countersigns its listing with its node key: each device in a statement carries a signature by the node it names, over the cell id, the member's `PdnId` and the author it writes with, made by the device that adds itself and copied into every later version, and the fold counts no listing whose countersignature fails. A member then lists no node it does not run.
+- Deferred with the defence against a member's own devices, recorded as D34 records its paths.
+
+**Example:** Bob's modified phone b1 lists, in Bob's device statement, the node id of a server outside "Family", whose 100 members hold 2 devices each.
+
+| option | the server |
+|---|---|
+| the listed device countersigns | never dialed: the listing counts for nothing |
+| deferred | dialed as Bob by 200 member devices on every reconcile pass, 10 s apart by default |

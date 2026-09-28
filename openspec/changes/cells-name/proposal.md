@@ -62,17 +62,17 @@ Either way the rule is one admission check over the writer's role at the point i
 
 ### Where a shared name sits, and how two changes made at once resolve
 
-- In the membership store, under `name/<version>/<aseq>`: `<version>` one above the highest the writing device holds, `<aseq>` the writer's point, judged as a membership act is. The membership store is served before the record store, so a newcomer reads the name in its first session. Two changes at one version resolve by a deterministic pick, such as the lower author key: meaningless and harmless for a label, and a later change by anyone who saw both settles it.
+- In the membership store, under `name/<version>/<actor>/<aseq>`: `<version>` one above the highest the writing device holds, `<actor>` the writer and `<aseq>` its point, judged as a membership act is. The membership store is served before the record store, so a newcomer reads the name in its first session. Two changes at one version resolve by a deterministic pick, such as the lower author key: meaningless and harmless for a label, and a later change by anyone who saw both settles it.
 - In the record store, as a record every member may edit, merged as a mergeable-document is; the name arrives with the records, after the membership.
 - One entry, the newest by entry timestamp. A device whose clock runs behind loses its change to an earlier one, and one whose clock runs ahead wins every change for up to 10 minutes.
 
-**Example:** changes to the name of "Family" under the first option, Alice and Bob both owners.
+**Example:** changes to the name of "Family" under the first option, Alice and Bob both owners; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `…`: the writer and its point.
 
 | what happens | written | every member device reads |
 |---|---|---|
-| Alice names the cell on a1 | `name/1/1`: "Family" | Family |
-| Alice renames it | `name/2/1`: "Walkers" | Walkers |
-| Alice on a1 and Bob on b1, disconnected from each other, rename it | `name/3/…`: "Hikers" from a1, "Ramblers" from b1 | one of the two, the same on every device |
+| Alice names the cell on a1 | `name/1/<alice>/1`: "Family" | Family |
+| Alice renames it | `name/2/<alice>/1`: "Walkers" | Walkers |
+| Alice on a1 and Bob on b1, disconnected from each other, rename it | `name/3/…`: "Hikers" from a1 under Alice, "Ramblers" from b1 under Bob | one of the two, the same on every device |
 | Bob, having seen both, renames it again | `name/4/…`: "Ramblers" | Ramblers |
 | Carol's modified phone c1 writes a name | `name/5/…` | counts for nothing: Carol is no owner at the point she names |
 
