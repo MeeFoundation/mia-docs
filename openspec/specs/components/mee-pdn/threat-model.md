@@ -34,3 +34,14 @@ What the platform separates is how an honest node keeps its identities: each hol
 | a modified runtime, or one whose process is taken over | writes an entry under a3's author for Alice-leisure while Alice acts as Alice-work, and opens a session naming Alice-leisure to read what she was granted | the entry is Alice-leisure's act, and the session is served as hers |
 
 The arrangement is sized for the identities of one person on that person's own devices. On a node shared by different people, whoever controls the node controls every identity on it; ADR-0013 does not answer that arrangement, and the platform gives the people behind those identities no protection from one another.
+
+## Payload bytes by hash
+
+A node serves a payload to any caller that asks for its hash, whatever that caller was granted. Blob transfer is mounted with no gate, and the blob store is one per node, under the replicas of every identity the node hosts, so the isolation between identities on one node and the filter a grant sets cover entries and not payload bytes (ADR-0013). A payload is withheld only as far as its hash is: a party that learns a hash outside the platform fetches the bytes, and a party that holds the hash of a known file learns whether the node keeps it.
+
+**Example:** requests to Bob's phone b1, where Bob granted Alice-leisure `contact/email` of his data namespace and Dave's phone d1 holds a connection with nobody.
+
+| caller | asks b1 for | gets |
+|---|---|---|
+| Alice's tablet a3 | the payload of Bob's `notes/diary` entry, whose hash it learned outside the platform | the diary, which neither identity on a3 was granted |
+| d1 | the hash of a public tax form Bob keeps in his data namespace | the form, and with it the fact that Bob keeps it |
