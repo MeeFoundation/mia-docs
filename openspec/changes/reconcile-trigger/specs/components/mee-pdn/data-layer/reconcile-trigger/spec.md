@@ -10,17 +10,16 @@ A capability-scoped peer on another node — authorized (per subset-rbsr) to rea
 
 When a write lands in a replica, the serving node SHALL trigger — directly, not by broadcast — exactly those scoped peers whose read capabilities cover the written claim. A peer SHALL be addressed as a node together with the identity holding the replica there, since one node may hold one issuer's namespace for two identities at once, each under its own grant; an addressed identity hosted on the sending node itself SHALL be triggered by the write announcement, which reaches only the co-located identities entitled to read the written entry ([in-process sessions](../in-process-sessions/spec.md)). The trigger SHALL carry no claim content; what the triggered peer obtains comes through filtered reconciliation. Triggers are best-effort: a missed trigger SHALL be compensated by the next reconciliation, which remains the sole carrier of correctness.
 
-**Example:** Alice (issuer) writes `contact/email` on her laptop a1, which also hosts Dave and Erin; a2 is her phone. Bob and Dave hold read grants on `contact/email`, Carol and Erin on `contact/phone`; the family tablet t1 hosts Bob and Carol.
+**Example:** Alice-work (issuer) writes `contact/email` on Alice's tablet a3, which also hosts Alice-leisure; Alice's phone a1 hosts both of her identities as well. Alice-leisure and Bob hold read grants on `contact/email`, Carol on `contact/phone`.
 
-| addressee (node, identity) | covered | what a1 does |
+| addressee (node, identity) | covered | what a3 does |
 |---|---|---|
-| (a2, Alice) | issuer | nothing: a2 is in the swarm, learns of the write there and pulls it by reconciliation |
+| (a1, Alice-work) | issuer | nothing: a1 is in the swarm, learns of the write there and pulls it by reconciliation |
+| (a1, Alice-leisure) | yes | dials a1 and triggers it, naming Alice-leisure |
 | (b1, Bob) | yes | dials b1 and triggers it |
-| (t1, Bob) | yes | dials t1 and triggers it, naming Bob |
-| (t1, Carol) | no | nothing |
-| (a1, Dave) | yes | announces the write: an in-process session from Alice to Dave |
-| (a1, Erin) | no | nothing: no in-process session opens |
-| No trigger carries any part of `contact/email`; each triggered replica obtains it through filtered reconciliation. | | |
+| (c1, Carol) | no | nothing |
+| (a3, Alice-leisure) | yes | announces the write: an in-process session from Alice-work to Alice-leisure |
+| When Alice-work then writes `contact/phone`, a3 dials c1 alone and opens no in-process session. No trigger carries any part of either claim; each triggered replica obtains it through filtered reconciliation. | | |
 
 #### Scenario: Only the covered peer is triggered
 

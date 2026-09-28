@@ -6,14 +6,14 @@
 
 Reconciliation between devices of the identity a replica belongs to SHALL deliver every claim of that replica — all are read-authorized by Invariant 1 — so the filter does not restrict an identity's own devices. A cell's two stores extend the same rule to every member: reconciliation between devices of the cell's members SHALL deliver every entry of either store, since a cell has no narrower audience than its members. On a multi-identity node this SHALL be judged per replica: a node is an own device for the replicas of the identities it is linked into, a member device for a cell's stores when the identity it names in the session is one of those identities and a member of the cell, and a scoped peer elsewhere.
 
-**Example:** callers reconcile with Alice's phone a1: her laptop a2, and the family tablet, linked into Bob and Erin; Bob is a member of "Family" and holds a grant from Alice on `contact/email`, and Erin is no member.
+**Example:** callers reconcile with Bob's phone b1: his laptop b2, and Alice's tablet a3, linked into Alice-leisure and Alice-work; Alice-leisure is a member of "Family" and holds a grant from Bob on `contact/email`, and Alice-work is no member.
 
-| caller | names | replica on a1 | a1 delivers |
+| caller | names | replica on b1 | b1 delivers |
 |---|---|---|---|
-| a2 | Alice | Alice's data namespace | every claim, unfiltered |
-| the tablet | Bob | Alice's data namespace | `contact/email` alone, filtered |
-| the tablet | Bob | the record store of "Family" | every entry, unfiltered |
-| the tablet | Erin | the record store of "Family" | nothing: the session is refused |
+| b2 | Bob | Bob's data namespace | every claim, unfiltered |
+| a3 | Alice-leisure | Bob's data namespace | `contact/email` alone, filtered |
+| a3 | Alice-leisure | the record store of "Family" | every entry, unfiltered |
+| a3 | Alice-work | the record store of "Family" | nothing: the session is refused |
 
 #### Scenario: Own devices replicate in full
 

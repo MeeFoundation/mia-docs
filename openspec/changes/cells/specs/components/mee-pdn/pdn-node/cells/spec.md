@@ -6,7 +6,6 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 
 |                                | Cell owner | Cell member |
 | ------------------------------ | ---------- | ----------- |
-| Rename cell for all members    | yes        | no          |
 | Invite member to a cell        | yes        | yes         |
 | Leave cell                     | yes        | yes         |
 | Delete cell for all members    | no         | no          |
@@ -57,13 +56,11 @@ The service's surface — the operations the requirements below constrain:
 /// fails with the unknown-cell error, and a refusal by role is a typed error that writes nothing.
 trait CellsService {
     /// Derives the cell id, creates both stores, writes the signed founding event; the identity is the first owner.
-    async fn create(&self, identity: PdnId, name: &str) -> Result<CellId>;
-    /// The cells the identity is a member of, with their names.
+    async fn create(&self, identity: PdnId) -> Result<CellId>;
+    /// The cells the identity is a member of.
     async fn list(&self, identity: PdnId) -> Result<Vec<CellInfo>>;
     /// The current members, each with its role.
     async fn members(&self, identity: PdnId, cell: CellId) -> Result<Vec<Member>>;
-    /// Renames the cell for every member. An owner.
-    async fn rename(&self, identity: PdnId, cell: CellId, name: &str) -> Result<()>;
 
     /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member. Writes nothing to the cell:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
@@ -71,7 +68,7 @@ trait CellsService {
     /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
-    /// `Kick` and `Demote` name another member; `Leave` also forgets both stores on the identity's devices.
+    /// `Kick` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the cell's tombstone.
     async fn act(&self, identity: PdnId, cell: CellId, act: CellAct) -> Result<()>;
 
     /// Places a record under the identity's own name at a fresh id: a claim's or an immutable-document's one entry,
@@ -99,24 +96,24 @@ enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 
 ### Requirement: The cells service creates a cell for a hosted identity
 
-The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and answers the cell id, the one address of the cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 **Example:** `create` calls on Alice's phone a1, which hosts Alice and not Erin; the nonces a1 draws are 16 bytes of `5a`, then 16 bytes of `a5`.
 
 | call | result |
 |---|---|
-| `create(Alice, "Family")` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
-| `create(Alice, "Family")` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells, both named "Family" |
-| `create(Erin, "Family")` | the unknown-identity error, and no store exists for Erin |
+| `create(Alice)` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
+| `create(Alice)` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells |
+| `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
 #### Scenario: A created cell is listed with its creator as member
 
-- **WHEN** a hosted identity creates a cell named "Family"
-- **THEN** the identity lists a cell with that name and a fresh cell id, whose members are exactly that identity
+- **WHEN** a hosted identity creates a cell
+- **THEN** the identity lists a cell with a fresh cell id, whose members are exactly that identity
 
-#### Scenario: Two cells with one name coexist
+#### Scenario: Two cells of one identity are two ids
 
-- **WHEN** a hosted identity creates two cells both named "Family"
+- **WHEN** a hosted identity creates two cells
 - **THEN** both are listed, with different cell ids, and each is addressed by its own id
 
 #### Scenario: Creating for an unhosted identity is refused
@@ -168,24 +165,29 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself: before it syncs the cell, and before every later sync, it SHALL check that the member's device list, as the [cell stores](../../data-layer/cell-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
 
-**Example:** Bob's directory once Bob has joined "Family" on his phone b1, and what the family tablet t1, linked into Bob and hosting Erin too, does with it; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
+**Example:** Alice-leisure's directory once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
 ```
-cells/eead8ef96aa1254969d63c12631b799c                        the cell's record, written at the join
+cells/eead8ef96aa1254969d63c12631b799c/1                      the cell's record at the founding, Alice-leisure's sequence 1
 tickets/cell/eead8ef96aa1254969d63c12631b799c/membership      the membership store's write ticket
 tickets/cell/eead8ef96aa1254969d63c12631b799c/records         the record store's write ticket
-announcement-key                                              Bob's announcement key pair, minted with Bob
+announcement-key                                              Alice-leisure's announcement key pair, minted with her
 
-t1 opens both stores from these tickets and writes member/<bob>/devices/2 — b1 and t1 — into the membership store
-Erin's directory holds no cells/ entry and no tickets/cell/ kind, only an announcement-key of her own: list answers no such cell for Erin, and her read of the cell fails with the unknown-cell error
+a3 opens both stores from these tickets and writes member/<alice-leisure>/devices/2 — a1 and a3 — into the membership store
+Alice-work's directory holds no cells/ entry and no tickets/cell/ kind for Family, and an announcement-key of her own: list answers no such cell for Alice-work, and her read of Family fails with the unknown-cell error
 ```
 
 #### Scenario: A linked device reaches the cell
 
 - **WHEN** identity B joins a cell on its phone while B's laptop is linked into B
 - **THEN** the laptop eventually lists the cell, reads its entries, and its own device is served by the other members
+
+#### Scenario: A device a later version missed puts itself back
+
+- **WHEN** a device D of identity B has written a version of B's device statement listing itself, and another device of B that has not seen it writes the next version without D
+- **THEN** D's first sync after that version reaches it is preceded by a statement at the version after it, listing D beside every device the version that missed D lists, and the other members' devices admit D's entries again
 
 #### Scenario: A co-located non-member identity does not reach the cell
 
@@ -237,39 +239,19 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 - **WHEN** owner B is kicked, a member invites B again and B joins, and B then attempts to promote a member
 - **THEN** every member lists B as a plain member, and B's attempt is refused with a typed error
 
-### Requirement: An owner renames the cell for every member
-
-Renaming a cell SHALL be available only to an owner's device, and the new name SHALL become the name every member lists. A rename by a member that is no owner SHALL be refused with a typed error and change no state.
-
-**Example:** renaming "Family", whose owner is Alice and whose plain member is Carol, as Carol's phone c1 sees it; `Family` stands for its cell id.
-
-| call | on c1 |
-|---|---|
-| `rename(Carol, Family, "Carol's")` | a typed error; `list` still answers "Family" |
-| `rename(Alice, Family, "Walkers")` | once the rename arrives, `list` answers "Walkers" for `eead8ef96aa1254969d63c12631b799c` |
-
-#### Scenario: An owner renames the cell
-
-- **WHEN** owner A renames the cell "Family" to "Walkers" and the rename reaches a device of member C
-- **THEN** C lists the cell under "Walkers", its cell id unchanged
-
-#### Scenario: A plain member's rename is refused
-
-- **WHEN** member C, no owner, attempts to rename the cell
-- **THEN** the attempt is refused with a typed error and every member lists the cell under its name unchanged
-
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a cell that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a cell leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the cell then has no owner. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' admission rule; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
-**Example:** kicks and a leave in "Family", in this order: Alice is an owner, Bob, Carol and Dave plain members, and the family tablet t1 hosts Bob and Carol; `Family` stands for its cell id.
+**Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its cell id.
 
 | call | result |
 |---|---|
-| `act(Bob, Family, Kick(Carol))` | a typed error, nothing written |
-| `act(Alice, Family, Kick(Alice))` | a typed error, nothing written |
-| `act(Alice, Family, Kick(Dave))` | written: Dave's devices are refused from their next session with each member device the kicked event has reached |
-| `act(Carol, Family, Leave)` on Carol's phone c1 | her left event written and `cells/eead8ef96aa1254969d63c12631b799c` tombstoned in her directory; both stores forgotten on c1, and on t1 once her directory syncs there, while Bob's replicas on t1 go on; her records and operations stay in the cell |
+| `act(Bob, Wedding, Kick(Alice-work))` | a typed error, nothing written |
+| `act(Erin, Wedding, Kick(Erin))` | a typed error, nothing written |
+| `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the kicked event has reached, and learn of the kick from the membership store |
+| `act(Erin, Wedding, Leave)` | a typed error, nothing written: Erin is the one owner, and the cell has other members |
+| `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `cells/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; the record store forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, the membership store kept as the cell's tombstone, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
 
 #### Scenario: An owner kicks a member
 
@@ -291,6 +273,16 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 - **WHEN** owner A attempts to kick itself
 - **THEN** the attempt is refused with a typed error, and every member still lists A as a member and an owner
 
+#### Scenario: The last owner does not leave a cell with other members
+
+- **WHEN** A, the one owner of a cell whose members are A, B and C, attempts to leave, then promotes B and attempts to leave again
+- **THEN** the first attempt is refused with a typed error and every member still lists A as a member and the one owner, and the second is written, leaving B the one owner
+
+#### Scenario: The last two owners leaving at once leave the cell without an owner
+
+- **WHEN** A and C, a cell's only owners, leave while disconnected from each other, and plain member B's device then reconciles with both
+- **THEN** B's device lists no owner, B reads and appends to the cell's mergeable-documents, and B's kick of a member and promotion of itself are refused with a typed error
+
 #### Scenario: A member leaves
 
 - **WHEN** C leaves the cell from one of its devices
@@ -300,14 +292,14 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 
 The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. Reading a mergeable-document SHALL return its operations as they are held, each with its writer, and the service computes no document state from them. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
 
-**Example:** record calls in "Family", in this order: Alice is an owner, Bob and Carol plain members, and Erin, hosted on the family tablet t1 beside them, no member; Bob's note is a mergeable-document he placed earlier; `Family` stands for its cell id.
+**Example:** record calls in "Family", in this order: Alice-leisure is an owner, Bob and Carol plain members, and Alice-work, hosted on Alice's tablet a3 beside Alice-leisure, no member; Bob's note is a mergeable-document he placed earlier; `Family` stands for its cell id.
 
 | call | result |
 |---|---|
 | `put_record(Bob, Family, Claim, …)` | a `RecordRef` with member Bob, kind `Claim` and a fresh id; every member reads Bob's bytes |
 | `append_op(Bob, Family, that claim, …)` | a typed error: a claim is placed once |
 | `append_op(Carol, Family, Bob's note, …)` | written: `read_ops` lists it with Carol as its writer |
-| `append_op(Erin, Family, Bob's note, …)` | the unknown-cell error |
+| `append_op(Alice-work, Family, Bob's note, …)` | the unknown-cell error |
 
 #### Scenario: A claim round-trips unchanged
 
@@ -338,14 +330,14 @@ The cells service SHALL place a record as one of three kinds — claim, mergeabl
 
 A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process. The hosted cells SHALL be re-derived from each hosted identity's directory, as its connections are: every cell whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the cell's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no cell.
 
-**Example:** the family tablet t1 runs on a storage directory and hosts Bob and Carol, both members of "Family"; Carol left a second cell, `684aad236ce530cd7b5dedb6ab6b755a`, before t1 stops.
+**Example:** Alice's tablet a3 runs on a storage directory and hosts Alice-leisure and Alice-work, both members of "Wedding"; Alice-work left a second cell, `684aad236ce530cd7b5dedb6ab6b755a`, before a3 stops.
 
-| step | t1 |
+| step | a3 |
 |---|---|
-| t1 stops | on disk, `cells/eead8ef96aa1254969d63c12631b799c` is live in Bob's directory and in Carol's, and `cells/684aad236ce530cd7b5dedb6ab6b755a` is tombstoned in Carol's |
-| Alice places a claim from her phone a1 meanwhile | — |
-| t1 starts on the same directory | opens Family's two stores for Bob and for Carol, each from the tickets in the identity's own directory, and nothing for `684aad236ce530cd7b5dedb6ab6b755a`; neither hosting record names a cell |
-| t1's first sessions | Alice's claim arrives, and Bob's and Carol's replicas converge inside the process |
+| a3 stops | on disk, the entry at the highest sequence under `cells/f942dfc21acd0218d48f61f714ddfff3/` is non-empty in Alice-leisure's directory and in Alice-work's, and the one under `cells/684aad236ce530cd7b5dedb6ab6b755a/` is a tombstone in Alice-work's |
+| Erin places a claim from her phone e1 meanwhile | — |
+| a3 starts on the same directory | opens Wedding's two stores for Alice-leisure and for Alice-work, each from the tickets in the identity's own directory, and for `684aad236ce530cd7b5dedb6ab6b755a` Alice-work's tombstone alone, no record store; neither hosting record names a cell |
+| a3's first sessions | Erin's claim arrives, and Alice-leisure's and Alice-work's replicas converge inside the process |
 
 #### Scenario: A cell is hosted again after a restart
 
@@ -360,4 +352,4 @@ A directory-configured runtime SHALL host again, after a restart, every cell its
 #### Scenario: A cell left before the restart stays left
 
 - **WHEN** a runtime on a storage directory hosts a member of a cell, the member leaves the cell, and the runtime stops and starts again on the same directory
-- **THEN** the identity lists no such cell, and neither store is opened or served
+- **THEN** the identity lists no such cell, the record store is neither opened nor served, and the membership store stays as the cell's tombstone

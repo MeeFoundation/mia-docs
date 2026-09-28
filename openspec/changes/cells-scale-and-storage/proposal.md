@@ -10,7 +10,8 @@ A cell is two stores, the membership store and the record store, each held whole
 |---|---|---|---|
 | Bob's phone b1 | Bob | 1 | 2 |
 | Bob's phone b1 | Bob | 50 | 100 |
-| the family tablet t1 | Bob and Carol | the same 50 cells | 200 |
+| Alice's phone a1 | Alice | 300, each a personal folder she keeps alone | 600 |
+| Alice's tablet a3 | Alice-leisure and Alice-work | 50 each, 10 of them shared | 200 |
 
 ## What Changes
 
@@ -18,24 +19,13 @@ Nothing is decided. The change settles the questions below from the load tests' 
 
 ## Open Questions
 
-### One-member cells
-
-A personal folder that one identity keeps alone is a cell of one member. Two forms: a pair of replicas from birth — the cell's two stores read literally, hundreds of pairs per device for a full personal tree, each replica its own swarm and its own reconcile pass, whose standing cost the fingerprint question measures — or key prefixes in the identity's own namespace, turned into a replica at the second member, which is a data move and raises the question of whether a record's id survives it. The team leans to a pair from birth, measured.
-
-**Example:** Alice keeps 300 personal folders as one-member cells on her phone a1, and Bob then joins one of them, "Recipes".
-
-| option | on a1 before Bob joins | when Bob joins "Recipes" |
-|---|---|---|
-| a pair of replicas from birth | 600 replicas, each with its own swarm and its own reconcile pass | nothing moves: Bob imports the two stores |
-| key prefixes in Alice's own namespace | one namespace | the entries of "Recipes" move into two new replicas, and their ids survive the move only if a record's id is derived from the cell rather than the replica |
-
 ### When the linear-scan fingerprint gives way to a cached fingerprint tree
 
 With two stores per cell the tree serves each store over its own order. By the measurement above the tree pays off on the standing cost of passes over quiet stores — two per cell for every member identity a device hosts — and not on catch-up; a record store with 100 writers is never quiescent, so every catch-up session scans it per round. The load tests show at how many cells and entries per device the passes over quiet stores become the cost that matters.
 
 ### Reachability beyond relays
 
-Two devices on different networks without a relay and without DNS do not reliably reach each other, and relays come in a change of their own. Beyond them, always-on member devices can serve as the cell's hubs, and whether the platform prefers them as contacts is open.
+Two devices on different networks without a relay and without DNS do not reliably reach each other, so a cell across networks rests on iroh relays, which the stack binds and the product is expected to run itself. Beyond them, always-on member devices can serve as the cell's hubs, and whether the platform prefers them as contacts is open.
 
 ### Swarm and cadence parameters for 200 nodes
 
@@ -67,10 +57,10 @@ Several identities on one node multiply the replicas a device holds by the cells
 
 ## Capabilities
 
-None is settled. The fingerprint tree touches `components/mee-pdn/pdn-store/crate`; the download policy, one-member cells and storage bounds touch `components/mee-pdn/data-layer/cell-store` and `components/mee-pdn/pdn-node/cells`.
+None is settled. The fingerprint tree touches `components/mee-pdn/pdn-store/crate`; the download policy and storage bounds touch `components/mee-pdn/data-layer/cell-store` and `components/mee-pdn/pdn-node/cells`.
 
 ## Impact
 
 - **`crates/pdn-store`**: the cached fingerprint tree; the download policy it already offers.
-- **`crates/data-layer`**: the download policy of a cell's record store, quotas, one-member cells.
+- **`crates/data-layer`**: the download policy of a cell's record store, quotas.
 - **`crates/pdn-node`**: what the cells service reads when a payload is not local.

@@ -16,13 +16,13 @@ The runtime core SHALL be usable as a library with no host attached: a process e
 ### Requirement: Identity service creates and links identities
 The identity service SHALL create an identity on its first device — minting a placeholder `PdnId` (a random identifier with no key material behind it) and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](../device-linking/spec.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
 
-**Example:** Bob is hosted on device b1; Alice and Carol are both hosted on device a1, which mints a linking invite for each.
+**Example:** Alice-work and Alice-leisure are both hosted on Alice's phone a1, which mints a linking invite for each; her tablet a3 runs a runtime that hosts no identity yet.
 
-| call on b1 | result |
+| call on a3 | result |
 |---|---|
-| `link(Alice's payload, timeout)` | b1 hosts Bob and Alice; `connections().list(Carol)` answers `UnknownIdentity` |
-| `link(Carol's payload, timeout)` | b1 hosts Carol too: one linking act per identity |
-| `link(a second payload for Alice, timeout)` | `IdentityAlreadyHosted { identity: Alice }`, before any dial; that secret stays unburned |
+| `link(Alice-work's payload, timeout)` | a3 hosts Alice-work; `connections().list(Alice-leisure)` answers `UnknownIdentity` |
+| `link(Alice-leisure's payload, timeout)` | a3 hosts Alice-leisure too: one linking act per identity |
+| `link(a second payload for Alice-work, timeout)` | `IdentityAlreadyHosted { identity: Alice-work }`, before any dial; that secret stays unburned |
 
 #### Scenario: Create on one runtime, link on another
 - **WHEN** an identity is created on runtime A and runtime B links from a linking invite minted on A
@@ -170,15 +170,15 @@ The runtime SHALL expose a subscription to write-retraction events of its hosted
 
 The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's directory device records rather than kept beside them, and SHALL be re-derived at every grant sweep of the connection whose grant bound the replica: once when the grant binder of that connection starts, and again at every entry or payload that arrives on this device in the counterparty's store of that connection. A sweep that reads no device the issuer published in that store leaves the contact set as it was. A change of the directory alone does not re-derive it: a device the identity links after the namespace was imported enters the contacts of the replica on an existing device at that device's next grant sweep, while the linked device counts every sibling its directory lists from its own first import. The directory of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
 
-**Example:** Bob holds Alice's namespace under her grant on b1 and b2; Carol, also hosted on b2, has a device c1; the grant sweep runs on b2.
+**Example:** Alice-leisure holds Bob's namespace under his grant on her phone a1 and her tablet a3; Alice-work, also hosted on a3, has her laptop a2 as a second device; the grant sweep runs on a3.
 
-| read by the sweep | lists | enters the contacts of Bob's replica on b2 |
+| read by the sweep | lists | enters the contacts of Alice-leisure's replica on a3 |
 |---|---|---|
-| Bob's directory, `devices/` keys | b1, b2 | b1, dialed as Bob; b2 is this device |
-| Alice's store toward Bob, `devices/` keys | a1 | a1, dialed as Alice |
-| Carol's directory, `devices/` keys | b2, c1 | nothing: it is never read for Bob's replica |
+| Alice-leisure's directory, `devices/` keys | a1, a3 | a1, dialed as Alice-leisure; a3 is this device |
+| Bob's store toward Alice-leisure, `devices/` keys | b1 | b1, dialed as Bob |
+| Alice-work's directory, `devices/` keys | a2, a3 | nothing: it is never read for Alice-leisure's replica |
 | contacts | | a1, b1 |
-| later, Bob links b3: the contacts on b2 stay a1, b1 until an entry or payload next arrives in Alice's store toward Bob on b2 | | |
+| later, Alice-leisure links a4: the contacts on a3 stay a1, b1 until an entry or payload next arrives in Bob's store toward Alice-leisure on a3 | | |
 
 #### Scenario: A sibling contact is dialed with the issuer offline
 
