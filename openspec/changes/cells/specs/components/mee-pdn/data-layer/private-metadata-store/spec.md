@@ -69,7 +69,7 @@ An identity's device-announcement key pair (cells D16) SHALL be minted when the 
 | a1 has created Alice | absent | nothing yet |
 | a2 linked, the entry's record arrived, its payload bytes not | present | nothing yet |
 | the payload bytes arrived | present | the pair whose public key is `17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce`, the one a1 holds |
-| On the family tablet, which hosts Bob and Carol, each directory holds a pair of its own at `announcement-key`: Bob's with the public key `d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48`, Carol's with another. | | |
+| On Alice's tablet a3, which hosts both of her identities — Alice-leisure, the one above, and Alice-work — each directory holds a pair of its own at `announcement-key`: Alice-leisure's with the public key `17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce`, Alice-work's with `d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48`. | | |
 
 #### Scenario: The announcement key reaches a linked device
 

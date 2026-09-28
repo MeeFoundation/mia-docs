@@ -21,7 +21,7 @@ enum MembershipAct {
     Promote { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
     /// An owner; subject ≠ actor.
     Demote  { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
-    /// The member's devices, one entry per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
+    /// The member's devices, one key per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
     /// `signature` by the announcement key over "pdn/cell-devices/v1" ‖ version ‖ devices.
     AnnounceDevices { version: u64, devices: Vec<MemberDevice>, signature: Signature },
 }
@@ -80,18 +80,19 @@ Receiving a founding event, on every member device (reconciliation, a fresh devi
 
 A cell SHALL be served by exactly two pdn-store namespaces — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other cell's stores. Two cells SHALL NOT share a store, whatever their member sets. Both stores SHALL be addressed through the cell id, and no domain namespace id is allocated for either. Every member identity SHALL hold a replica of each store of its own, created or imported for that identity ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): two identities of one node that are both members SHALL each hold both stores, the two copies converging inside the process ([in-process sessions](../in-process-sessions/spec.md)) and sharing no replica. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a cell's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a directory, a connection metadata store, another cell's store or the cell's other store — with nothing registered, and a data import SHALL refuse a ticket naming a cell's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
 
-**Example:** the replicas the family tablet t1 holds; t1 hosts Bob and Carol, both members of the cell "Family", and Erin, no member, and Bob holds Alice's data namespace under her grant.
+**Example:** the replicas Alice's tablet a3 holds; a3 hosts Alice-leisure and Alice-work, both members of the cell "Wedding", Alice-leisure a member of "Family" too and Alice-work no member of it, and Alice-work holds Erin's data namespace under her grant.
 
-| replica on t1 | held for |
+| replica on a3 | held for |
 |---|---|
-| Family's membership store | Bob |
-| Family's record store | Bob |
-| Family's membership store, converging with Bob's copy inside the process | Carol |
-| Family's record store, likewise | Carol |
-| Alice's data namespace, under her grant | Bob |
-| the connection metadata pair between Alice and Bob | Bob |
-| each identity's own directory and data store | Bob, Carol, Erin |
-| An import for Bob, as Family's record store, of a ticket naming Alice's data namespace is refused, nothing registered, and Alice's namespace is held and reconciled as before. | |
+| Wedding's membership store | Alice-leisure |
+| Wedding's record store | Alice-leisure |
+| Wedding's membership store, converging with Alice-leisure's copy inside the process | Alice-work |
+| Wedding's record store, likewise | Alice-work |
+| Family's membership store and record store | Alice-leisure alone |
+| Erin's data namespace, under her grant | Alice-work |
+| the connection metadata pair between Erin and Alice-work | Alice-work |
+| each identity's own directory and data store | Alice-leisure, Alice-work |
+| An import for Alice-work, as Wedding's record store, of a ticket naming Erin's data namespace is refused, nothing registered, and Erin's namespace is held and reconciled as before. | |
 
 #### Scenario: Creating a cell allocates two dedicated replicas
 
@@ -188,13 +189,13 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 A session for either of a cell's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member kicked from the cell SHALL be refused from the first session set up after the kicked event reaches the serving device; what it obtained while a member is retained.
 
-**Example:** callers ask Bob's phone b1 for a session on the record store of "Family", addressing Bob's replica; the family tablet t1 hosts Bob, Carol and Erin, Erin no member, and Dave, no member, holds the store's ticket on his phone d1.
+**Example:** callers ask Bob's phone b1 for a session on the record store of "Family", addressing Bob's replica; Alice's tablet a3 hosts Alice-leisure, a member, and Alice-work, no member, and Dave, no member, holds the store's ticket on his phone d1.
 
 | caller | names | b1 |
 |---|---|---|
 | c1, Carol's phone | Carol | serves every entry |
-| t1 | Carol | serves every entry, as Carol |
-| t1 | Erin | refuses with `00 00 00 02 02 00`, the answer for a store b1 does not host |
+| a3 | Alice-leisure | serves every entry, as Alice-leisure |
+| a3 | Alice-work | refuses with `00 00 00 02 02 00`, the answer for a store b1 does not host |
 | d1 | Dave | refuses with the same frame, the ticket notwithstanding |
 | c1, once Carol's kicked event has reached b1 | Carol | refuses with the same frame from the next session; what c1 took before stays readable on it |
 
@@ -236,7 +237,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one entry per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once it arrives, or dropped and offered again by the next session. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once it arrives, or dropped and offered again by the next session. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again.
 
 **Example:** Bob's chain in "Family" as every member device holds it; the key's last segment is the actor's sequence; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
 
@@ -374,13 +375,13 @@ A session between two member devices SHALL reconcile the membership store to con
 
 A record SHALL sit under the name of the member that placed it, the key carrying the record's kind and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/immutable-document/<id>/<mseq>` for an immutable-document, `by/<pdnid>/mergeable-document/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's author key, the writer's membership sequence and the writer's own operation sequence. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without the trailing sequence.
 
-**Example:** Bob's three records in "Family", placed from his phone b1 and from the family tablet t1, which also hosts Carol; Bob and Carol each joined at their sequence 1; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<claim>`, `<scan>`, `<note>`: the ids `put_record` minted for the three records.
+**Example:** Bob's three records in "Family", placed from his phone b1 and from his laptop b2; Bob and Carol each joined at their sequence 1; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<claim>`, `<scan>`, `<note>`: the ids `put_record` minted for the three records.
 
 ```
 by/<bob>/claim/<claim>/1                         from b1
-by/<bob>/immutable-document/<scan>/1             from t1, under t1's author for Bob
+by/<bob>/immutable-document/<scan>/1             from b2, under b2's author
 by/<bob>/mergeable-document/<note>/<op>          <op>: b1's author, Bob's sequence 1, that author's operation 1
-by/<bob>/mergeable-document/<note>/<op>          <op>: t1's author for Carol, Carol's sequence 1, that author's operation 1 — under Bob's name all the same
+by/<bob>/mergeable-document/<note>/<op>          <op>: c1's author, Carol's sequence 1, that author's operation 1 — under Bob's name all the same
 
 a listing under by/<bob>/ returns these four entries; each record's identity is its key without the last segment
 ```
@@ -506,20 +507,21 @@ An entry in either store whose key fits neither store's layout, or fits one only
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the highest validly signed version among the member's statements, never entry timestamps, so an older statement written later displaces nothing.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
 
-**Example:** device statements in "Family"; Alice invited Bob, whose phone is b1, and the family tablet t1 was later linked into Bob and into Carol, whose phone is c1; Dave's phone is d1; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`.
+**Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
 | entry | written by | signed by | every member device |
 |---|---|---|---|
-| `member/<bob>/devices/1`: b1 with b1's author | a1, Alice's phone, in the join dialogue that brought Bob in | Bob's announcement key | admits it: the writer is not the member |
-| `member/<bob>/devices/2`: b1, and t1 with t1's author for Bob | t1, just linked | Bob's announcement key | admits it, whoever relays it, and resolves Bob's devices by version 2 |
-| `member/<bob>/devices/3`: b1, t1 and d1 | d1 | Dave's announcement key | drops it |
-| `member/<carol>/devices/2`: c1, and t1 with t1's author for Carol | t1, just linked into Carol | Carol's announcement key | admits it: t1 stands under two authors, one per member |
+| `member/<bob>/devices/1`: b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's announcement key | admits it: the writer is not the member |
+| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's announcement key | admits it, whoever relays it, and resolves Alice-leisure's devices by version 2 |
+| `member/<bob>/devices/2` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding version 1 alone | Bob's announcement key | admits both and resolves Bob's devices to b1, b2 and b3 |
+| `member/<bob>/devices/3`: b1, b2, b3 and d1 | d1 | Dave's announcement key | drops it |
+| `member/<alice-work>/devices/1`: a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's announcement key | admits it: a3 stands under two authors, one per member |
 
 #### Scenario: A new device registers itself through its siblings
 
-- **WHEN** a device freshly linked into member B writes B's newest device statement into its local replica, reconciles with another device of B that holds the cell, and that device then reconciles with a device of member C
+- **WHEN** a device freshly linked into member B writes the next version of B's device statement, listing itself, into its local replica, reconciles with another device of B that holds the cell, and that device then reconciles with a device of member C
 - **THEN** C's device admits the statement and serves the new device's next session, which it refused before the statement arrived
 
 #### Scenario: Two members on one node are two authors under one node id
@@ -537,16 +539,21 @@ A member's device-list statement — each device's node id beside the author the
 - **WHEN** a device of B holding version 2 of B's statement writes it into a replica already holding version 3
 - **THEN** device resolution still follows version 3 on every member device
 
+#### Scenario: Two statements at one version list both devices
+
+- **WHEN** two devices of B, out of reach of each other, each write the next version of B's statement listing a different new device, and both statements reach a member device in either order
+- **THEN** that device resolves B's devices to every device either statement lists, and a third statement at that version signed by a key that is not B's announcement key adds nothing
+
 ### Requirement: A cell's stores are forgotten together
 
 Forgetting a cell SHALL stop reconciling both replicas, leave both swarms, drop both replicas, and remove the cell's registration together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures. Forgetting SHALL reach the replicas of the identity that forgets alone: a co-located member's replicas of the same cell go on as before.
 
-**Example:** the family tablet t1 hosts Bob and Carol, both members of "Family", and Bob forgets the cell.
+**Example:** Alice's tablet a3 hosts Alice-leisure and Alice-work, both members of "Wedding", and Alice-work forgets the cell.
 
-| on t1, afterwards | as Bob | as Carol |
+| on a3, afterwards | as Alice-work | as Alice-leisure |
 |---|---|---|
-| a read of Alice's claim | the unknown-cell error | the claim |
-| Family's two replicas | dropped, both swarms left, reconciled no more | open and reconciling |
+| a read of Erin's claim | the unknown-cell error | the claim |
+| Wedding's two replicas | dropped, both swarms left, reconciled no more | open and reconciling |
 
 #### Scenario: Forgetting a cell unregisters it
 

@@ -50,15 +50,15 @@ A tombstone is the store's empty entry at a record's key — `…/<kind>/<id>`, 
 
 The rule belongs to the record store alone: the store beneath keeps carrying no relation between keys, so a directory's tombstone at `connections/<P>` leaves that key open for a later connect, and an entry outside the record layout touches nothing. pdn-store gains the two primitives the rule builds on — removing every author's entries at one key with their blobs, and reading every author's entries at one key, empty ones included, at ingest — which changes the fork and brings the stress pass of the flaky-tests practice with it. Blob collection, which the node does not run, is wired for its one blob store: its single protect callback answers with the union of every hosted identity's engine.
 
-**Example:** Alice, an owner, deletes Bob's lease scan from a1, and the family tablet t1, hosting Bob and Carol, takes the tombstone.
+**Example:** in "Wedding", Erin, an owner, deletes Bob's scan of the venue contract from her phone e1, and Alice's tablet a3, hosting Alice-leisure and Alice-work, both members, takes the tombstone.
 
-| step on t1 | Bob's replica | Carol's replica | the scan's blob |
+| step on a3 | Alice-leisure's replica | Alice-work's replica | the scan's blob |
 |---|---|---|---|
 | before | holds the scan | holds the scan | kept |
-| Bob's replica takes the tombstone from a1 | removes the scan, keeps the tombstone | holds the scan | kept: Carol's replica references it |
-| the in-process path brings the tombstone to Carol's replica | tombstone | removes the scan, keeps the tombstone | released |
-| b1, which missed the tombstone, offers the scan, whatever its timestamp | refuses it at ingest | refuses it at ingest | stays released |
-| b1 then takes the tombstone from t1 and removes its own copy of the scan. | | | |
+| Alice-leisure's replica takes the tombstone from e1 | removes the scan, keeps the tombstone | holds the scan | kept: Alice-work's replica references it |
+| the in-process path brings the tombstone to Alice-work's replica | tombstone | removes the scan, keeps the tombstone | released |
+| Bob's phone b1, which missed the tombstone, offers the scan, whatever its timestamp | refuses it at ingest | refuses it at ingest | stays released |
+| b1 then takes the tombstone from a3 and removes its own copy of the scan. | | | |
 
 **Rejected alternatives:**
 
@@ -101,13 +101,13 @@ Placing on top of a record is refused on the writing device, and a version under
 - (b) Last writer wins on reconciliation: within one record, the newest timestamp from any device of its member wins, and older versions go with their blobs; the membership sequence in the key stays. Every device converges on one version, and only the member's own devices contend over timestamps. But an honest collision silently loses one version, "a record's key is written once" — which the deletion rule rests on — needs rewriting, and a departed member naming its old sequence rewrites its old records in place. The access tables would then read: no update on the writing device, and the newest version winning on reconciliation, so a modified device of a member rewrites that member's own claims and immutable-documents.
 - What the choice turns on is the form of a record's id: with a fresh id the service mints, as `put_record` does, two devices of one member never meet at one id, there is no honest collision, and (b) rests on convergence alone; with an id that is a file path or a well-known name, the collision is real — one file placed from a phone and a laptop while disconnected — and (b) resolves it by losing one version.
 
-**Example:** Bob places his lease scan at the well-known id `lease.pdf` from his phone b1 at 10:00 and from the family tablet t1 at 10:05, the two disconnected from each other; both entries sit at `by/<bob>/immutable-document/lease.pdf/1`, `<bob>` being 64 lowercase hex chars of Bob's `PdnId`.
+**Example:** Bob places his lease scan at the well-known id `lease.pdf` from his phone b1 at 10:00 and from his laptop b2 at 10:05, the two disconnected from each other; both entries sit at `by/<bob>/immutable-document/lease.pdf/1`, `<bob>` being 64 lowercase hex chars of Bob's `PdnId`.
 
 | | every member device once both versions have reached it |
 |---|---|
-| today | holds both, one per author; a read shows t1's |
+| today | holds both, one per author; a read shows b2's |
 | (a) refused everywhere | holds whichever version arrived first and refuses the other, which every session offers again, until Bob or an owner deletes the record |
-| (b) last writer wins | holds t1's; b1's goes with its blob |
+| (b) last writer wins | holds b2's; b1's goes with its blob |
 
 ### A non-empty entry at a record's own key
 

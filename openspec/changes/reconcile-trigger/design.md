@@ -32,14 +32,14 @@ On a write, the serving node resolves the scoped peers whose grants cover the wr
 
 A peer is a node and the identity holding the replica there, never a node alone (ADR-0013). One node may hold one issuer's namespace for two identities at once, each under its own grant, and the trigger names the covering identity — the audience the grant record names.
 
-**Example:** Alice (issuer) writes `contact/email` on her laptop a1. Bob holds a read grant on `contact/email`, Carol one on `contact/phone`; Bob publishes the devices b1 (his phone) and t1 (the family tablet), Carol publishes t1.
+**Example:** Bob (issuer) writes `contact/email` on his phone b1. Alice-leisure holds a read grant on `contact/email`, Alice-work one on `contact/phone`; Alice-leisure publishes the devices a1 (her phone) and a3 (her tablet), Alice-work publishes a3.
 
-| addressee (node, identity) | grant a1 wrote toward the identity | a1 sends |
+| addressee (node, identity) | grant b1 wrote toward the identity | b1 sends |
 |---|---|---|
-| (b1, Bob) | covers `contact/email` | a trigger, on a connection it dials to b1 |
-| (t1, Bob) | covers `contact/email` | a trigger naming Bob, on a connection it dials to t1 |
-| (t1, Carol) | covers `contact/phone` alone | nothing |
-| t1 reconciles Bob's replica alone; Carol's replica there hears nothing of the write, not even that one happened. | | |
+| (a1, Alice-leisure) | covers `contact/email` | a trigger, on a connection it dials to a1 |
+| (a3, Alice-leisure) | covers `contact/email` | a trigger naming Alice-leisure, on a connection it dials to a3 |
+| (a3, Alice-work) | covers `contact/phone` alone | nothing |
+| a3 reconciles Alice-leisure's replica alone; Alice-work's replica there hears nothing of the write, not even that one happened. | | |
 
 **Rejected alternatives:**
 
@@ -55,13 +55,13 @@ A peer is a node and the identity holding the replica there, never a node alone 
 
 A trigger whose addressee is hosted on the sending node is the write announcement the node already raises (Context): the writer's engine sends `CoLocatedRequest::Announce`, and the node opens `Engine::sync_in_process` from the writer to the addressed identity, the way a contact naming the node's own id is reached. On a data namespace the announcement reaches the issuer and the addressees D1 resolves on this node, and no other identity that holds the namespace. A directory and a connection metadata store are read whole by every identity that holds them (Invariants 1 and 3), so a write to one still reaches each of its co-located holders. An announcement the pair cannot take at once, because its previous session is still being set up or is running, is that pair's pending trigger under D3, and it is replayed to that same pair once the session ends.
 
-**Example:** Alice's laptop a1 hosts Alice, Bob and Erin. Bob (read grant on `contact/email`) holds her namespace on a1 and on his phone b1; Erin (read grant on `contact/phone`) holds it on a1. Alice writes `contact/email` on a1.
+**Example:** Alice's laptop a1 hosts Alice-work and Alice-leisure. Alice-leisure (read grant on `contact/email`) holds Alice-work's namespace on a1, and Bob (read grant on `contact/email` too) holds it on his phone b1. Alice-work writes `contact/email` on a1, then `contact/phone`.
 
-| addressee | its node | what a1 does |
-|---|---|---|
-| (a1, Bob) | a1's own endpoint id | `Announce`, then `Engine::sync_in_process` from Alice to Bob, as for a contact naming a1 |
-| (a1, Erin) | a1's own endpoint id | nothing: her grant does not cover `contact/email`, so no session opens |
-| (b1, Bob) | another node | dials b1 with a trigger; b1 then reconciles with a1 in a session on `/iroh-sync/1` |
+| write | addressee | its node | what a1 does |
+|---|---|---|---|
+| `contact/email` | (a1, Alice-leisure) | a1's own endpoint id | `Announce`, then `Engine::sync_in_process` from Alice-work to Alice-leisure, as for a contact naming a1 |
+| `contact/email` | (b1, Bob) | another node | dials b1 with a trigger; b1 then reconciles with a1 in a session on `/iroh-sync/1` |
+| `contact/phone` | (a1, Alice-leisure) | a1's own endpoint id | nothing: her grant does not cover `contact/phone`, so no session opens |
 
 **Rejected alternatives:**
 

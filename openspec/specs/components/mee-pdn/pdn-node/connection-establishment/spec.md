@@ -160,14 +160,14 @@ Establishment SHALL report to its own caller three failed outcomes of the dialog
 
 Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and each of the metadata pair's two stores SHALL be held twice on the node — created for the identity that writes it and imported for the identity that reads it — four replicas in all, each store's two replicas converging inside the node without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
 
-**Example:** Alice and Bob are both hosted on node n1, and Bob establishes from Alice's invite with no other node reachable.
+**Example:** Alice-work and Alice-leisure are both hosted on Alice's phone a1, and Alice-leisure establishes from Alice-work's invite with no other node reachable.
 
-| part | on n1 |
+| part | on a1 |
 |---|---|
-| transport | `inviter_addr` names n1's own endpoint id, which iroh refuses to dial: a pipe inside n1 buffering 65,540 bytes each way |
+| transport | `inviter_addr` names a1's own endpoint id, which iroh refuses to dial: a pipe inside a1 buffering 65,540 bytes each way |
 | dialogue | the same `PairingRequest`, `verify_and_burn` and assembly as between two nodes |
-| Alice's store toward Bob | held twice on n1: for Alice, who writes it, and for Bob, who reads it; the two sync inside n1 |
-| Bob's store toward Alice | held twice on n1: for Bob, who writes it, and for Alice, who reads it; the two sync inside n1 |
+| Alice-work's store toward Alice-leisure | held twice on a1: for Alice-work, who writes it, and for Alice-leisure, who reads it; the two sync inside a1 |
+| Alice-leisure's store toward Alice-work | held twice on a1: for Alice-leisure, who writes it, and for Alice-work, who reads it; the two sync inside a1 |
 
 #### Scenario: Two identities of one node connect and exchange a grant
 

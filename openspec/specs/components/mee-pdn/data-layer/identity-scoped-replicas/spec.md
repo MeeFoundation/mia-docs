@@ -10,13 +10,13 @@ A hosted identity owns its own half of the node: the replicas it acquired, the a
 
 Every replica a node holds SHALL belong to exactly one hosted identity, and the act that brings it there — a create or an import, a private metadata directory and a connection metadata store included — SHALL name that identity. Two identities SHALL NOT share a replica, whether they acquired the same namespace under two grants of one issuer or hold the two ends of one connection's metadata pair. The runtime SHALL import the ticket a grant record carries only for the identity the grant is addressed to: it reads a connection's grants for the identity at that connection's end alone, and a record addressed to anyone else binds nothing there. An import the host makes explicitly SHALL land in the identity it names, whichever hosted identity that is, and SHALL bring that identity nothing it was not granted. A ticket carries no record of the grant or the connection it came from, so no import can tell a grant's ticket from any other. What makes one useless to an identity the grant does not address is twofold: the issuer answers only the audiences it granted, and a replica an identity imports is served only to callers that identity's own records place — whole to the issuer's devices listed in the device set the issuer published into its connection with that identity, and to that identity's own devices filtered by a grant record addressed to it. An identity with no connection to the issuer therefore re-serves the replica to nobody, and one connected to the issuer without a grant re-serves it to the issuer's devices alone. A replica an identity holds is no evidence that a grant was made to it.
 
-**Example:** Bob (issuer, node b1) grants `contact/email` to Alice-work and to Alice-leisure, both hosted on node a1; Carol, hosted on a1 too, has no grant; `<x>` is x's `PdnId` in hex.
+**Example:** Bob (issuer, node b1) grants `contact/email` to Alice-work and to Alice-leisure, both hosted on node a1; Carol (issuer, node c1) grants `contact/phone` to Alice-work alone; `<x>` is x's `PdnId` in hex.
 
-| replica of Bob's namespace in | imported by | comes to carry |
-|---|---|---|
-| `identities/<Alice-work>/docs.redb` | the runtime, from the grant to Alice-work | `contact/email` |
-| `identities/<Alice-leisure>/docs.redb` | the runtime, from the grant to Alice-leisure | `contact/email`, converging on its own |
-| `identities/<Carol>/docs.redb` | the host, for Carol, from the ticket of Alice-work's grant | nothing: b1 answers Alice-work and Alice-leisure alone |
+| replica | in | imported by | comes to carry |
+|---|---|---|---|
+| Bob's namespace | `identities/<Alice-work>/docs.redb` | the runtime, from the grant to Alice-work | `contact/email` |
+| Bob's namespace | `identities/<Alice-leisure>/docs.redb` | the runtime, from the grant to Alice-leisure | `contact/email`, converging on its own |
+| Carol's namespace | `identities/<Alice-leisure>/docs.redb` | the host, for Alice-leisure, from the ticket of Carol's grant to Alice-work | nothing: c1 answers Alice-work alone |
 
 #### Scenario: Two audiences of one issuer hold two replicas
 

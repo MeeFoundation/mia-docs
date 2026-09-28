@@ -10,7 +10,7 @@ A cell is two stores, the membership store and the record store, each held whole
 |---|---|---|---|
 | Bob's phone b1 | Bob | 1 | 2 |
 | Bob's phone b1 | Bob | 50 | 100 |
-| the family tablet t1 | Bob and Carol | the same 50 cells | 200 |
+| Alice's tablet a3 | Alice-leisure and Alice-work | 50 each, 10 of them shared | 200 |
 
 ## What Changes
 
