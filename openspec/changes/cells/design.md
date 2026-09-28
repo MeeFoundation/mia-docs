@@ -217,7 +217,7 @@ The creator is the cell's first owner — its founding event (D23). An owner pro
 
 ### D13. Acting on a record does not depend on its member's membership state
 
-The rights to act on a record are the same whether the member that placed it in the cell is a current member or a departed one — one that left or was kicked. Leaving and a kick change admission alone — sessions refused, entries naming a sequence at which the member was no longer a member dropped (D22) — and change nothing about what is in the cell or what members may do to it: the member's own records stay, its operations on other members' mergeable-documents stay, no power over a member's records appears at its departure, and none disappears — the members edit a departed member's mergeable-documents as they do a current member's. A member that joins again writes again — new records, new operations, naming its new sequence — as any member, and its earlier records, naming its earlier sequence, resolve to it as they always did (D22). Members leave, rejoin and are kicked over a cell's life, and the rules for its records read the same throughout.
+The rights to act on a record are the same whether the member that placed it in the cell is a current member or a departed one — one that left or was kicked. Leaving and a kick change admission alone — the record store refused, the membership store served up to the departure (D36), entries naming a sequence at which the member was no longer a member dropped (D22) — and change nothing about what is in the cell or what members may do to it: the member's own records stay, its operations on other members' mergeable-documents stay, no power over a member's records appears at its departure, and none disappears — the members edit a departed member's mergeable-documents as they do a current member's. A member that joins again writes again — new records, new operations, naming its new sequence — as any member, and its earlier records, naming its earlier sequence, resolve to it as they always did (D22). Members leave, rejoin and are kicked over a cell's life, and the rules for its records read the same throughout.
 
 **Example:** Carol's records in "Family" as her membership changes; Bob is a plain member.
 
@@ -229,7 +229,7 @@ The rights to act on a record are the same whether the member that placed it in 
 
 ### D14. Every reachable membership state is repairable by owners
 
-No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves the cell's membership in a state its owners cannot repair from inside, and a mergeable-document spoiled by edits is repaired by further edits. Recreating the cell — a new store, re-invited members, re-uploaded content — is never the only way out of a membership state. A record placed stays: no member and no owner deletes or replaces one, so a claim or an immutable-document placed by mistake, a member's junk and a departed member's records stay for every member for as long as the cell lives. The converse holds too: no operation deletes a cell for every member, owners included — a cell ends by its members leaving, each forgetting its own copy, and a device that holds the store keeps it anyway (Invariant 2). The cell after its last leave — every member's chain ending in a left or kicked event — needs no form of its own, and no device observes it, since leaving forgets both stores. Every rule in this design is measured against this invariant; the act that could strand it — the last owner gone — is the open edge (B10).
+No sequence of acts — joins, leaves, kicks, promotions, demotions — leaves the cell's membership in a state its owners cannot repair from inside, and a mergeable-document spoiled by edits is repaired by further edits. Recreating the cell — a new store, re-invited members, re-uploaded content — is never the only way out of a membership state. A record placed stays: no member and no owner deletes or replaces one, so a claim or an immutable-document placed by mistake, a member's junk and a departed member's records stay for every member for as long as the cell lives. The converse holds too: no operation deletes a cell for every member, owners included — a cell ends by its members leaving, each forgetting its own copy of the records and keeping the membership store as the cell's tombstone (D36), and a device that holds the record store keeps it anyway (Invariant 2). The cell after its last leave — every member's chain ending in a left or kicked event — needs no form of its own: every former member's devices hold the tombstone, and no record store is left to observe. Every rule in this design is measured against this invariant; the act that could strand it — the last owner gone — is the open edge (B10).
 
 **Example:** states "Family" reaches and how its owner Alice repairs each from inside; Bob and Carol are plain members.
 
@@ -336,14 +336,14 @@ A session between two member devices reconciles the membership store to converge
 
 ### D20. Every member device holds the write ticket of both stores
 
-Every member device holds both stores whole and holds their write tickets; write authority inside a cell is the gate's, judged per entry (D6, D17), never the ticket's mode. Any member edits other members' mergeable-documents (D6), and every member relays what it holds (D7). A kicked member keeps the write tickets it held: honest devices refuse its sessions and drop the entries it authors under a sequence at which it was no longer a member (D13, D22), which is the whole of a kick under bearer tickets — an entry it authors afterwards under an earlier sequence, a membership act among them, counts (D34).
+Every member device holds both stores whole and holds their write tickets; write authority inside a cell is the gate's, judged per entry (D6, D17), never the ticket's mode. Any member edits other members' mergeable-documents (D6), and every member relays what it holds (D7). A kicked member keeps the write tickets it held: honest devices refuse it the record store, serve it the membership store only up to its kick (D36), and drop the entries it authors under a sequence at which it was no longer a member (D13, D22), which is the whole of a kick under bearer tickets — an entry it authors afterwards under an earlier sequence, a membership act among them, counts (D34).
 
 **Example:** what the write tickets decide in "Family", where Alice is an owner, Bob a plain member, and Carol was kicked at her sequence 2; each holds both write tickets.
 
 | | Alice | Bob | Carol |
 |---|---|---|---|
 | both write tickets | held | held | held still |
-| sessions with member devices | served | served | refused from the first session after the kick reaches the serving device |
+| sessions with member devices | served | served | the record store refused from the first session after the kick reaches the serving device, the membership store served up to the kick (D36) |
 | an operation on the shopping list | admitted | admitted | dropped when it names her sequence 2; admitted when, written after the kick, it names her sequence 1 (D34) |
 
 **Rejected alternatives:**
@@ -522,7 +522,7 @@ Cells are built in parallel with what exists. Connections, grants, subset-rbsr a
 | Alice's phone number | her own namespace at `contact/phone`, under a grant to Bob | — |
 | the shopping list | — | the cell's record store, under Alice's name |
 | Alice withdraws the grant | Bob stops receiving `contact/phone` | nothing changes |
-| Bob leaves the cell | nothing changes | Bob's devices forget both stores |
+| Bob leaves the cell | nothing changes | Bob's devices forget the record store and keep the membership store as the cell's tombstone |
 
 **Rejected alternatives:**
 
@@ -575,7 +575,7 @@ GET /debug/identities/<alice-leisure>/cells/eead8ef96aa1254969d63c12631b799c/rec
 
 ### D32. A session names two members, and the caller is looked up in the serving identity's own records
 
-Every session on a cell's store names, as every session under identity-scoped replicas does, the member whose replica it addresses and the member its caller acts as, and is served only when the member the caller names is a current member whose records list the caller's node id. Which records follow from who serves. Where the caller names the identity the serving replica belongs to — a sibling device of that identity — its node id is looked up in that identity's own directory, as for every other store of the identity. Where it names another member, it is looked up in that member's device statements in the membership store (D16), whether the session crosses the network or runs inside the process between two identities of one node. A freshly linked device is therefore served by its siblings at once, before any statement lists it, and its statement reaches the other members through them. A caller naming an identity that is no member is refused indistinguishably from the store not being hosted — a co-located identity on a member's own node included, though it shares that member's node id — and so is a caller naming a member whose records do not list it. A node hosting members B and D is served as B in a session naming B and as D in one naming D, never as both.
+Every session on a cell's store names, as every session under identity-scoped replicas does, the member whose replica it addresses and the member its caller acts as, and is served only when the member the caller names is a current member whose records list the caller's node id, or, on the membership store alone and up to its departure, a former member whose records list it (D36). Which records follow from who serves. Where the caller names the identity the serving replica belongs to — a sibling device of that identity — its node id is looked up in that identity's own directory, as for every other store of the identity. Where it names another member, it is looked up in that member's device statements in the membership store (D16), whether the session crosses the network or runs inside the process between two identities of one node. A freshly linked device is therefore served by its siblings at once, before any statement lists it, and its statement reaches the other members through them. A caller naming an identity that is no member is refused indistinguishably from the store not being hosted — a co-located identity on a member's own node included, though it shares that member's node id — and so is a caller naming a member whose records do not list it. A node hosting members B and D is served as B in a session naming B and as D in one naming D, never as both.
 
 **Example:** callers ask Bob's phone b1 for a session on the record store of "Family", addressing Bob's replica. Bob's laptop b2 was linked a minute ago and no statement lists it yet; Alice's tablet a3 hosts Alice-leisure, a member, and Alice-work, no member; no statement of Dave's lists a3; `<b2-hex>`: 64 lowercase hex chars of b2's `NodeId`.
 
@@ -617,7 +617,7 @@ Cells serve load testing first, and the defence of a cell against a member's dev
 
 ### D35. A cell's record in the directory follows the identity's membership sequence
 
-The identity's directory records each cell under `cells/<cell-id-hex>/<seq>`, where `<seq>` is the sequence, in the identity's own chain in the cell's membership store, of the event the entry mirrors: the founding event or a joined event writes a non-empty entry at its sequence, and a left event writes a pdn-store tombstone at its own. The identity holds the cell when the entry at the highest sequence, across all authors, is non-empty, a tombstone outweighing a non-empty entry at one sequence; entry timestamps are never read, so a leave from a device whose clock runs behind still ends holding on every device, and a join after it holds the cell again. The device that acts writes both with one number: the leaving device places its left event at the sequence after the highest it holds in its own chain and the tombstone at the same one, and a joining device, caught up when the join returns (D26), reads the sequence of its joined event before it writes. The record sits in the directory, the identity's own store, because a departed member's devices are served no session on the cell's stores (D32), its siblings' included, so the left event may never reach them, while the directory syncs between them always; a restart re-derives the held cells from the same entries (D16). pdn-store's delete removes its own key alone, so a tombstone at `cells/<cell-id-hex>/1` leaves `cells/<cell-id-hex>/10` standing. A kick writes nothing into the kicked member's directory.
+The identity's directory records each cell under `cells/<cell-id-hex>/<seq>`, where `<seq>` is the sequence, in the identity's own chain in the cell's membership store, of the event the entry mirrors: the founding event or a joined event writes a non-empty entry at its sequence, and a left event, or a kicked event its device learns of, writes a pdn-store tombstone at its own. The identity holds the cell when the entry at the highest sequence, across all authors, is non-empty, a tombstone outweighing a non-empty entry at one sequence; entry timestamps are never read, so a leave from a device whose clock runs behind still ends holding on every device, and a join after it holds the cell again. The device that acts writes both with one number: the leaving device places its left event at the sequence after the highest it holds in its own chain and the tombstone at the same one, and a joining device, caught up when the join returns (D26), reads the sequence of its joined event before it writes. The record sits in the directory, the identity's own store, because a departed member's devices are served no session on the cell's stores (D32), its siblings' included, so the left event may never reach them, while the directory syncs between them always; a restart re-derives the held cells from the same entries (D16). pdn-store's delete removes its own key alone, so a tombstone at `cells/<cell-id-hex>/1` leaves `cells/<cell-id-hex>/10` standing. A kick reaches the kicked member's directory through the first of its devices that learns of it (D36).
 
 **Example:** Bob acts on his membership of "Family" from his phone b1, whose clock is right, and his laptop b2, whose clock runs 80 minutes behind.
 
@@ -636,10 +636,56 @@ The identity's directory records each cell under `cells/<cell-id-hex>/<seq>`, wh
 - A counter of the directory's own beside the cell id.
   - **Cons:** a second number for what the membership chain already numbers, which two disconnected devices of the identity bump alike.
 
+### D36. A departed member's devices keep the cell's membership store as its tombstone
+
+A member that leaves, and a member whose device learns that it was kicked, forget the record store and keep the membership store for good, on every device of the identity, as the cell's tombstone. The tombstone holds the departure's past: the departure event — the member's left event, or the kicked event in its chain — and every entry that event depends on, followed back through the earlier events of its subject's chain, its actor's chain up to the point it names, and, for each of these in turn, the same, with the joined events and device statements that resolve their authors, down to the founding event. A member device serves a session naming a former member on the membership store alone and over the departure's past alone, in both directions, and refuses it the record store as it refuses any caller that is no member (D32); a sibling device serves the tombstone whole, it being the identity's own. The past follows from the event set alone, so every member device serves the same one, and nothing written outside it — a later record, a later member, a later device statement — reaches a former member. A left event written with no member reachable therefore reaches the members at the leaving device's first session with any of them, and a device offline during its member's kick learns of the kick at its first session, turns the cell into its tombstone, and writes the directory's tombstone at the kicked event's sequence (D35), which carries the departure to the identity's other devices. A tombstone is reconciled with member devices, outside the store's swarm, until one session with a member device has converged over the departure's past, and is then kept and reconciled with the identity's own devices alone; a device linked after the departure takes it from a sibling. A join after the departure turns the tombstone back into the cell's membership store (D35). Without an anchored log a former member's device is taken on its word within the departure's past, as every member's own history is (D34). The forgotten record store's payloads leave the device once no other replica on it references them (D37).
+
+**Example:** Carol leaves "Family" on her phone c1 while c1 is offline, her laptop c2 holds the cell too, and an hour later c1 reaches Bob's phone b1; meanwhile Bob invited Dave, and nothing in Carol's departure depends on Dave's join.
+
+| step | Carol's devices | b1 |
+|---|---|---|
+| Carol leaves on c1 | c1 writes her left event at her sequence 3 and `cells/eead8ef96aa1254969d63c12631b799c/3` as the directory's tombstone, forgets the record store, keeps the membership store; c2 does the same once Carol's directory syncs | — |
+| an hour later c1 reaches b1 | a session on the membership store over the past of Carol's left event: c1 sends the left event and takes what of that past it lacks | admits the left event; Dave's joined event, outside that past, is not sent |
+| c1 asks b1 for the record store | refused with `00 00 00 02 02 00` | |
+| Alice places a record | receives nothing | receives it |
+| had Alice kicked Carol while c1 was offline instead | c1 takes the kicked event and the past it rests on in its first session, forgets the record store and writes the directory's tombstone at the kicked event's sequence | serves that past, and nothing after it |
+
+**Rejected alternatives:**
+
+- Both stores forgotten at the leave.
+  - **Cons:** a left event written with no member reachable exists nowhere once the device forgets, and every member device lists the member for good; a device offline during a kick learns nothing of it and keeps writing entries nobody receives.
+- Both stores forgotten once another member's device has acknowledged the left event.
+  - **Cons:** an acknowledgement of its own, and a device offline during a kick still learns nothing.
+- Both stores forgotten after a bound.
+  - **Cons:** a bound that passes before a member device is reached loses the left event.
+- The former member's own chain alone as the tombstone's past.
+  - **Cons:** a kicked event is written by an owner, and the owner's chain up to the point the event names is what makes it verifiable, so the former member's device could judge its own kick by nothing.
+- Every entry the serving device held when the departure reached it.
+  - **Cons:** entries of different chains carry no order between them, so each member device would serve a different set, fixed by what it happened to hold.
+
+### D37. A node removes the payloads no replica it holds references
+
+The node runs blob collection over its one blob store, whose single protect callback answers with the union of what every hosted identity's engine references, so a payload stays while any replica of any identity the node hosts references it and leaves the device at the next run once none does. A payload replicates with its entry, so every device of a member downloads every payload of the cell; a forgotten record store, a forgotten data replica or a withdrawn grant's replica frees its payloads without anything to delete by hand. The collection runs at an interval `SpawnOptions` sets.
+
+**Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; its record store held Bob's lease scan and a photo whose bytes Carol also keeps in her own data namespace.
+
+| payload | referenced after the record store is forgotten by | on c1 after the next run |
+|---|---|---|
+| Bob's lease scan | nothing | removed |
+| the photo | Carol's data namespace | kept |
+| On Alice's tablet a3, where Alice-work leaves "Wedding" and Alice-leisure stays a member, every payload of the cell stays: Alice-leisure's replica of the record store references each. | | |
+
+**Rejected alternatives:**
+
+- No collection: payloads stay until the device's storage is reset.
+  - **Cons:** every payload a device ever downloaded stays on its disk for good, a departed member's and a withdrawn grant's among them, and keeps being served by hash to any caller.
+- A collection per identity.
+  - **Cons:** the blob store is one per node, so one identity's run would remove a payload a co-located identity's replica still references.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
-- [A kicked member keeps both stores' write tickets and topic ids] → honest devices refuse its sessions and drop the entries it authors under a sequence at which it was no longer a member; an entry it authors afterwards under an earlier sequence, a membership act among them, passes (D34); it retains what it received and still sees content-free announcements; real expulsion under bearer tickets is a new cell, accepted while cells serve load testing (D20, D28).
+- [A kicked member keeps both stores' write tickets and topic ids] → honest devices refuse it the record store, serve it the membership store only up to its kick (D36), and drop the entries it authors under a sequence at which it was no longer a member; an entry it authors afterwards under an earlier sequence, a membership act among them, passes (D34); it retains what it received and still sees content-free announcements; real expulsion under bearer tickets is a new cell, accepted while cells serve load testing (D20, D28).
 - [Membership is a multi-writer set] → its events order by per-member sequence numbers, never by timestamp (D3, D21); two owners' concurrent events on one member at one sequence — a kick beside a promotion or a demotion — need a tie-break (B10); a member-signed founding chain gives membership a root but no total order.
 - [Authorship is a transport-level binding] → author keys are held per hosted identity on a device (ADR-0013); the binding of an author key to a member is what the member publishes under its announcement key (D16), verifiable by anyone holding the join statement; an honest gate enforces it; a modified member device can forge locally but cannot pass honest gates under the name of a member it does not host, while a node acts as every identity it hosts, holding the secrets of each (threat model); what it can still do under its own name after departing is D34. Signed claims come with KERI.
 - [Range fingerprints are linear scans] → a record store with 100 writers is never quiescent, so every catch-up session scans it per round; a cached fingerprint tree in pdn-store is the fix, outside this change, and the membership store's convergence does not wait for it (D3).
@@ -679,7 +725,7 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
     - A fold-time guard over all chains: a demotion that would leave the cell with no owner is ignored, and when two would jointly do so, the one whose actor has the lower key stands. **Leaning.**
     - A member that cannot be demoted — the creator as a root owner, which D11 rejects.
   - The same event twice at one point from two owners — two promoted events of B at sequence 5: the same transition, applied once.
-  - The last two owners leaving at once, while disconnected from each other. The refusal of the second case runs on the writing device, and each device still sees the other owner, so both left events stand and the owner set empties. Ignoring one of them does not help: that member has forgotten both stores and would stay an owner who holds nothing.
+  - The last two owners leaving at once, while disconnected from each other. The refusal of the second case runs on the writing device, and each device still sees the other owner, so both left events stand and the owner set empties. Ignoring one of them does not help: that member has forgotten the record store and would stay an owner who holds none of the records.
     - (a) An owner's leave completes only once another owner's device has acknowledged it, so two concurrent leaves wait on each other; an owner that is never online again blocks the other's leave.
     - (b) When the owner set empties through concurrent left events, the member with the lowest join sequence becomes an owner by rule: against D11, as in the second case, but only for this race; it needs the order the second case's (b) needs.
     - (c) Accepted: the cell stays without an owner — members read and edit, nobody kicks a member — and a new cell is the way out, against D14 for this edge.
@@ -726,14 +772,3 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 | (a) recovery through the identity | Alice restores her identity on a new phone a4 with KERI's pre-rotated keys; a4 signs its device statement under the rotated key, and a member hands a4 the cell's tickets without writing a joined event; Alice acts as an owner again |
 | (b) an owner silent past a bound loses the role | past the bound Bob becomes an owner, each device judging the bound by its own clock, so devices disagree on when |
 | (c) accepted | Alice stays listed as the owner, and nobody acts as one |
-
-- B13. A left event that never leaves the leaving device. A leave tombstones the cell's record in the identity's directory, so the member's other devices forget the cell when the directory syncs, and forgets both stores on the leaving device; but the left event itself has to reach another member before that device forgets, or it exists nowhere and the member stays listed. Options: the leaving device forgets only once another member's device has acknowledged the left event; it forgets after a bound whether or not one has; or it keeps the membership store until the event is served once, and forgets the record store at once.
-
-**Example:** Carol leaves "Family" on her phone c1 while c1 is offline, and an hour later c1 reaches Bob's phone b1.
-
-| option | at the leave | an hour later |
-|---|---|---|
-| forget once another member's device acknowledges the left event | c1 keeps both stores | b1 takes the left event and acknowledges it, and c1 forgets both |
-| forget after a bound | c1 forgets both once the bound passes, whether or not the event left it | if the bound passed first, the left event exists nowhere, and every member device still lists Carol |
-| keep the membership store until the event is served once | c1 forgets the record store at once | c1 serves the left event to b1, then forgets the membership store |
-

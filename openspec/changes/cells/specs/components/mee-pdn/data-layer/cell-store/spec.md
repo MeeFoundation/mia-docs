@@ -187,7 +187,7 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 ### Requirement: Only member devices are served
 
-A session for either of a cell's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member kicked from the cell SHALL be refused from the first session set up after the kicked event reaches the serving device; what it obtained while a member is retained.
+A session for either of a cell's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member kicked from the cell, or one that left it, SHALL be refused the record store from the first session set up after its departure event reaches the serving device, and served the membership store only as the requirement on a departed member's tombstone states; what it obtained while a member is retained.
 
 **Example:** callers ask Bob's phone b1 for a session on the record store of "Family", addressing Bob's replica; Alice's tablet a3 hosts Alice-leisure, a member, and Alice-work, no member, and Dave, no member, holds the store's ticket on his phone d1.
 
@@ -216,8 +216,35 @@ A session for either of a cell's stores SHALL name the member whose replica it a
 
 #### Scenario: A kicked member is refused from the next session
 
-- **WHEN** a member is kicked and the kicked event has reached a serving device, and a device of the kicked member then requests a session
+- **WHEN** a member is kicked and the kicked event has reached a serving device, and a device of the kicked member then requests a session on the record store
 - **THEN** the request is refused as for an unhosted replica, while the remaining members' devices are still served, and what the kicked member's device obtained while a member is still readable on it
+
+### Requirement: A departed member's devices keep the membership store as the cell's tombstone
+
+A member's departure event — its left event, or a kicked event in its chain — SHALL end its devices' hold on the record store and SHALL NOT end their hold on the membership store: every device of the departed member's identity SHALL keep the membership store for good as the cell's tombstone, and forget the record store. The departure's past SHALL be the departure event and every entry it depends on — the earlier events of its subject's chain, its actor's chain up to the point it names, and, for each of these in turn, the same, with the joined events and device statements that resolve their authors — down to the founding event. A member device SHALL serve a session naming a former member, from a device the former member's statements list, on the membership store alone and over the departure's past alone, in both directions, and SHALL serve it nothing outside that past; a sibling device of the former member SHALL serve it the tombstone whole. A tombstone SHALL be reconciled with member devices until one session with a member device has converged over the departure's past, and then with the identity's own devices alone.
+
+**Example:** Carol leaves "Family" on her phone c1 while c1 is offline, and an hour later c1 reaches Bob's phone b1; meanwhile Bob invited Dave, and nothing in Carol's departure depends on Dave's join.
+
+| on b1 | c1 |
+|---|---|
+| a session on the membership store naming Carol | served over the past of her left event: b1 admits the left event and sends what of that past c1 lacks, and not Dave's joined event |
+| a session on the record store naming Carol | refused with `00 00 00 02 02 00` |
+| a record Alice places afterwards | reaches b1 and never c1 |
+
+#### Scenario: A left event written offline reaches the members
+
+- **WHEN** a member leaves on a device with no member device reachable, and that device later reaches a member device
+- **THEN** the member device persists the left event and every member device lists the member as no member, while the departed device is refused the record store
+
+#### Scenario: A device offline during its member's kick learns of the kick
+
+- **WHEN** member C's device is offline while an owner kicks C, and the device then requests a session from a member device
+- **THEN** the session on the membership store delivers C's kicked event and the entries it rests on, C's device forgets the record store and keeps the membership store, and neither a record placed after the kick nor a membership event outside the kick's past reaches it from any member device
+
+#### Scenario: Every device of a departed identity keeps the tombstone
+
+- **WHEN** a member leaves on one device while another device of its identity holds the cell, and the identity's directory syncs
+- **THEN** both devices hold the membership store and neither holds the record store
 
 ### Requirement: Membership needs no connection
 
@@ -543,21 +570,22 @@ A member's device-list statement — each device's node id beside the author the
 - **WHEN** two devices of B, out of reach of each other, each write the next version of B's statement listing a different new device, and both statements reach a member device in either order
 - **THEN** that device resolves B's devices to every device either statement lists, and a third statement at that version signed by a key that is not B's announcement key adds nothing
 
-### Requirement: A cell's stores are forgotten together
+### Requirement: A departure forgets the record store and keeps the membership store
 
-Forgetting a cell SHALL stop reconciling both replicas, leave both swarms, drop both replicas, and remove the cell's registration together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures. Forgetting SHALL reach the replicas of the identity that forgets alone: a co-located member's replicas of the same cell go on as before.
+Forgetting a cell at a departure SHALL stop reconciling the record store, leave both swarms, drop the record store's replica, and turn the cell's registration into its tombstone together, so that operations addressed to that cell afterwards fail with an unknown-cell error distinguishable from transport and storage failures, while the membership store's replica stays as the tombstone the requirement on a departed member's tombstone describes. Forgetting SHALL reach the replicas of the identity that forgets alone: a co-located member's replicas of the same cell go on as before.
 
-**Example:** Alice's tablet a3 hosts Alice-leisure and Alice-work, both members of "Wedding", and Alice-work forgets the cell.
+**Example:** Alice's tablet a3 hosts Alice-leisure and Alice-work, both members of "Wedding", and Alice-work leaves the cell.
 
 | on a3, afterwards | as Alice-work | as Alice-leisure |
 |---|---|---|
 | a read of Erin's claim | the unknown-cell error | the claim |
-| Wedding's two replicas | dropped, both swarms left, reconciled no more | open and reconciling |
+| Wedding's record store | dropped, its swarm left, reconciled no more | open and reconciling |
+| Wedding's membership store | kept as the tombstone, its swarm left | open and reconciling |
 
 #### Scenario: Forgetting a cell unregisters it
 
-- **WHEN** a node holds a cell's stores and forgets the cell
-- **THEN** reading or writing under that cell fails with the unknown-cell error, neither replica is reconciled or served, and the node's other cells are unaffected
+- **WHEN** a node holds a cell's stores and forgets the cell at a departure
+- **THEN** reading or writing under that cell fails with the unknown-cell error, the record store is neither reconciled nor served, the membership store is held as the cell's tombstone alone, and the node's other cells are unaffected
 
 #### Scenario: One member forgetting spares the co-located other
 

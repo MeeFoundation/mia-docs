@@ -37,6 +37,7 @@ Several people need one space they all write into: its content stays with every 
 | `components/mee-pdn/data-layer/private-metadata-store`  | `openspec/specs/components/mee-pdn/data-layer/private-metadata-store/spec.md`  |
 | `components/mee-pdn/pdn-node-http/host`                 | `openspec/specs/components/mee-pdn/pdn-node-http/host/spec.md`                 |
 | `components/mee-pdn/pdn-node-http/container-stand`      | `openspec/specs/components/mee-pdn/pdn-node-http/container-stand/spec.md`      |
+| `components/mee-pdn/data-layer/node-assembly`           | `openspec/specs/components/mee-pdn/data-layer/node-assembly/spec.md`           |
 
 ### New Capabilities
 
@@ -50,6 +51,7 @@ Several people need one space they all write into: its content stays with every 
 - `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds, keeps a record per cell and membership event of the identity, keyed by its sequence, that a leave tombstones, and holds the identity's announcement key pair at a fixed path, minted with the identity.
 - `components/mee-pdn/pdn-node-http/host`: the debug surface covers the cells service, one route per operation, with its refusals reported as refusals.
 - `components/mee-pdn/pdn-node-http/container-stand`: the stand runs a cell across three containers with its paired denials, a kick and a restart.
+- `components/mee-pdn/data-layer/node-assembly`: the node runs blob collection over its one blob store, a payload staying while any hosted identity's replica references it.
 
 ## Impact
 

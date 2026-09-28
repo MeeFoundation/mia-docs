@@ -68,7 +68,7 @@ trait CellsService {
     /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
-    /// `Kick` and `Demote` name another member; `Leave` also forgets both stores on the identity's devices.
+    /// `Kick` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the cell's tombstone.
     async fn act(&self, identity: PdnId, cell: CellId, act: CellAct) -> Result<()>;
 
     /// Places a record under the identity's own name at a fresh id: a claim's or an immutable-document's one entry,
@@ -241,7 +241,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' admission rule; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 **Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its cell id.
 
@@ -249,8 +249,8 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 |---|---|
 | `act(Bob, Wedding, Kick(Alice-work))` | a typed error, nothing written |
 | `act(Erin, Wedding, Kick(Erin))` | a typed error, nothing written |
-| `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused from their next session with each member device the kicked event has reached |
-| `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `cells/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; both stores forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
+| `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the kicked event has reached, and learn of the kick from the membership store |
+| `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `cells/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; the record store forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, the membership store kept as the cell's tombstone, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
 
 #### Scenario: An owner kicks a member
 
@@ -325,7 +325,7 @@ A directory-configured runtime SHALL host again, after a restart, every cell its
 |---|---|
 | a3 stops | on disk, the entry at the highest sequence under `cells/f942dfc21acd0218d48f61f714ddfff3/` is non-empty in Alice-leisure's directory and in Alice-work's, and the one under `cells/684aad236ce530cd7b5dedb6ab6b755a/` is a tombstone in Alice-work's |
 | Erin places a claim from her phone e1 meanwhile | — |
-| a3 starts on the same directory | opens Wedding's two stores for Alice-leisure and for Alice-work, each from the tickets in the identity's own directory, and nothing for `684aad236ce530cd7b5dedb6ab6b755a`; neither hosting record names a cell |
+| a3 starts on the same directory | opens Wedding's two stores for Alice-leisure and for Alice-work, each from the tickets in the identity's own directory, and for `684aad236ce530cd7b5dedb6ab6b755a` Alice-work's tombstone alone, no record store; neither hosting record names a cell |
 | a3's first sessions | Erin's claim arrives, and Alice-leisure's and Alice-work's replicas converge inside the process |
 
 #### Scenario: A cell is hosted again after a restart
@@ -341,4 +341,4 @@ A directory-configured runtime SHALL host again, after a restart, every cell its
 #### Scenario: A cell left before the restart stays left
 
 - **WHEN** a runtime on a storage directory hosts a member of a cell, the member leaves the cell, and the runtime stops and starts again on the same directory
-- **THEN** the identity lists no such cell, and neither store is opened or served
+- **THEN** the identity lists no such cell, the record store is neither opened nor served, and the membership store stays as the cell's tombstone
