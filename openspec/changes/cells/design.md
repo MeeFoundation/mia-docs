@@ -265,7 +265,7 @@ A record's authorship is cryptographic — the author signature on its entries �
 
 ### D16. A member's devices are announced by the member itself, under its announcement key
 
-Each identity holds a device-announcement key pair, minted with the identity. The secret lives in its private metadata store at a fixed path and reaches every new device at linking, beside the store tickets; the cell's own write tickets sit there under per-cell kinds, beside one record per cell that the identity's joining writes and its leave tombstones. The identity's other devices open on demand every cell whose record is live, and a restarted runtime re-derives its hosted cells from the same records, as it re-derives connections from theirs (private metadata store spec). The cell holds two things about a member's devices: a join statement binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter in its invite act, its root the inviter's word exactly as D26 states, and for the creator the founding event (D25) — and the member's device-list statements: each of the member's devices with its node id and the author the member writes with on it — one author per hosted identity on a device (ADR-0013), so a node hosting two members appears under one node id with two authors — a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
+Each identity holds a device-announcement key pair, minted with the identity. The secret lives in its private metadata store at a fixed path and reaches every new device at linking, beside the store tickets; the cell's own write tickets sit there under per-cell kinds, beside the records of each cell that the identity's joining writes and its leave tombstones, keyed by the identity's membership sequence (D35). The identity's other devices open on demand every cell whose record is live, and a restarted runtime re-derives its hosted cells from the same records, as it re-derives connections from theirs (private metadata store spec). The cell holds two things about a member's devices: a join statement binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter in its invite act, its root the inviter's word exactly as D26 states, and for the creator the founding event (D25) — and the member's device-list statements: each of the member's devices with its node id and the author the member writes with on it — one author per hosted identity on a device (ADR-0013), so a node hosting two members appears under one node id with two authors — a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
 
 A statement is self-contained proof, so who writes it into the store does not matter: the gate judges an entry in the membership device area by the embedded signature against the announcement key from the join statement, never by the entry's author. A freshly linked device therefore registers itself — it holds the write ticket and the announcement secret, writes the next version, the member's device list with itself added, into its local replica of every cell the identity is a member of, and ordinary sync spreads it through the identity's own devices, which serve the new device by the identity's own directory before any statement lists it (D32), and from them through any member, with no waiting on another member being online. Before syncing a cell replica, each of the identity's devices checks that the member's device list names it with the author its identity writes with there, and when it does not, writes the next version: that list with itself added. The sweep heals an interrupted fan-out, a cell joined after a linking, a device linked before the join, and a version a sibling wrote from a view that missed this device; only the device itself knows the author it writes with, so only it puts itself back (D32).
 
@@ -625,6 +625,27 @@ Cells serve load testing first, and the defence of a cell against a member's dev
 - Hash-linked membership sequences, ahead of the logs.
   - **Cons:** the logs' duplicity handling built a second time, in a format the logs' own encoding then replaces.
 
+### D35. A cell's record in the directory follows the identity's membership sequence
+
+The identity's directory records each cell under `cells/<cell-id-hex>/<seq>`, where `<seq>` is the sequence, in the identity's own chain in the cell's membership store, of the event the entry mirrors: the founding event or a joined event writes a non-empty entry at its sequence, and a left event writes a pdn-store tombstone at its own. The identity holds the cell when the entry at the highest sequence, across all authors, is non-empty, a tombstone outweighing a non-empty entry at one sequence; entry timestamps are never read, so a leave from a device whose clock runs behind still ends holding on every device, and a join after it holds the cell again. The device that acts writes both with one number: the leaving device places its left event at the sequence after the highest it holds in its own chain and the tombstone at the same one, and a joining device, caught up when the join returns (D26), reads the sequence of its joined event before it writes. The record sits in the directory, the identity's own store, because a departed member's devices are served no session on the cell's stores (D32), its siblings' included, so the left event may never reach them, while the directory syncs between them always; a restart re-derives the held cells from the same entries (D16). pdn-store's delete removes its own key alone, so a tombstone at `cells/<cell-id-hex>/1` leaves `cells/<cell-id-hex>/10` standing. A kick writes nothing into the kicked member's directory.
+
+**Example:** Bob acts on his membership of "Family" from his phone b1, whose clock is right, and his laptop b2, whose clock runs 80 minutes behind.
+
+| real time | device | writes | entry timestamp | Bob's devices hold "Family" |
+|---|---|---|---|---|
+| 10:00 | b1 | `cells/eead8ef96aa1254969d63c12631b799c/1`, non-empty: joined at his sequence 1 | 10:00 | yes |
+| 11:00 | b2 | `cells/eead8ef96aa1254969d63c12631b799c/2`, the tombstone: left at his sequence 2 | 09:40 | no, once the directory syncs |
+| 12:00 | b1, on a new invite | `cells/eead8ef96aa1254969d63c12631b799c/3`, non-empty: joined at his sequence 3 | 12:00 | yes |
+
+**Rejected alternatives:**
+
+- One entry per cell at `cells/<cell-id-hex>`, the newest across authors by entry timestamp.
+  - **Cons:** a leave written from a device whose clock runs behind the one that wrote the join loses to the join, and the identity's other devices go on holding a cell whose members refuse them.
+- The identity's own chain in the membership store, read directly.
+  - **Cons:** a departed member's siblings are served no session on the cell's stores, so the left event may never reach them.
+- A counter of the directory's own beside the cell id.
+  - **Cons:** a second number for what the membership chain already numbers, which two disconnected devices of the identity bump alike.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
@@ -748,7 +769,3 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 |---|---|---|---|
 | the cell id, the member and the path | the cell id of "Recipes", Alice, `mergeable-document/<cake>` | unchanged | still resolves |
 | the replica and the key | Alice's data namespace and the recipe's key | the new record store and the key | names the old replica, and breaks |
-
-### D. Sync and scale
-
-- D6'. Clocks: chat ordering by writer timestamps under the fork's 10-minute future window; and a leave written from a device whose clock is behind the one that wrote the cell's record in the directory — the leave's tombstone is its own author's, the record another's, and the newest entry across authors is the record, so the identity's other devices go on holding the cell.

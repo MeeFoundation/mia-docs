@@ -47,7 +47,7 @@ Several people need one space they all write into: its content stays with every 
 
 - `components/mee-pdn/data-layer/capability-gated-ingest`: the gate arms on a cell's two stores too, judging by the entry's author resolved to a member rather than by the session peer.
 - `components/mee-pdn/data-layer/subset-reconciliation`: the unfiltered-session rule and the swarm-composition rule extend to the member devices of a cell's stores; the import refusal for tracked non-data replicas names them.
-- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds, keeps one record per cell that a leave tombstones, and holds the identity's announcement key pair at a fixed path, minted with the identity.
+- `components/mee-pdn/data-layer/private-metadata-store`: the directory publishes a cell's two write tickets under per-cell kinds, keeps a record per cell and membership event of the identity, keyed by its sequence, that a leave tombstones, and holds the identity's announcement key pair at a fixed path, minted with the identity.
 - `components/mee-pdn/pdn-node-http/host`: the debug surface covers the cells service, one route per operation, with its refusals reported as refusals.
 - `components/mee-pdn/pdn-node-http/container-stand`: the stand runs a cell across three containers with its paired denials, a kick and a restart.
 

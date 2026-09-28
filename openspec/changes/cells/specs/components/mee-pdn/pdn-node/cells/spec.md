@@ -173,7 +173,7 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 **Example:** Alice-leisure's directory once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
 ```
-cells/eead8ef96aa1254969d63c12631b799c                        the cell's record, written at the creation
+cells/eead8ef96aa1254969d63c12631b799c/1                      the cell's record at the founding, Alice-leisure's sequence 1
 tickets/cell/eead8ef96aa1254969d63c12631b799c/membership      the membership store's write ticket
 tickets/cell/eead8ef96aa1254969d63c12631b799c/records         the record store's write ticket
 announcement-key                                              Alice-leisure's announcement key pair, minted with her
@@ -265,7 +265,7 @@ Renaming a cell SHALL be available only to an owner's device, and the new name S
 
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
 
 **Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its cell id.
 
@@ -274,7 +274,7 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 | `act(Bob, Wedding, Kick(Alice-work))` | a typed error, nothing written |
 | `act(Erin, Wedding, Kick(Erin))` | a typed error, nothing written |
 | `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused from their next session with each member device the kicked event has reached |
-| `act(Alice-work, Wedding, Leave)` on a3 | her left event written and `cells/f942dfc21acd0218d48f61f714ddfff3` tombstoned in her directory; both stores forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
+| `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `cells/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; both stores forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, while Alice-leisure's replicas on a3 go on; her records and operations stay in the cell |
 
 #### Scenario: An owner kicks a member
 
@@ -347,7 +347,7 @@ A directory-configured runtime SHALL host again, after a restart, every cell its
 
 | step | a3 |
 |---|---|
-| a3 stops | on disk, `cells/f942dfc21acd0218d48f61f714ddfff3` is live in Alice-leisure's directory and in Alice-work's, and `cells/684aad236ce530cd7b5dedb6ab6b755a` is tombstoned in Alice-work's |
+| a3 stops | on disk, the entry at the highest sequence under `cells/f942dfc21acd0218d48f61f714ddfff3/` is non-empty in Alice-leisure's directory and in Alice-work's, and the one under `cells/684aad236ce530cd7b5dedb6ab6b755a/` is a tombstone in Alice-work's |
 | Erin places a claim from her phone e1 meanwhile | — |
 | a3 starts on the same directory | opens Wedding's two stores for Alice-leisure and for Alice-work, each from the tickets in the identity's own directory, and nothing for `684aad236ce530cd7b5dedb6ab6b755a`; neither hosting record names a cell |
 | a3's first sessions | Erin's claim arrives, and Alice-leisure's and Alice-work's replicas converge inside the process |

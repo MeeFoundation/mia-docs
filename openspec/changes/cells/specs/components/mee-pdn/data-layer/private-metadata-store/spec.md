@@ -46,7 +46,7 @@ The directory carries the identity's own device-internal state — its device se
 |---|---|
 | `devices/<b1-hex>`, `devices/<b2-hex>` | yes |
 | `connections/<alice-hex>` | yes |
-| `cells/eead8ef96aa1254969d63c12631b799c` | yes |
+| `cells/eead8ef96aa1254969d63c12631b799c/1` | yes |
 | `announcement-key` | yes |
 | the tickets to Bob's own stores, to the connection's metadata pair and to both stores of "Family" | yes |
 | the ticket to Alice's data namespace, which her grant carries | no: it sits in the connection metadata store Alice writes toward Bob |
@@ -81,18 +81,18 @@ An identity's device-announcement key pair (cells D16) SHALL be minted when the 
 - **WHEN** a node hosts identities A and B
 - **THEN** each directory holds its own announcement key pair and the two differ; denied: a device of B only, requesting a session for A's directory, obtains no session and no entry of it
 
-### Requirement: One entry per cell, cell id in the key
+### Requirement: One entry per membership event of the identity, cell id and sequence in the key
 
-A cell the identity is a member of SHALL be recorded by a directory entry at path `cells/<cell-id-hex>` (32 lowercase hex chars of the cell id), written when the identity creates or joins the cell; leaving the cell SHALL write a pdn-store tombstone at that path. A cell SHALL count as held if and only if the latest entry at its path across all authors has non-zero length, so a later join after a leave holds it again; the payload is opaque, and listing the held cells SHALL read records alone, before any payload arrives.
+A cell the identity creates or joins SHALL be recorded by a directory entry at path `cells/<cell-id-hex>/<seq>` — 32 lowercase hex chars of the cell id, then the sequence, in the identity's own chain in the cell's membership store, of the founding or joined event the entry records — written by the device that creates or joins; leaving the cell SHALL write a pdn-store tombstone at `cells/<cell-id-hex>/<seq>`, `<seq>` being the sequence of the left event. A cell SHALL count as held if and only if the entry at its highest sequence across all authors has non-zero length, a tombstone outweighing a non-empty entry at one sequence, and SHALL NOT be judged by entry timestamps, so a later join after a leave holds it again and a leave from a device whose clock runs behind still ends holding; the payload is opaque, and listing the held cells SHALL read records alone, before any payload arrives.
 
-**Example:** Bob's phone b1 and his laptop b2 act on his membership of "Family"; 10:00, 10:05 and 10:10 are entry timestamps.
+**Example:** Bob's phone b1, whose clock is right, and his laptop b2, whose clock runs 80 minutes behind, act on his membership of "Family".
 
-| device | act | entry at `cells/eead8ef96aa1254969d63c12631b799c` |
-|---|---|---|
-| b1 | Bob joins "Family" | b1's author, 10:00, non-empty |
-| b2 | Bob leaves it | b2's author, 10:05, length 0: the tombstone |
-| after sync both read b2's tombstone as the latest across authors: neither lists the cell as held | | |
-| b1 | Bob joins again on a new invite | b1's author, 10:10, non-empty: the cell is held on both again |
+| real time | device | act | entry | entry timestamp |
+|---|---|---|---|---|
+| 10:00 | b1 | Bob joins "Family", at his sequence 1 | `cells/eead8ef96aa1254969d63c12631b799c/1`, b1's author, non-empty | 10:00 |
+| 11:00 | b2 | Bob leaves it, at his sequence 2 | `cells/eead8ef96aa1254969d63c12631b799c/2`, b2's author, length 0: the tombstone | 09:40 |
+| after sync both read the tombstone at the highest sequence: neither lists the cell as held | | | | |
+| 12:00 | b1 | Bob joins again on a new invite, at his sequence 3 | `cells/eead8ef96aa1254969d63c12631b799c/3`, b1's author, non-empty: the cell is held on both again | 12:00 |
 
 #### Scenario: A created cell is recorded on the identity's other devices
 
@@ -103,3 +103,8 @@ A cell the identity is a member of SHALL be recorded by a directory entry at pat
 
 - **WHEN** the identity leaves a cell on the phone, while the cell was held on the laptop too, and the laptop's directory replica syncs
 - **THEN** the laptop no longer lists the cell as held
+
+#### Scenario: A leave from a device whose clock runs behind ends holding
+
+- **WHEN** the identity joins a cell on one device and later leaves it on another whose clock runs an hour behind the first's, and the two directory replicas sync
+- **THEN** neither device lists the cell as held, although the tombstone's timestamp is the older of the two entries
