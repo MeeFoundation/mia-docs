@@ -21,7 +21,7 @@ grants/<alice>   author laptop   timestamp 11:57:00   tombstone   ← loses, alt
 | Bob's data session is served | yes | yes | — | no |
 | Bob reads Alice's data under the grant | — | — | yes | no |
 
-No error and no warning reaches anyone. The reverse holds too: a grant published again on a device whose clock is behind a sibling's tombstone never takes effect, and Bob loses access without explanation. The same holds for every other record the identity's devices both write and delete at one key: the pending-device record `pending-devices/<device>`, which the inviting device writes and the new device deletes when it confirms itself (`confirm_device`), and the directory's record of a cell once cells exist. A published device record and a connection record have deletes in data-layer, `withdraw_device` and `disconnect`, but nothing in pdn-node calls either, so no device deletes them. The grant requirement of the connection metadata store promises that only the last published record is read, which a clock behind breaks.
+No error and no warning reaches anyone. The reverse holds too: a grant published again on a device whose clock is behind a sibling's tombstone never takes effect, and Bob loses access without explanation. The same holds for every other record the identity's devices both write and delete at one key: the pending-device record `pending-devices/<device>`, which the inviting device writes and the new device deletes when it confirms itself (`confirm_device`). A cell's record in the directory is not among them: it is keyed by the identity's sequence in the cell's membership store, and the entry at the highest sequence decides, whatever the timestamps. A published device record and a connection record have deletes in data-layer, `withdraw_device` and `disconnect`, but nothing in pdn-node calls either, so no device deletes them. The grant requirement of the connection metadata store promises that only the last published record is read, which a clock behind breaks.
 
 Under [defect-reachability](../../specs/code-practices/defect-reachability.md) the withdrawal is reached by a host through the public surface of pdn-node — a withdrawal from any device of the identity — under an operating condition, [clocks that disagree](../../specs/code-practices/operating-conditions.md); it obliges a fix.
 
@@ -37,13 +37,14 @@ Nothing is decided. The change settles one question — what orders a device's w
   - A withdrawal, a publication again and any rewrite hold on every device that has seen the earlier entry; truly concurrent writes, neither of which has seen the other, stay last-writer-wins by clock.
   - Every local write path, the future ones of cells included, carries the rule; the timestamp stops being a pure clock reading, shifted by at most the skew the device has observed, and ingest already admits entries up to 10 minutes ahead.
   - The same rule answers a device refusing its own repeated delete after its clock stepped back, since that write too is dated past the device's own tombstone.
+  - It is Lamport's clock rule applied to the wall clock, a hybrid logical clock. With no cryptographic binding such a clock is the writer's word, which costs little here: at these keys only the identity's own devices write, and a node acts as every identity it hosts ([threat model](../../specs/components/mee-pdn/threat-model.md)).
 - **A withdrawal is a record with a version.** A non-empty withdrawal record with a version at the same key; readers take every author's entries and pick by version. A medium or large change: the format of the grant and of the device record, `read_grant`, `granted_rights`, `device_listed`.
   - A withdrawal stops depending on clocks at all.
   - A second ordering mechanism above the store; an empty entry no longer means "no grant", and the access book no longer reads through `single_latest_per_key`.
 - **The condition is documented.** The last-writer-wins requirement of the connection metadata store states the assumption about clocks, and a scenario "published on one device, withdrawn on another" with its paired denial pins today's behaviour.
   - Behaviour does not change; the condition becomes explicit.
 
-The first two options are exclusive: a monotonic timestamp and a version order two ways, and mixing them leaves each record kind ordered by a different rule. The third combines with either.
+The first two options are exclusive: a monotonic timestamp and a version order two ways, and mixing them leaves each record kind ordered by a different rule. The third combines with either. A cell's record in the directory is ordered by a version already, the identity's membership sequence, so under the first option the directory holds records ordered both ways.
 
 **Example:** the withdrawal above, the laptop having seen the phone's grant before it withdraws.
 
