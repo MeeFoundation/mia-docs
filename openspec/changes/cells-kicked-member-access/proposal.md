@@ -2,7 +2,7 @@
 
 ## Why
 
-A kick under bearer tickets takes admission away and nothing else ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). Honest member devices refuse the kicked member's devices the record store as a store they do not host, from the first session after the kicked event reaches them, serve them the membership store only up to the kick, so a device offline during the kick learns of it at its first session, and drop the entries it authors under a membership sequence at which it is no member. What the kicked member keeps: both stores' write tickets, and both topic ids, which equal the stores' namespace ids, so it goes on receiving the content-free announcements of every write. Shedding a member entirely is a new cell today — a new pair of stores, the remaining members invited again, the content placed again.
+A kick under bearer tickets takes admission away and nothing else ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). Honest member devices refuse the kicked member's devices the record store as a store they do not host, from the first session after the kicked event reaches them, serve them the membership store only up to the kick, so a device offline during the kick learns of it at its first session, and read none of the entries it authors under a membership sequence at which it is no member. What the kicked member keeps: both stores' write tickets, and both topic ids, which equal the stores' namespace ids, so it goes on receiving the content-free announcements of every write. Shedding a member entirely is a new cell today — a new pair of stores, the remaining members invited again, the content placed again.
 
 **Example:** Alice, an owner of "Family", kicks Carol; Carol's phone c1 is online and keeps what it held.
 
@@ -11,8 +11,8 @@ A kick under bearer tickets takes admission away and nothing else ([cell stores]
 | asks Bob's phone b1 for a session on the record store | `00 00 00 02 02 00`, the answer for a store b1 does not host |
 | asks b1 for a session on the membership store | its kicked event and the entries it rests on, and nothing written after |
 | stays subscribed to the record store's topic | every content-free announcement: when members write, and how often |
-| writes an entry naming her sequence 2, the kick's own | dropped on every honest member device |
-| writes an entry after the kick naming her sequence 1 | admitted: a member's own history is taken on its word |
+| writes an entry naming her sequence 2, the kick's own | held on every honest member device and read by none |
+| writes an entry after the kick naming her sequence 1 | read: a member's own history is taken on its word |
 
 ## What Changes
 

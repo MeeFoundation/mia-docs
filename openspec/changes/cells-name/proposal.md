@@ -57,7 +57,7 @@ Either way the rule is one admission check over the writer's role at the point i
 
 | option | on every member device |
 |---|---|
-| an owner | refused on Carol's device with a typed error, and an entry her modified device writes anyway is dropped: "Family" stays |
+| an owner | refused on Carol's device with a typed error, and an entry her modified device writes anyway counts for nothing: "Family" stays |
 | any member | "Carol's" |
 
 ### Where a shared name sits, and how two changes made at once resolve
@@ -74,7 +74,7 @@ Either way the rule is one admission check over the writer's role at the point i
 | Alice renames it | `name/2/1`: "Walkers" | Walkers |
 | Alice on a1 and Bob on b1, disconnected from each other, rename it | `name/3/…`: "Hikers" from a1, "Ramblers" from b1 | one of the two, the same on every device |
 | Bob, having seen both, renames it again | `name/4/…`: "Ramblers" | Ramblers |
-| Carol's modified phone c1 writes a name | `name/5/…` | dropped: Carol is no owner at the point she names |
+| Carol's modified phone c1 writes a name | `name/5/…` | counts for nothing: Carol is no owner at the point she names |
 
 ### Whether an invite carries the name
 

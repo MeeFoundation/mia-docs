@@ -8,7 +8,7 @@ The named point is a logical clock, a Lamport-style reference into the author's 
 
 A departed member's devices keep the cell's membership store as its tombstone and reconcile with every member device the part of it that precedes the departure — the departure event and every entry it depends on — and nothing after ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). What a former member's device sends within that part is taken on its word, as every member's own history is. Anchoring bounds it: with each entry anchored in its author's log, an entry of the former member's anchored after the position its departure holds in that log does not count, and what precedes a departure becomes a position in the log rather than the set of entries the departure depends on.
 
-The platform takes a member's own history on its word while cells serve load testing: it specifies what honest devices do on these paths, no scenario or test pins what the gate does with a member's contradictions, and a review reports none of it anew, since this change records it. Under [defect-reachability](../../specs/code-practices/defect-reachability.md) these paths are reachable over the network: a modified member device takes ownership back and kicks the owners that demoted it, which ends honest members' sessions. That obliges a fix, and this change is where the fix sits. The deferral ends before any cell carries data people depend on: this change lands before connections are removed from the platform.
+The platform takes a member's own history on its word while cells serve load testing: it specifies what honest devices do on these paths, no scenario or test pins what the fold does with a member's contradictions, and a review reports none of it anew, since this change records it. Under [defect-reachability](../../specs/code-practices/defect-reachability.md) these paths are reachable over the network: a modified member device takes ownership back and kicks the owners that demoted it, which ends honest members' sessions. That obliges a fix, and this change is where the fix sits. The deferral ends before any cell carries data people depend on: this change lands before connections are removed from the platform.
 
 The direction is set: anchored signatures. A key event log commits to its owner's events in order and cannot be appended to in the past, and an anchored signature ties a signed entry to a position in its signer's log, so a narrowing that names the position it saw in the narrowed member's log tells an act written after it from one written before it. Key event logs arrive with the platform's own KERI implementation.
 
@@ -16,15 +16,15 @@ The direction is set: anchored signatures. A key event log commits to its owner'
 
 | entry | names | on every honest member device |
 |---|---|---|
-| b1 promotes Bob himself | Bob's sequence 2, at which he is an owner | admitted: Bob is an owner again |
-| b1 then kicks Alice | Bob's sequence 2 | admitted: Alice is out of the cell, and her devices are refused from their next session |
-| c1 places a claim under Carol's name, which a member device the kick has not reached takes and relays | Carol's sequence 1 | admitted |
-| b1 promotes Bob himself naming his sequence 3, at which he is a plain member | Bob's sequence 3 | dropped |
-| b1 places a claim under Alice's name | — | dropped |
+| b1 promotes Bob himself | Bob's sequence 2, at which he is an owner | counts: Bob is an owner again |
+| b1 then kicks Alice | Bob's sequence 2 | counts: Alice is out of the cell, and her devices are refused from their next session |
+| c1 places a claim under Carol's name, which a member device the kick has not reached takes and relays | Carol's sequence 1 | read |
+| b1 promotes Bob himself naming his sequence 3, at which he is a plain member | Bob's sequence 3 | counts for nothing |
+| b1 places a claim under Alice's name | — | read by none |
 
 ## What Changes
 
-The change settles how a cell's entries anchor in their authors' logs, and whether a defence lands ahead of the logs, and then specifies and builds the answer. Neither is decided; the options stand under Open Questions, strongest first.
+The change settles how a cell's entries anchor in their authors' logs, where a member's log is held for the cell's other members, what one log shows across the cells of its identity, and whether a defence lands ahead of the logs, and then specifies and builds the answers. None is decided; the options stand under Open Questions, strongest first.
 
 ## Open Questions
 
@@ -35,21 +35,52 @@ The change settles how a cell's entries anchor in their authors' logs, and wheth
 
 With several parties, the first-seen rule the KERI roadmap applies between two parties does not detect duplicity, so duplicity detection moves earlier in that roadmap under either option.
 
+A log is validated as KERI validates one: an event whose predecessors have not arrived waits in escrow and is judged once they do, and a member's two versions of one event are caught only while both are held side by side. The cell's stores hold every entry a session they serve carries and leave what counts to the fold, so under either option a second version of an event sits beside the first on every member device, where the log's validation finds it.
+
 KERI's own shape for an anchored record is an Authentic Chained Data Container (ACDC) with a transaction event log (TEL): the record is the container, its issuance and revocation are events of the log, and each event is committed by a seal — its sequence number and digest — in an event of the issuer's key event log, which makes it verifiable and orders it against the issuer's rotations, while the date the event carries is the issuer's word ([ACDC](https://trustoverip.github.io/kswg-acdc-specification/), [TEL](https://trustoverip.github.io/tswg-ptel-specification/draft-pfeairheller-ptel.html)). Record-store entries anchored under the first option would take the same shape, and a cell's claim presented to a party outside the cell would travel by the Issuance and Presentation Exchange protocol (IPEX), whose messages disclose a container to a party that signs its acceptance ([IPEX](https://www.ietf.org/archive/id/draft-ssmith-ipex-00.html)).
 
 **Example:** the cases of Why, under each option.
 
 | option | b1 promotes Bob under his sequence 2 | c1's claim under Carol's sequence 1 |
 |---|---|---|
-| acts and entries anchored | ignored: anchored past the position Alice's demotion saw in Bob's log | dropped: anchored past the position the kick saw in Carol's log |
-| acts alone | ignored, as above | admitted |
+| acts and entries anchored | ignored: anchored past the position Alice's demotion saw in Bob's log | read by none: anchored past the position the kick saw in Carol's log |
+| acts alone | ignored, as above | read |
+
+### Where a member's log is held for the other members
+
+A member's anchored entry verifies only against the member's key event log up to the anchor's position, each event of the log committing to the one before it, so every member device that judges the member's entries holds the member's log from its inception. The KERI roadmap keeps an identity's log in its directory, which only the identity's own devices sync; a cell's other members are served neither the directory nor any other store of the identity.
+
+- A copy in the membership store of each cell. The member's devices write every event of its log into every cell they hold, as a device statement reaches every cell of the identity, and a newcomer's log arrives with its join. Each cell holds the member's whole log, the events from before the member joined included, and a member of many cells writes each event into each of them.
+- A store of the identity's log that every member of its cells reads. One copy per identity, at the price of a replica more for every device to reconcile per identity it shares a cell with, and of every serving device classifying a caller by the cells the two share, so that a member kicked from the last cell they shared stops receiving the log's later events, its devices among them.
+
+**Example:** Bob is a member of "Family" and "Taxes"; his log holds its inception, a rotation adding his laptop b2 and three interaction events, each some hundreds of bytes, about 1.5 KB in all; Carol is a member of "Family" alone.
+
+| option | what holds Bob's log | what Carol's phone c1 holds of it |
+|---|---|---|
+| a copy in each cell | the membership store of "Family" and that of "Taxes" | the copy in "Family": all five events |
+| a store every member reads | one store of Bob's log, with a replica on every device of every member of either cell | its replica of that store, all five events |
+
+### What one log shows the members of its identity's other cells
+
+An identity keeps one log for every cell it is a member of, and a log verifies only whole up to a position, so the members of a cell that hold a member's log hold every event of it, the interaction events anchoring the member's acts in its other cells among them. A seal is a digest and shows no content; how many acts the member anchored elsewhere, and in what order against its acts here, the members of each of its cells see.
+
+- An identifier delegated per cell. At join the member's identity delegates an identifier for the cell, one seal in its own log per cell joined, and its acts in the cell anchor in the delegated log, which only that cell's members hold. The identity's own log shows how many cells it joined and when, and nothing of what it did in them; the cost is a log per member per cell, and KERI's cooperative delegation — the delegator's seal on the delegate's inception and the delegate's reference to the delegator — at every join.
+- Few events, several seals in one. Only membership acts anchor, several of them in one interaction event where they come together, so the log shows little of any cell; record-store entries stay unanchored, as the first question's second option leaves them.
+- One log for every cell, the view accepted: the members of each cell see the count and the order of the member's anchored acts in the others.
+
+**Example:** one evening Bob places 40 claims in "Taxes" and kicks Dave there; Carol, on her phone c1, is a member of "Family" alone, which Bob is a member of too.
+
+| option | what c1 holds of Bob's evening |
+|---|---|
+| an identifier delegated per cell | nothing: the claims and the kick anchor in the log delegated for "Taxes", which "Family" does not hold |
+| few events, several seals in one | one interaction event, carrying the kick's seal: the claims are not anchored |
+| one log for every cell | 41 interaction events where record-store entries anchor as the first question's first option has them, one where only acts do |
 
 ### Whether a defence lands before the logs
 
-- Act numbers and narrowing marks in the membership store. Every membership act carries in its key its author's own act number in the cell: 1 for the author's first act, one more for each next, and an act is admitted only once the device holds every lower number of the same author, so a device holding an act holds every earlier act of its author. Every event that narrows a member — demoted, kicked, left — carries a mark: for each author the member's device statements list, the highest number of that author's acts the writing device holds; the event is admitted only once the device holds the acts its mark names, so a mark names nothing that did not exist when it was written. An act of the member naming a point before a narrowing that forbids it — any act before a kick or a leave, an owner's act before a demotion — counts only if its number is within that narrowing's mark for its author: the first such narrowing after the named point decides, and at a sequence holding several, the highest of their marks. An act beyond the mark was written after the narrowing, or before it and unseen by the narrowing's writer, and the two are not told apart: a concurrent act loses to its actor's narrowing. Two acts of one author under one number are both ignored. The rule is the fold's: the fold that lists members, serves sessions and judges the record store ignores an act beyond the mark and every event resting on it, while the gate judges an event's named point by the membership folded without the rule, so every member device holds the same entries whatever order they arrived in. The mark never withdraws what the narrowing rests on: the writing device held every event its own authority depends on, and with them every earlier act of their authors. The whole membership store is in the write admission, so every check costs nothing at run time; the cost is the mechanism itself, built and tested before the logs replace it, and it leaves the record store open.
+- Act numbers and narrowing marks in the membership store. Every membership act carries in its key its author's own act number in the cell: 1 for the author's first act, one more for each next, and an act counts only once the device holds every lower number of the same author, so a device holding an act holds every earlier act of its author. Every event that narrows a member — demoted, kicked, left — carries a mark: for each author the member's device statements list, the highest number of that author's acts the writing device holds; the event counts only once the device holds the acts its mark names, so a mark names nothing that did not exist when it was written. An act of the member naming a point before a narrowing that forbids it — any act before a kick or a leave, an owner's act before a demotion — counts only if its number is within that narrowing's mark for its author: the first such narrowing after the named point decides, and at a sequence holding several, the highest of their marks. An act beyond the mark was written after the narrowing, or before it and unseen by the narrowing's writer, and the two are not told apart: a concurrent act loses to its actor's narrowing. Two acts of one author under one number are both ignored. The rule is the fold's: the fold that lists members, serves sessions and reads the record store ignores an act beyond the mark and every event resting on it, while every member device holds the same entries whatever order they arrived in. The mark never withdraws what the narrowing rests on: the writing device held every event its own authority depends on, and with them every earlier act of their authors. The fold reads the whole membership store, so every check costs nothing at run time; the cost is the mechanism itself, built and tested before the logs replace it, and it leaves the record store open.
   - Weaker forms fall short. A mark on promotions alone leaves a demoted or kicked owner kicking and demoting others under its old point. A mark only in the invite act that readmits a member never reaches a demoted owner, who stays a member and is never readmitted. An event in the actor's own chain naming the point right before it lets a former owner promote a colluding member under its old point and be promoted back. A list of the acts the writer holds says what one number per author says once admission is gapless, and grows with every act.
-  - At the gate instead of the fold, a device that learns of the narrowing first drops what rests on the ignored act while a device that learned later holds it, and every session between them offers the difference again.
-  - The option brings a question of its own: what the record store admitted meanwhile on an act the fold later ignores — the records of a newcomer the act invited, and, where records can be deleted, the deletions of a member it promoted. Either the record store removes the entries that named the membership the ignored act gave, and every device converges on their absence, or they stay where they landed, and every session offers them again to the devices that drop them.
+  - What rests on an act the fold ignores — the records of a newcomer the act invited, and, where records can be deleted, the deletions of a member it promoted — stops reading on every device at once, since the record view reads by the fold; a record read yesterday is gone today when the mark that ignores the act arrives, and the application shows its person why.
   - It also makes two owners' narrowings of each other depend on each other: each is an owner's act of its actor naming a point before the other, beyond the other's mark, so each counts only if the other does not, and the fold needs a rule for that — whether an act the fold ignores still narrows by its mark, or a tie-break.
 - A kick that commits to the departed member's record-store entries: a per-author high-water mark on the operation sequence, or a Merkle root over the author's range. The high-water mark counts operations and does not reach a claim or an immutable-document, and needs a uniqueness the gate cannot check without the record store; the Merkle root needs a cached fingerprint tree in pdn-store.
 - Hash-linked membership sequences, each event carrying the digest of the one before it, for the rewrite. Detecting one member contradicting itself is the logs' duplicity handling, built here a second time, in a format the logs' own encoding then replaces.
@@ -70,11 +101,11 @@ KERI's own shape for an anchored record is an Authentic Chained Data Container (
 
 | option | b1 promotes Bob under his sequence 2 | c1's claim under Carol's sequence 1 | b1 rewrites Bob's earlier invite of Dave at the same key |
 |---|---|---|---|
-| act numbers and marks | ignored: beyond the demotion's mark | admitted | replaces the original: the key, act number included, is the same |
-| a kick that commits to record-store entries | counts | dropped, under the Merkle-root variant | replaces the original |
-| hash-linked membership sequences | counts | admitted | shows once a later event of Dave's chain names the original's digest |
-| witnessing | counts: every honest device accepted it | admitted on the commitment of the member device that relayed it | shows against the commitments made to the original |
-| none | counts | admitted | replaces the original |
+| act numbers and marks | ignored: beyond the demotion's mark | read | replaces the original: the key, act number included, is the same |
+| a kick that commits to record-store entries | counts | read by none, under the Merkle-root variant | replaces the original |
+| hash-linked membership sequences | counts | read | shows once a later event of Dave's chain names the original's digest |
+| witnessing | counts: every honest device accepted it | read on the commitment of the member device that relayed it | shows against the commitments made to the original |
+| none | counts | read | replaces the original |
 
 ### How the last owner who lost every device returns
 
@@ -89,7 +120,7 @@ The last owner losing every device writes no event: the owner stays listed and n
 
 ## Operating conditions
 
-An unstable connection is what puts the gap within reach of ordinary timing: an entry reaches a device the narrowing has not yet reached, and any member device relays it from there. Clocks do not close it: an entry's timestamp is set by its author, and a key event log proves order, not time, so a point stays a position in a chain under every option. Placing a logged event against a wall-clock time takes evidence from outside the log: a witness's signed and dated record of the log's state shows that an event happened no later than that date, while that an event happened after a given time rests on its author's word alone ([ToIP dossier specification, issue 35](https://github.com/trustoverip/kswg-dossier-specification/issues/35)); a cell has no witnesses, so it keeps relative order only. A capability-bound write does not close it alone either, since an entry signed under a since-revoked capability poses the same question.
+Several identities on one node keep a log each: Alice-leisure's and Alice-work's acts in "Wedding" anchor in two logs, as their entries sit under two authors. An unstable connection is what puts the gap within reach of ordinary timing: an entry reaches a device the narrowing has not yet reached, and any member device relays it from there. Clocks do not close it: an entry's timestamp is set by its author, and a key event log proves order, not time, so a point stays a position in a chain under every option. Placing a logged event against a wall-clock time takes evidence from outside the log: a witness's signed and dated record of the log's state shows that an event happened no later than that date, while that an event happened after a given time rests on its author's word alone ([ToIP dossier specification, issue 35](https://github.com/trustoverip/kswg-dossier-specification/issues/35)); a cell has no witnesses, so it keeps relative order only. A capability-bound write does not close it alone either, since an entry signed under a since-revoked capability poses the same question.
 
 ## Out of Scope
 
@@ -99,10 +130,10 @@ An unstable connection is what puts the gap within reach of ordinary timing: an 
 
 ## Capabilities
 
-None is settled. Every option touches `components/mee-pdn/data-layer/cell-store`, where the membership fold and the gate are specified, and `components/mee-pdn/pdn-node/cells`, where acts are written.
+None is settled. Every option touches `components/mee-pdn/data-layer/cell-store`, where the membership fold and the record view are specified, and `components/mee-pdn/pdn-node/cells`, where acts are written; where a member's log is held touches `components/mee-pdn/data-layer/private-metadata-store` as well.
 
 ## Impact
 
-- **`crates/data-layer`**: the membership fold and the gate of both cell stores.
+- **`crates/data-layer`**: the membership fold and the record view of both cell stores.
 - **`crates/pdn-node`**: the membership acts the cells service writes, and their anchors.
-- **The KERI implementation**: the key event log each member's entries anchor in.
+- **The KERI implementation**: the key event log each member's entries anchor in, and delegation, if a cell anchors in an identifier delegated for it.

@@ -50,14 +50,14 @@ A mergeable-document is a markdown note or a rich text held as a JSON tree of te
 A key orders one writer's operations; a merge across writers needs the operations each edit saw.
 
 - The dependencies in the payload, as a CRDT's change format carries them. The key layout stays, and a device merges once it holds a change's dependencies, which whole-store reconciliation brings.
-- The dependencies read by the record store, which holds an operation until the operations it depends on are admitted, as the membership store defers an event. A document is never merged over a gap, at the cost of a second reading of the payload below pdn-layer.
+- The dependencies read by the record view, which reads an operation only once the operations it depends on are held, as the membership fold counts an event only once what it rests on is held. A document is never merged over a gap, at the cost of a second reading of the payload below pdn-layer.
 
 **Example:** Carol's removal of the line saw Bob's operation 3 and not his operation 4, and reaches Alice's laptop a2 before operation 3 does.
 
 | option | a2 |
 |---|---|
 | dependencies in the payload | holds the removal; the merge waits for operation 3, or merges over the gap if it allows one |
-| dependencies read by the record store | holds the removal back until operation 3 is admitted |
+| dependencies read by the record store | reads the removal only once operation 3 is held |
 
 ### What keeps a document's history bounded
 

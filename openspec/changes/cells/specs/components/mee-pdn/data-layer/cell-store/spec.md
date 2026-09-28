@@ -1,6 +1,6 @@
 # data-layer: cell stores
 
-A cell is a space shared by 0..n members — identities — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store namespaces, each held whole, as a replica of its own, by every member identity on every device that hosts it: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is admission: a session names the member whose replica it addresses and the member its caller acts as, and is served to member devices only, and a record-store entry is admitted by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry stops at the first honest device it meets. What a member's own devices write as that member — records under its name and acts in any member's chain — is taken on the member's word: an act or a record naming a point the member has since lost, an entry replacing one the member's own author wrote at the same key, two events of the member's at one point, and two entries of one of its records from two of its devices or under two membership sequences are held as they come, a read of such a record returning the one with the newest timestamp, and nothing below specifies or tests what the gate does with them. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
+A cell is a space shared by 0..n members — identities — identified by a cell id that carries no key material and is derived from its creator's announcement key and a random nonce. It lives in two dedicated pdn-store namespaces, each held whole, as a replica of its own, by every member identity on every device that hosts it: the **membership store**, the cell's authority — who is a member, with what role, on which devices — and the **record store**, the records that authority governs. No egress filter runs inside a cell, member devices form each store's swarm, any member device catches up from any other, and a session reconciles the membership store to convergence before the record store. What keeps a cell honest is who is served and what counts: a session names the member whose replica it addresses and the member its caller acts as, and is served to member devices only; either store holds whatever such a session carries; and a record-store entry reads by its author — a claim or an immutable-document from the devices of the member under whose name it sits, a mergeable-document's operation from any member's devices — judged on every member device against the writer's membership state at the membership sequence the entry names, so that a forged entry counts on no honest device, while every member device holds and relays it. What a member's own devices write as that member — records under its name and acts in any member's chain — is taken on the member's word: an act or a record naming a point the member has since lost, an entry replacing one the member's own author wrote at the same key, two events of the member's at one point, and two entries of one of its records from two of its devices or under two membership sequences are held as they come, a read of such a record returning the one with the newest timestamp, and nothing below specifies or tests what the fold and the record view do with them. The runtime's cells service ([pdn-node cells](../../pdn-node/cells/spec.md)) creates and joins the stores; this spec covers the stores themselves.
 
 The membership store is two shapes: what a device writes — an act — and what the fold computes for a member from everything written about it — its chain of events. An act is one entry; its author key resolves to the actor, and the actor's own sequence at the time of acting (`actor_seq`) and the position in the subject's chain (`subject_seq`) sit in the key (cells D21, D23).
 
@@ -21,7 +21,7 @@ enum MembershipAct {
     Promote { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
     /// An owner; subject ≠ actor.
     Demote  { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
-    /// The member's devices, one key per version; judged by the embedded signature under the member's announcement key, whoever writes it (D16).
+    /// The member's devices, one key per version; counted by the embedded signature under the member's announcement key, whoever writes it (D16).
     /// `signature` by the announcement key over "pdn/cell-devices/v1" ‖ version ‖ devices.
     AnnounceDevices { version: u64, devices: Vec<MemberDevice>, signature: Signature },
 }
@@ -45,13 +45,13 @@ enum MembershipEvent {
 /// Left and Kicked no member; a transition the state does not allow (Promoted of no member, Joined of a member) is ignored.
 struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<MemberDevice> }
 
-/// The gate's check of one event, from the write admission alone:
+/// The fold's check of one event, over everything the device holds:
 ///   Founded          → seq == 1 and the receiving steps below pass
 ///   Joined           → by != subject and state(by, by_seq).member
 ///   Left             → by == subject
 ///   Promoted         → state(by, by_seq).owner
 ///   Kicked | Demoted → by != subject and state(by, by_seq).owner
-/// and for every kind: by's chain held up to by_seq — else deferred.
+/// and for every kind: by's chain held up to by_seq — else the event counts once it is.
 ```
 
 The cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
@@ -68,10 +68,10 @@ Creating a cell, on the creator's device:
    { nonce, announcement_pubkey, signature }   — pdn_id is the key's <pdnid>; cell_id is not stored
 5. cell_id goes to the identity's directory, the invite, links in notes
 
-Receiving a founding event, on every member device (reconciliation, a fresh device's first session included):
+Counting a founding event, on every member device, once its payload has arrived (a fresh device's first session included):
 1. recompute cell_id from the event's pdn_id, announcement_pubkey, nonce → must equal the cell id the device holds
 2. verify signature under announcement_pubkey over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce
-3. either check fails → drop the event, whatever order it arrived in
+3. either check fails → the event counts for nothing, whatever order it arrived in
 ```
 
 ## ADDED Requirements
@@ -134,7 +134,7 @@ cell_id               eead8ef96aa1254969d63c12631b799c
 signature             6eaf69a517c28cd7…d40e03370f, 64 bytes of Ed25519
                       over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce, 100 bytes
 a founding event in Alice's chain under another announcement key, d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48,
-with the same nonce, derives 816954cae150f2652ecaeceab07ae4ac, and every device holding eead8ef96aa1254969d63c12631b799c drops it
+with the same nonce, derives 816954cae150f2652ecaeceab07ae4ac, and every device holding eead8ef96aa1254969d63c12631b799c counts it for nothing
 both stores' namespace ids are 32-byte public keys of their own, and neither is the cell id
 ```
 
@@ -155,7 +155,7 @@ both stores' namespace ids are 32-byte public keys of their own, and neither is 
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and authority to write inside the cell is judged by the ingest gate per entry, never by ticket mode — a member's write ticket widens nothing the gate refuses. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices, dialed as that identity; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the cell is judged by the membership fold and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices, dialed as that identity; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states.
 
 **Example:** Alice places a claim in "Family" on her phone a1 while Bob's phone b1 is in the record store's swarm and Carol's phone c1 is offline; then a1 goes offline and c1 comes back.
 
@@ -178,12 +178,12 @@ Every device of every member SHALL hold both stores whole — every record reada
 #### Scenario: A newcomer writes with the tickets it was handed
 
 - **WHEN** a newcomer joins, is handed both stores' write tickets, and its device writes a claim
-- **THEN** every member's devices persist the claim
+- **THEN** every member's devices read the claim
 
 #### Scenario: A member's write ticket widens nothing
 
 - **WHEN** a device of member C, no owner, holding the record store's write ticket, produces an entry at the key of B's claim and reconciles with a device of B
-- **THEN** B's device drops it and B's claim reads unchanged on every member device
+- **THEN** B's device holds it and reads nothing of it, and B's claim reads unchanged on every member device
 
 ### Requirement: Only member devices are served
 
@@ -219,6 +219,29 @@ A session for either of a cell's stores SHALL name the member whose replica it a
 - **WHEN** a member is kicked and the kicked event has reached a serving device, and a device of the kicked member then requests a session on the record store
 - **THEN** the request is refused as for an unhosted replica, while the remaining members' devices are still served, and what the kicked member's device obtained while a member is still readable on it
 
+### Requirement: A cell store holds whatever a session it serves carries
+
+Either store of a cell SHALL hold every entry a session carries from a caller it serves — a member device's session whole, a former member's over its departure's past — and SHALL drop only what pdn-store drops on its own: a key over 8,192 bytes, a timestamp more than 10 minutes ahead, an entry whose signature does not verify. No entry SHALL be judged at ingest by its author, its key or the membership, and no entry SHALL wait at ingest. What an entry counts for SHALL follow from the whole set of entries a device holds, whatever order they arrived in: the membership fold counts an event, and the record view reads a record's entry, by the rules the requirements below state, and an entry whose payload or whose dependencies have not arrived counts once they have. Every member device then holds the same entries, and a forged entry is held and relayed by every member device and counts on none.
+
+**Example:** Bob's modified phone b1, Bob being a plain member of "Family", carries into a session with Carol's phone c1 Alice's claim, an entry of its own at that claim's key, and a promoted event for Bob it wrote; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `<id>`: the claim's id.
+
+| entry b1 carries | its author | on c1 |
+|---|---|---|
+| `by/<alice>/claim/<id>/1` | a1's | held, and read as Alice's claim |
+| `by/<alice>/claim/<id>/1` | b1's | held, and read by nothing: Alice's claim reads unchanged |
+| a promoted event in Bob's chain | b1's | held, and counted for nothing: Bob is no owner |
+| a later session between c1 and b1 | | finds no difference |
+
+#### Scenario: A forged entry is held and counts for nothing
+
+- **WHEN** a device of member B, no owner, carries into a session with a device of member C member A's claim, an entry of its own at that claim's key, and a promoted event for B
+- **THEN** C's device holds all three, reads A's claim as A's and nothing of B's entry at its key, lists B as a plain member, and a later session between the two devices finds no difference
+
+#### Scenario: Entries arriving in any order converge
+
+- **WHEN** two member devices take the same entries of both stores — a newcomer's joined event, its device statement and its first claim among them — one in that order and the other in the reverse
+- **THEN** both hold the same entries, list the same members and read the same records
+
 ### Requirement: A departed member's devices keep the membership store as the cell's tombstone
 
 A member's departure event — its left event, or a kicked event in its chain — SHALL end its devices' hold on the record store and SHALL NOT end their hold on the membership store: every device of the departed member's identity SHALL keep the membership store for good as the cell's tombstone, and forget the record store. The departure's past SHALL be the departure event and every entry it depends on — the earlier events of its subject's chain, its actor's chain up to the point it names, and, for each of these in turn, the same, with the joined events and device statements that resolve their authors — down to the founding event. A member device SHALL serve a session naming a former member, from a device the former member's statements list, on the membership store alone and over the departure's past alone, in both directions, and SHALL serve it nothing outside that past; a sibling device of the former member SHALL serve it the tombstone whole. A tombstone SHALL be reconciled with member devices until one session with a member device has converged over the departure's past, and then with the identity's own devices alone.
@@ -227,14 +250,14 @@ A member's departure event — its left event, or a kicked event in its chain �
 
 | on b1 | c1 |
 |---|---|
-| a session on the membership store naming Carol | served over the past of her left event: b1 admits the left event and sends what of that past c1 lacks, and not Dave's joined event |
+| a session on the membership store naming Carol | served over the past of her left event: b1 takes the left event and sends what of that past c1 lacks, and not Dave's joined event |
 | a session on the record store naming Carol | refused with `00 00 00 02 02 00` |
 | a record Alice places afterwards | reaches b1 and never c1 |
 
 #### Scenario: A left event written offline reaches the members
 
 - **WHEN** a member leaves on a device with no member device reachable, and that device later reaches a member device
-- **THEN** the member device persists the left event and every member device lists the member as no member, while the departed device is refused the record store
+- **THEN** the member device holds the left event and every member device lists the member as no member, while the departed device is refused the record store
 
 #### Scenario: A device offline during its member's kick learns of the kick
 
@@ -264,7 +287,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL be judged against its actor's chain folded up to `<aseq>`: a joined event is admitted when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — is admitted when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event failing its check SHALL be dropped silently on every member device, and an event whose actor's chain the device does not hold up to `<aseq>` SHALL be deferred within the session and re-judged once it arrives, or dropped and offered again by the next session. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all persist, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — counts when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
 
 **Example:** Bob's chain in "Family" as every member device holds it; the key's last segment is the actor's sequence; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
 
@@ -284,10 +307,10 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 - **WHEN** owner A promotes B (B's sequence 2, after B's join at 1), demotes B (3) and promotes B again (4), and the three events reach a device of member C in the order 4, 2, 3
 - **THEN** C's device lists B by the highest sequence it holds after each arrival — an owner throughout — and as an owner once all three have arrived
 
-#### Scenario: A role event from a plain member is dropped
+#### Scenario: A role event from a plain member counts for nothing
 
 - **WHEN** a device of member C, no owner, produces a promoted event for C and reconciles with a device of B
-- **THEN** B's device drops it and B still lists the owners unchanged
+- **THEN** B's device holds it and still lists the owners unchanged
 
 #### Scenario: A leave ends the membership and a new join restores it as a plain member
 
@@ -304,35 +327,35 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 - **WHEN** owner A promoted C naming A's sequence 3, A was then demoted at A's sequence 4, and a device linked into member B after that catches up
 - **THEN** B's new device lists C as an owner
 
-#### Scenario: An event naming an actor point without the membership state it needs is dropped
+#### Scenario: An event naming an actor point without the membership state it needs counts for nothing
 
 - **WHEN** A was demoted at A's sequence 4 and a device of member E relays a promoted event for F authored by A's device naming A's sequence 4
-- **THEN** no member device persists it and F is listed as a plain member
+- **THEN** every member device holds it, counts it for nothing, and lists F as a plain member
 
 #### Scenario: Nobody leaves for another member
 
 - **WHEN** a device of member D produces a left event in B's chain
-- **THEN** no member device persists it and B is still listed as a member
+- **THEN** every member device holds it, counts it for nothing, and still lists B as a member
 
 #### Scenario: Nobody kicks or demotes itself
 
 - **WHEN** a device of owner A produces a kicked event and a demoted event in A's own chain
-- **THEN** no member device persists either, and A is still listed as a member and an owner
+- **THEN** every member device holds both, counts neither, and still lists A as a member and an owner
 
 #### Scenario: A departed member does not readmit itself
 
 - **WHEN** C left at C's sequence 2, and a device of member D relays a joined event in C's chain at C's sequence 3, authored by C's device and naming C's sequence 1
-- **THEN** no member device persists it and C is listed as no member
+- **THEN** every member device holds it, counts it for nothing, and lists C as no member
 
-#### Scenario: A founding event that does not derive the cell id is dropped
+#### Scenario: A founding event that does not derive the cell id counts for nothing
 
 - **WHEN** a device of owner C produces a founding event in C's own chain, or one in the creator's chain under another announcement key or nonce
-- **THEN** no member device persists it and the owners are listed unchanged
+- **THEN** every member device holds it, counts it for nothing, and lists the owners unchanged
 
-#### Scenario: A device holding nothing refuses an invented founder whatever arrives first
+#### Scenario: A device holding nothing counts no invented founder, whatever arrives first
 
 - **WHEN** a device freshly linked into member D, holding the cell id from D's directory and no membership store, sessions first with a modified device of member B that serves a founding event in B's chain and withholds the creator's, and then with a device of member C
-- **THEN** the linked device persists no event of B's invented chain, and after the session with C lists the members and owners C's device lists
+- **THEN** the linked device holds B's invented chain and counts none of it, and after the session with C lists the members and owners C's device lists
 
 #### Scenario: A promoted event for no member changes nothing
 
@@ -354,25 +377,25 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 - **WHEN** owner A demotes owner B at B's sequence 4 while B, disconnected from A, leaves at its sequence 4, and the members' devices then reconcile
 - **THEN** every member device holds both entries and lists B as no member, the leave outranking the demotion
 
-#### Scenario: An event by no member's device is dropped
+#### Scenario: An event by no member's device counts for nothing
 
 - **WHEN** a device of member D relays an event in B's chain authored by a key that resolves to no member's device
-- **THEN** no member device persists it and B's chain is read unchanged
+- **THEN** every member device holds it, counts it for nothing, and reads B's chain unchanged
 
-#### Scenario: An event ahead of its actor's point is admitted when the point arrives
+#### Scenario: An event ahead of its actor's point counts once the point arrives
 
 - **WHEN** a device of member D receives a promoted event for C authored by A's device naming A's sequence 3 while holding A's chain only up to sequence 2, and A's sequence 3 arrives in a later session
-- **THEN** the event is deferred, not persisted, in the first session, and persisted in the session that brings A's sequence 3
+- **THEN** the event is held from the first session and counts from the session that brings A's sequence 3
 
 ### Requirement: Verdicts hold their limits without an anchored log
 
-The gate SHALL judge by the point an entry names and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are its consequences on honest devices — what the gate does, not what a cell wants — each named after the decision or the open question that keeps it.
+The fold and the record view SHALL judge an entry by the point it names and by nothing else, and a session SHALL be served by the membership as of its setup: an event or a record whose named point checks out counts, whoever carries it and whenever it arrives, and what the entries a device holds cannot resolve counts for nothing until they can. The scenarios below are the consequences on honest devices — what the platform does, not what a cell wants — each named after the decision that keeps it.
 
 **Example:** verdicts in "Family" beside what a cell would want of each.
 
-| case | the gate | a cell wants | kept by |
+| case | the platform | a cell wants | kept by |
 |---|---|---|---|
-| Alice's promotion of Carol, naming Alice's sequence 3, an event only devices that have since died ever held | defers it for ever | admitted | the actor's point, until a current owner promotes Carol anew |
+| Alice's promotion of Carol, naming Alice's sequence 3, an event only devices that have since died ever held | counts it never | counted | the actor's point, until a current owner promotes Carol anew |
 | Dave's phone d1 asks Alice's phone a1 for a session before Dave's joined event reaches a1 | refuses it | served | the session order, healed once the joined event arrives |
 
 #### Scenario: A newcomer is refused a session until its joined event arrives (cells D19)
@@ -383,24 +406,24 @@ The gate SHALL judge by the point an entry names and by the membership state as 
 #### Scenario: A dependency whose authoring device died is never resolved until re-issued (cells D23)
 
 - **WHEN** A's sequence 3 — the event that promoted A — reached only A's device before B's device, which authored it, died; A's device then promoted C naming A's sequence 3, spread that event to a device of D, and died too, so no live device holds A's sequence 3
-- **THEN** every device defers C's promoted event indefinitely and lists C as a plain member meanwhile, and lists C as an owner only after a current owner promotes C anew — an ordinary promotion at a point every device holds
+- **THEN** every device holds C's promoted event and counts it never, listing C as a plain member meanwhile, and lists C as an owner only after a current owner promotes C anew — an ordinary promotion at a point every device holds
 
 ### Requirement: The membership store is reconciled before the record store
 
-A session between two member devices SHALL reconcile the membership store to convergence, fold it into the write admission, and only then reconcile the record store under it; both stores SHALL be reconciled whole, with no capability filter on either. The write admission a session is judged by SHALL be that session's own — the fold of the replica it addresses, carried from its setup to the gate, and on the membership store grown within the session as deferred events are admitted — so two sessions of one node acting as two members never judge by each other's. A record whose author's membership the same session brings SHALL be judged under that membership; a record that reaches a device ahead of its author's joined event SHALL be dropped and persisted from the first session after the joined event arrives.
+A session between two member devices SHALL reconcile the membership store to convergence, fold it, and only then reconcile the record store; both stores SHALL be reconciled whole, with no capability filter on either. The record store's session SHALL be served by the membership folded after the membership store's session, so that a newcomer whose joined event that session brings is served and a member whose departure it brings is refused. A record SHALL be held whatever it arrives ahead of, and SHALL read once the membership its entries name has arrived.
 
 **Example:** Alice's laptop a2 holds neither Dave's joined event nor Dave's first claim, and sessions with Carol's phone c1, which holds both; `<dave>`: 64 lowercase hex chars of Dave's `PdnId`; `<id>`: the id `put_record` minted.
 
 | step of the session | a2 |
 |---|---|
 | 1. the membership store reconciled to convergence | takes Dave's joined event and his device statement, listing his phone d1 |
-| 2. the write admission folded | Dave a member at his sequence 1, writing on d1 |
-| 3. the record store reconciled under it | takes `by/<dave>/claim/<id>/1` from d1's author, judged at Dave's sequence 1: admitted in this session |
+| 2. the membership folded | Dave a member at his sequence 1, writing on d1 |
+| 3. the record store reconciled | takes `by/<dave>/claim/<id>/1` from d1's author, which the record view reads at Dave's sequence 1 at once |
 
-#### Scenario: A newcomer's first record is admitted in the session that brings its membership
+#### Scenario: A newcomer's first record reads once the session brings its membership
 
 - **WHEN** newcomer D's joined event and D's first claim are both unknown to a device of B, and B's device sessions with a device holding both
-- **THEN** B's device persists D's claim in that session
+- **THEN** B's device reads D's claim at the end of that session
 
 ### Requirement: The record store's key names the member and the kind
 
@@ -424,77 +447,77 @@ a listing under by/<bob>/ returns these four entries; each record's identity is 
 
 ### Requirement: A claim is written only by its issuer
 
-An entry that is a claim SHALL be admitted over sync only when it was authored by a device of the member the claim names as its issuer, that member being a member at the sequence the claim's key names. A claim entry authored by a device of any other member SHALL be dropped before persisting, on every member device, silently — the verdict is on the entry's author, not on the session peer that carried it, so an entry relayed by a third member keeps the verdict its author earns.
+A claim SHALL read only from an entry authored by a device of the member the claim names as its issuer, that member being a member at the sequence the claim's key names. An entry at a claim's key authored by a device of any other member SHALL be held and read by nothing, on every member device, silently — the verdict is on the entry's author, not on the session peer that carried it, so an entry relayed by a third member keeps the verdict its author earns.
 
 **Example:** entries at the key of Alice's claim `by/<alice>/claim/<id>/1` reach Carol's phone c1; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `<id>`: the id `put_record` minted; a1 is Alice's phone, b1 Bob's.
 
 | entry | its author | carried by | c1 |
 |---|---|---|---|
-| Alice's claim | a1's | a1 | persists it |
-| Alice's claim | a1's | b1 | persists it: judged by its author, not by b1 |
-| another entry at that key | b1's | b1 | drops it, signalling nothing; Alice's claim reads unchanged |
+| Alice's claim | a1's | a1 | reads it |
+| Alice's claim | a1's | b1 | reads it: judged by its author, not by b1 |
+| another entry at that key | b1's | b1 | holds it and reads nothing of it, signalling nothing; Alice's claim reads unchanged |
 
-#### Scenario: The issuer's own claim is admitted
+#### Scenario: The issuer's own claim is read
 
 - **WHEN** a device of member A writes a claim issued by A and a device of member B reconciles
-- **THEN** B's device persists the claim
+- **THEN** B's device reads the claim
 
-#### Scenario: Another member's entry under the issuer's claims is dropped
+#### Scenario: Another member's entry under the issuer's claims is read by nothing
 
 - **WHEN** a device of member B produces an entry that names A as the claim's issuer and reconciles with a device of A or of a third member
-- **THEN** the entry is not persisted, no rejection is signalled, and A's own claim at that key survives unchanged
+- **THEN** the entry is held and read by nothing, no rejection is signalled, and A's own claim at that key reads unchanged
 
 #### Scenario: A relayed claim is judged by its author
 
 - **WHEN** a device of member C receives, from a device of member B, a claim authored by a device of A that names A as issuer
-- **THEN** C's device persists it, although the session peer is B
+- **THEN** C's device reads it, although the session peer is B
 
 ### Requirement: A mergeable-document is edited by every member
 
-An operation on a mergeable-document SHALL be admitted from a device of any member, whoever's name the mergeable-document sits under, each operation carrying its writer's author signature and naming, in its key, the writer's membership sequence at the time of writing. The one ground for dropping an operation is its writer's membership state at that sequence: an operation whose author resolves to no member's device, or to a member that was not a member at the named sequence of its own events, SHALL be dropped before persisting, silently, on every member device — no role, no mergeable-document and no time of authoring narrows admission further; an operation naming a sequence the device does not yet hold SHALL be dropped and persisted from the first session after the events arrive, since reconciliation offers again what the device lacks. An operation is judged the same on every device whenever it arrives: everything a member wrote while a member — its operations on its own mergeable-documents and on other members' — SHALL be admitted after it leaves or is kicked, on a device that catches up later included, and SHALL resolve to that member after it joins again, its new operations naming its new sequence. No record carries a sharing mode.
+An operation on a mergeable-document SHALL read from a device of any member, whoever's name the mergeable-document sits under, each operation carrying its writer's author signature and naming, in its key, the writer's membership sequence at the time of writing. The one ground for not reading an operation is its writer's membership state at that sequence: an operation whose author resolves to no member's device, or to a member that was not a member at the named sequence of its own events, SHALL be held and read by nothing, silently, on every member device — no role, no mergeable-document and no time of authoring narrows reading further; an operation naming a sequence the device does not yet hold SHALL read once the events arrive. An operation is judged the same on every device whenever it arrives: everything a member wrote while a member — its operations on its own mergeable-documents and on other members' — SHALL read after it leaves or is kicked, on a device that catches up later included, and SHALL resolve to that member after it joins again, its new operations naming its new sequence. No record carries a sharing mode.
 
 **Example:** operations on Bob's note reach Alice's laptop a2, linked after all of them were written; Carol, on her phone c1, joined at her sequence 1, was kicked at 2 and invited again at 3.
 
 | operation | its author | names | a2 |
 |---|---|---|---|
-| Carol's, written while a member | c1's | her sequence 1 | persists it |
-| Carol's, written after the kick | c1's | her sequence 2 | drops it, signalling nothing |
-| Carol's, written after she joined again | c1's | her sequence 3 | persists it; her operation naming 1 still resolves to her |
-| one whose author no member's statement lists | — | — | drops it, signalling nothing |
+| Carol's, written while a member | c1's | her sequence 1 | reads it |
+| Carol's, written after the kick | c1's | her sequence 2 | holds it and reads nothing of it, signalling nothing |
+| Carol's, written after she joined again | c1's | her sequence 3 | reads it; her operation naming 1 still resolves to her |
+| one whose author no member's statement lists | — | — | holds it and reads nothing of it, signalling nothing |
 
 #### Scenario: Any member edits another member's mergeable-document
 
 - **WHEN** a device of member C, no owner, appends an operation to a mergeable-document under member B's name and the members' devices reconcile
-- **THEN** every member's devices persist C's operation, its author being C's device
+- **THEN** every member's devices read C's operation, its author being C's device
 
-#### Scenario: An operation by no member's device is dropped
+#### Scenario: An operation by no member's device is read by nothing
 
 - **WHEN** a device of member B carries an operation on a mergeable-document authored by a key that resolves to no member's device, and reconciles with a device of a third member
-- **THEN** no member device persists it, no rejection is signalled, and the mergeable-document's own operations survive unchanged
+- **THEN** every member device holds it and reads nothing of it, no rejection is signalled, and the mergeable-document's own operations read unchanged
 
 #### Scenario: A departed member's earlier operation reaches a device that catches up later
 
 - **WHEN** member C, a member from sequence 1, appended an operation naming sequence 1, C was then kicked at sequence 2, and a device linked into member B after the kick catches up from a device of member D
-- **THEN** B's new device persists C's operation, in C's own mergeable-documents and in B's alike
+- **THEN** B's new device reads C's operation, in C's own mergeable-documents and in B's alike
 
-#### Scenario: An operation naming a sequence at which its writer was no member is dropped
+#### Scenario: An operation naming a sequence at which its writer was no member is read by nothing
 
 - **WHEN** C was kicked at sequence 2 and a device of member D relays an operation authored by C's device naming sequence 2
-- **THEN** no member device persists it, no rejection is signalled, and C's operations naming sequence 1 stay
+- **THEN** every member device holds it and reads nothing of it, no rejection is signalled, and C's operations naming sequence 1 still read
 
 #### Scenario: A member that joins again writes under its new sequence
 
 - **WHEN** member C was kicked at sequence 2, a member invites C again at sequence 3, and C's device then appends an operation naming sequence 3
-- **THEN** every member device persists the operation, and C's earlier operations, naming sequence 1, still resolve to C
+- **THEN** every member device reads the operation, and C's earlier operations, naming sequence 1, still resolve to C
 
-#### Scenario: An operation ahead of its author's joined event is persisted once the event arrives
+#### Scenario: An operation ahead of its author's joined event reads once the event arrives
 
 - **WHEN** a device of member B receives, from a device of member E, an operation authored by a device of D while no joined event of D has reached B's device
-- **THEN** the operation is dropped, and it is persisted from the first session after D's joined event reaches B's device, reconciliation offering it again
+- **THEN** B's device holds the operation and reads nothing of it, and reads it as D's once D's joined event reaches B's device, with no session offering it again
 
 ### Requirement: A mergeable-document keeps every operation; an immutable-document is placed once by its member
 
-A mergeable-document SHALL hold each edit as its own entry under its own key, never overwritten by another edit: concurrent operations by two writers the cell admits SHALL both persist on every member device, and their merge is above the data layer. An immutable-document SHALL be one entry under one key, admitted only when authored by a device of the member under whose name it sits; an entry at that key authored by a device of any other member — an owner included — SHALL be dropped before persisting, silently, on every member device.
+A mergeable-document SHALL hold each edit as its own entry under its own key, never overwritten by another edit: concurrent operations by two writers the cell reads SHALL both be held and read on every member device, and their merge is above the data layer. An immutable-document SHALL be one entry under one key, read only when authored by a device of the member under whose name it sits; an entry at that key authored by a device of any other member — an owner included — SHALL be held and read by nothing, silently, on every member device.
 
 **Example:** Bob and Carol, disconnected from each other on b1 and c1, each append an operation to Bob's note, and Alice, an owner, writes from a1 at the key of Bob's lease scan; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<note>`, `<lease>`: ids `put_record` minted; `<op>`: the writer's author key, membership sequence and operation sequence, so each operation has its own.
 
@@ -502,21 +525,21 @@ A mergeable-document SHALL hold each edit as its own entry under its own key, ne
 |---|---|---|
 | Bob's operation | `by/<bob>/mergeable-document/<note>/<op>`, `<op>` naming b1's author | holds it |
 | Carol's operation | `by/<bob>/mergeable-document/<note>/<op>`, `<op>` naming c1's author | holds it beside Bob's |
-| Alice's entry at the scan's key | `by/<bob>/immutable-document/<lease>/1` | drops it, a1 excepted, and reads Bob's scan unchanged |
+| Alice's entry at the scan's key | `by/<bob>/immutable-document/<lease>/1` | holds it and reads nothing of it, a1 included, and reads Bob's scan unchanged |
 
 #### Scenario: Concurrent operations on a mergeable-document both persist
 
 - **WHEN** a device of member B and a device of member C each append an operation to a mergeable-document under B's name while disconnected, and the members' devices then reconcile
 - **THEN** every member device holds both operations
 
-#### Scenario: An immutable-document is admitted from its member and from nobody else
+#### Scenario: An immutable-document is read from its member and from nobody else
 
 - **WHEN** a device of member B places an immutable-document, a device of owner A then produces an entry at its key, and the members' devices reconcile
-- **THEN** every member device persists B's immutable-document, and every member device other than A's drops A's entry and reads B's immutable-document unchanged
+- **THEN** every member device reads B's immutable-document, and every member device, A's included, holds A's entry and reads nothing of it
 
 ### Requirement: Entries outside the key layout are kept, used by nothing, and listed
 
-An entry in either store whose key fits neither store's layout, or fits one only in part, SHALL be admitted when its author resolves to a device of a current member, and dropped silently otherwise; once admitted it SHALL be reconciled, held and relayed like any entry. A key longer than the store's bound of 8,192 bytes is dropped before any layout is read ([capability-gated ingest](../capability-gated-ingest/spec.md)), so every record key the layouts define, a record's id included, has to fit under that bound. No membership fold, no admission verdict and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
+An entry in either store whose key fits neither store's layout, or fits one only in part, SHALL be held like every entry a session carries from a member device, whoever its author, and reconciled and relayed like any entry. A key longer than the store's bound of 8,192 bytes is dropped before any layout is read ([capability-gated ingest](../capability-gated-ingest/spec.md)), so every record key the layouts define, a record's id included, has to fit under that bound. No membership fold and no record view SHALL read it, and the store SHALL list such entries with their authors so the application can show them.
 
 **Example:** entries outside the layout reach Carol's phone c1 from Bob's phone b1; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<id>`: an id `put_record` minted.
 
@@ -524,51 +547,51 @@ An entry in either store whose key fits neither store's layout, or fits one only
 |---|---|---|
 | `ext/anything` in the record store | b1's | holds it and lists it with b1's author; every record reads as before, and the next session with b1 finds no difference |
 | `by/<bob>/claim/<id>/1` in the membership store | b1's | holds it the same way, and no membership state changes |
-| `ext/anything`, relayed | one no member's statement lists | drops it |
+| `ext/anything`, relayed | one no member's statement lists | holds it and lists it with that author |
 
 #### Scenario: An unknown entry from a member converges and changes nothing
 
 - **WHEN** a device of member B writes an entry at `ext/anything` in the record store, and the members' devices reconcile
 - **THEN** every member device holds the entry and lists it with B as its author, every record reads as before, and a later session between any two member devices finds no difference
 
-#### Scenario: An unknown entry from no member's device is dropped
+#### Scenario: An unknown entry is held whoever authored it
 
 - **WHEN** a device of member D relays an entry at `ext/anything` authored by a key that resolves to no member's device
-- **THEN** no member device persists it
+- **THEN** every member device holds it and lists it with that author, and no record and no membership state changes
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. A statement that arrives before the event carrying the member's announcement key SHALL be deferred within the session and judged once that event is admitted, and so SHALL an entry whose author only a deferred statement lists. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL count by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL count for nothing on every member device, held as every entry is. A statement SHALL count once its payload has arrived and the event carrying the member's announcement key is held, whatever order the two arrive in, and an entry whose author only that statement lists SHALL read from then on. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
 
 **Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
 | entry | written by | signed by | every member device |
 |---|---|---|---|
-| `member/<bob>/devices/1`: b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's announcement key | admits it: the writer is not the member |
-| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's announcement key | admits it, whoever relays it, and resolves Alice-leisure's devices by version 2 |
-| `member/<bob>/devices/2` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding version 1 alone | Bob's announcement key | admits both and resolves Bob's devices to b1, b2 and b3 |
-| `member/<bob>/devices/3`: b1, b2, b3 and d1 | d1 | Dave's announcement key | drops it |
-| `member/<alice-work>/devices/1`: a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's announcement key | admits it: a3 stands under two authors, one per member |
+| `member/<bob>/devices/1`: b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's announcement key | counts it: the writer is not the member |
+| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's announcement key | counts it, whoever relays it, and resolves Alice-leisure's devices by version 2 |
+| `member/<bob>/devices/2` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding version 1 alone | Bob's announcement key | counts both and resolves Bob's devices to b1, b2 and b3 |
+| `member/<bob>/devices/3`: b1, b2, b3 and d1 | d1 | Dave's announcement key | holds it and counts it for nothing |
+| `member/<alice-work>/devices/1`: a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's announcement key | counts it: a3 stands under two authors, one per member |
 
 #### Scenario: A new device registers itself through its siblings
 
 - **WHEN** a device freshly linked into member B writes the next version of B's device statement, listing itself, into its local replica, reconciles with another device of B that holds the cell, and that device then reconciles with a device of member C
-- **THEN** C's device admits the statement and serves the new device's next session, which it refused before the statement arrived
+- **THEN** C's device counts the statement and serves the new device's next session, which it refused before the statement arrived
 
 #### Scenario: Two members on one node are two authors under one node id
 
 - **WHEN** identities B and D, hosted on one node, are both members of a cell and each places a record from that node
 - **THEN** B's and D's statements list the same node id under two different authors, and every member device resolves each record to the one member whose author signed it
 
-#### Scenario: A statement under a wrong key is dropped
+#### Scenario: A statement under a wrong key counts for nothing
 
 - **WHEN** a device of member M produces a device statement for member B signed by a key that is not B's announcement key
-- **THEN** no member device persists it, and B's device set stays what B's own statements say
+- **THEN** every member device holds it and counts it for nothing, and B's device set stays what B's own statements say
 
-#### Scenario: A device statement ahead of its join waits for it in the session
+#### Scenario: A device statement ahead of its join counts once the join arrives
 
 - **WHEN** in one session a device of A receives B's device statement, and an event authored by a device only that statement lists, before the joined event carrying B's announcement key
-- **THEN** both are deferred and persisted in that same session once the joined event arrives, while a statement for B signed by a key no joined event carries is persisted by no member device
+- **THEN** both are held and count once the joined event arrives, in that session or a later one, while a statement for B signed by a key no joined event carries counts on no member device
 
 #### Scenario: An old version displaces nothing
 
