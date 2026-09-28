@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The debug surface covers the embedded runtime's operations
-When enabled, the debug surface SHALL make identity creation and linking, connection establishment, grants, entry operations, cells, node status, and hosted identities reachable over HTTP. An entry operation SHALL name the identity performing it as well as the issuer addressed, and a cells operation the identity performing it as well as the cell, so a caller reaches exactly what that identity holds. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The cells routes SHALL cover every operation of the cells service, one route each: creating and listing cells, renaming a cell and listing its members; inviting and joining; the membership acts; placing records, appending operations, reading and listing records; and listing the entries outside the key layout.
+When enabled, the debug surface SHALL make identity creation and linking, connection establishment, grants, entry operations, cells, node status, and hosted identities reachable over HTTP. An entry operation SHALL name the identity performing it as well as the issuer addressed, and a cells operation the identity performing it as well as the cell, so a caller reaches exactly what that identity holds. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The cells routes SHALL cover every operation of the cells service, one route each: creating and listing cells and listing a cell's members; inviting and joining; the membership acts; placing records, appending operations, reading and listing records; and listing the entries outside the key layout.
 
 **Example:** two requests to the host on Alice's tablet a3, which hosts Alice-leisure, a member of the cell `eead8ef96aa1254969d63c12631b799c`, and Alice-work, no member; `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -35,7 +35,7 @@ The host SHALL report a runtime refusal with its allow-listed client-error statu
 
 | request | answer |
 |---|---|
-| `PUT /debug/identities/<alice-work>/cells/f942dfc21acd0218d48f61f714ddfff3/name` | 403; the cell's name is unchanged |
+| `POST /debug/identities/<alice-work>/cells/f942dfc21acd0218d48f61f714ddfff3/acts`, `Kick(<bob>)` | 403; Bob stays a member |
 | `GET /debug/identities/<alice-work>/cells/eead8ef96aa1254969d63c12631b799c/members` | 409 |
 | `GET /debug/identities/<alice-leisure>/cells/eead8ef96aa1254969d63c12631b799c/records/<bob>/claim/<absent>` | 404 |
 
@@ -60,8 +60,8 @@ The host SHALL report a runtime refusal with its allow-listed client-error statu
 - **THEN** the response is a client error other than 404
 
 #### Scenario: A refusal by role is reported as a refusal
-- **WHEN** a plain member renames the cell
-- **THEN** the response is a client error and every member lists the cell under its name unchanged
+- **WHEN** a plain member kicks another member of the cell
+- **THEN** the response is a client error and every member still lists the other member
 
 #### Scenario: An absent record is reported as absent
 - **WHEN** a member reads a record the cell does not hold

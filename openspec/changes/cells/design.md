@@ -22,6 +22,7 @@ This design records the decisions taken for the platform side of cells and the q
 - Content encryption — a separate layer; every member holds the plaintext by definition.
 - Recall of delivered content — Invariant 2 governs acquisition, not retention.
 - Chat — a later change of its own, on a sync shape of its own rather than the store's reconciliation.
+- A name for a cell: the cell id is its one address, and a cell carries no name.
 - Defence against a member's device contradicting its own member's history — acts under a point the member has lost, rewrites of its own entries, two events at one point: it rests on anchored signatures over the platform's key event logs (D34).
 - The merge of a mergeable-document's operations into one document, their encoding and the editing UX: cells store, admit and reconcile the operations and hand them back with their writers (D17).
 - Deleting or replacing a record: a record placed stays for every member (D14).
@@ -166,18 +167,6 @@ No egress filter: both stores are served whole to member devices, the membership
 - A replica per member inside the cell, the cell as the grant audience — "share without copying".
   - **Pros:** data stays with its issuer; grants stay per claim.
   - **Cons:** every member's content is a replica the reader reaches separately; grantees stay outside the swarm, so a live update needs a grant republish per item; a stream grows the grant record with every message.
-
-### D8. A cell has a human-readable name that is not an identifier
-
-Names repeat, including among one identity's cells. Only the cell id addresses a cell. The name is shared: the cell carries one name every member sees, set at creation and renamed by an owner; there is no per-member name on the platform. The name is a cell-level record (C8).
-
-**Example:** the cells Alice lists, two of them named "Family".
-
-| cell id | name | members |
-|---|---|---|
-| `eead8ef96aa1254969d63c12631b799c` | Family | Alice, Bob, Carol |
-| `684aad236ce530cd7b5dedb6ab6b755a` | Family | Alice and Dave |
-| Alice, an owner of the first, renames it "Walkers": every member of it lists "Walkers", and the second keeps its name. Every call addresses a cell by its id. | | |
 
 ### D9. Several cells with the same members are ordinary
 
@@ -551,7 +540,6 @@ The routes take this shape; the host spec leaves paths free to change:
 | `POST /debug/identities/{id}/cells`       | `create`       |
 | `GET /debug/identities/{id}/cells`        | `list`         |
 | `GET …/cells/{cell}/members`              | `members`      |
-| `PUT …/cells/{cell}/name`                 | `rename`       |
 | `POST …/cells/{cell}/invites`             | `invite`       |
 | `POST /debug/identities/{id}/cells/join`  | `join`         |
 | `POST …/cells/{cell}/acts`                | `act`          |
@@ -565,8 +553,8 @@ The routes take this shape; the host spec leaves paths free to change:
 **Example:** requests to the host on Alice's tablet a3, which hosts Alice-leisure, the owner of "Family" (`eead8ef96aa1254969d63c12631b799c`), and Alice-work, a plain member of "Wedding" (`f942dfc21acd0218d48f61f714ddfff3`) and no member of "Family"; `<alice-leisure>`, `<alice-work>`, `<bob>`: 64 lowercase hex chars of each `PdnId`.
 
 ```
-PUT /debug/identities/<alice-work>/cells/f942dfc21acd0218d48f61f714ddfff3/name
-→ 403, a refusal by role; the cell's name stays
+POST /debug/identities/<alice-work>/cells/f942dfc21acd0218d48f61f714ddfff3/acts   Kick(<bob>)
+→ 403, a refusal by role; Bob stays a member
 GET /debug/identities/<alice-work>/cells/eead8ef96aa1254969d63c12631b799c/members
 → 409, Alice-work being no member of "Family"
 GET /debug/identities/<alice-leisure>/cells/eead8ef96aa1254969d63c12631b799c/records/<bob>/claim/<an id the cell does not hold>
@@ -760,7 +748,6 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 ### C. Content
 
-- C8. The cell's name (D8): a cell-level entry outside every member's `by/<pdnid>/` prefix, written by owners — its key, the store it sits in, and how two owners' concurrent renames resolve.
 - C10. Record identity: derived from the cell id, the member under whose name the record sits and the path inside the cell without the trailing membership sequence (D21) — a record placed under another name being another id — or from the replica and the key as in data stores. It matters if a one-member cell is ever kept as key prefixes in a personal namespace and turned into a replica of its own when a second member joins.
 
 **Example:** Alice's one-member cell "Recipes" lives as key prefixes in her own namespace and becomes a pair of replicas when Bob joins it; a note in "Family" links her recipe for plum cake; `<cake>`: the id `put_record` minted for the recipe.

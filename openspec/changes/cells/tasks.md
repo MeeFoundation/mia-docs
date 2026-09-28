@@ -21,7 +21,7 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 
 ## 3. pdn-node: the cells service
 
-- [ ] 3.1 `create`, deriving the cell id and writing the signed founding event per D25; `list`, `members`; the name carried with the cell and never used as an address; `rename` by an owner, refused to a plain member with a typed error
+- [ ] 3.1 `create`, deriving the cell id and writing the signed founding event per D25; `list`, `members`; every call addressing a cell by its id
 - [ ] 3.2 The invite and join dialogue per D26: one-time short-lived secret, bearer-free payload, verify-and-burn before any state, uniform refusals, no state on refusal, minting writing nothing to either store, the newcomer recorded as a plain member by the inviting device's invite act and handed both stores' write tickets, its first device statement carried beside its join statement and written beside the invite act into the replica of the identity the secret was minted for, catch-up before the join returns; the dialogue generic over its streams and run inside the process between two identities of one node
 - [ ] 3.3 Writing a claim (immutable; a write addressed at an existing claim refused with a typed error), a mergeable-document (edited by any member, each operation under its writer's signature) and an immutable-document (anyone's update of one refused with a typed error before anything is written); reading and listing by cell id
 - [ ] 3.4 Kick and leave: the kicked event; a kick an owner-only act on another member, its target an owner or a plain member alike, a kick of oneself refused with a typed error; leaving tombstones `cells/<cell-id-hex>/<seq>` in the directory, `<seq>` the left event's sequence (D35), and forgets both stores
@@ -45,7 +45,7 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 ## 5. pdn-node-http: cells on the debug surface and the stand
 
 - [ ] 5.1 Debug routes for every operation of the cells service per D31, one call each: a cell the identity is no member of 409, a refusal by role 403, an absent record 404; no route writing a raw entry, handing over a store ticket or forcing reconciliation
-- [ ] 5.2 The stand's cell scenario per the container-stand delta: invitations by the creator and by an invited member with the consumed secret refused; a record and an edit reaching every member; a plain member's owner-only acts refused beside the creator's rename; a kicked member no longer receiving once the remaining members read a later record; a restart that brings the cell back, and one that keeps a left cell left
+- [ ] 5.2 The stand's cell scenario per the container-stand delta: invitations by the creator and by an invited member with the consumed secret refused; a record and an edit reaching every member; a plain member's owner-only acts refused beside an owner's promotion; a kicked member no longer receiving once the remaining members read a later record; a restart that brings the cell back, and one that keeps a left cell left
 
 ## 6. Docs and archive
 

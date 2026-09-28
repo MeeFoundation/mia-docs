@@ -6,7 +6,6 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 
 |                                | Cell owner | Cell member |
 | ------------------------------ | ---------- | ----------- |
-| Rename cell for all members    | yes        | no          |
 | Invite member to a cell        | yes        | yes         |
 | Leave cell                     | yes        | yes         |
 | Delete cell for all members    | no         | no          |
@@ -57,13 +56,11 @@ The service's surface — the operations the requirements below constrain:
 /// fails with the unknown-cell error, and a refusal by role is a typed error that writes nothing.
 trait CellsService {
     /// Derives the cell id, creates both stores, writes the signed founding event; the identity is the first owner.
-    async fn create(&self, identity: PdnId, name: &str) -> Result<CellId>;
-    /// The cells the identity is a member of, with their names.
+    async fn create(&self, identity: PdnId) -> Result<CellId>;
+    /// The cells the identity is a member of.
     async fn list(&self, identity: PdnId) -> Result<Vec<CellInfo>>;
     /// The current members, each with its role.
     async fn members(&self, identity: PdnId, cell: CellId) -> Result<Vec<Member>>;
-    /// Renames the cell for every member. An owner.
-    async fn rename(&self, identity: PdnId, cell: CellId, name: &str) -> Result<()>;
 
     /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member. Writes nothing to the cell:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
@@ -99,24 +96,24 @@ enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 
 ### Requirement: The cells service creates a cell for a hosted identity
 
-The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and answers the cell id, the one address of the cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 **Example:** `create` calls on Alice's phone a1, which hosts Alice and not Erin; the nonces a1 draws are 16 bytes of `5a`, then 16 bytes of `a5`.
 
 | call | result |
 |---|---|
-| `create(Alice, "Family")` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
-| `create(Alice, "Family")` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells, both named "Family" |
-| `create(Erin, "Family")` | the unknown-identity error, and no store exists for Erin |
+| `create(Alice)` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
+| `create(Alice)` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells |
+| `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
 #### Scenario: A created cell is listed with its creator as member
 
-- **WHEN** a hosted identity creates a cell named "Family"
-- **THEN** the identity lists a cell with that name and a fresh cell id, whose members are exactly that identity
+- **WHEN** a hosted identity creates a cell
+- **THEN** the identity lists a cell with a fresh cell id, whose members are exactly that identity
 
-#### Scenario: Two cells with one name coexist
+#### Scenario: Two cells of one identity are two ids
 
-- **WHEN** a hosted identity creates two cells both named "Family"
+- **WHEN** a hosted identity creates two cells
 - **THEN** both are listed, with different cell ids, and each is addressed by its own id
 
 #### Scenario: Creating for an unhosted identity is refused
@@ -241,27 +238,6 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 - **WHEN** owner B is kicked, a member invites B again and B joins, and B then attempts to promote a member
 - **THEN** every member lists B as a plain member, and B's attempt is refused with a typed error
-
-### Requirement: An owner renames the cell for every member
-
-Renaming a cell SHALL be available only to an owner's device, and the new name SHALL become the name every member lists. A rename by a member that is no owner SHALL be refused with a typed error and change no state.
-
-**Example:** renaming "Family", whose owner is Alice and whose plain member is Carol, as Carol's phone c1 sees it; `Family` stands for its cell id.
-
-| call | on c1 |
-|---|---|
-| `rename(Carol, Family, "Carol's")` | a typed error; `list` still answers "Family" |
-| `rename(Alice, Family, "Walkers")` | once the rename arrives, `list` answers "Walkers" for `eead8ef96aa1254969d63c12631b799c` |
-
-#### Scenario: An owner renames the cell
-
-- **WHEN** owner A renames the cell "Family" to "Walkers" and the rename reaches a device of member C
-- **THEN** C lists the cell under "Walkers", its cell id unchanged
-
-#### Scenario: A plain member's rename is refused
-
-- **WHEN** member C, no owner, attempts to rename the cell
-- **THEN** the attempt is refused with a typed error and every member lists the cell under its name unchanged
 
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
