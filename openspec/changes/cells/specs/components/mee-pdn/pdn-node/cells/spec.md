@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only, and replacing is deleting and creating anew under one's own name.
+The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
 
 **Cell**
 
@@ -27,8 +27,6 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Create an immutable-document as if it is authored by another member | no         | no          |
 | Update own immutable-document                                       | no         | no          |
 | Update another member's immutable-document                          | no         | no          |
-| Delete own immutable-document                                       | yes        | yes         |
-| Delete another member's immutable-document                          | yes        | no          |
 
 **Mergeable-document** — for example a note.
 
@@ -40,8 +38,6 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Create a mergeable-document as if it is authored by another member        | no         | no          |
 | Edit own mergeable-document                                               | yes        | yes         |
 | Edit another member's mergeable-document (preserving per-edit authorship) | yes        | yes         |
-| Delete own mergeable-document                                             | yes        | yes         |
-| Delete another member's mergeable-document                                | yes        | no          |
 
 **Claim**
 
@@ -53,8 +49,6 @@ The cells service of the runtime: creating a cell for a hosted identity, invitin
 | Issue a claim as if it is issued by another member | no         | no          |
 | Update own claim                                   | no         | no          |
 | Update another member's claim                      | no         | no          |
-| Delete own claim                                   | yes        | yes         |
-| Delete another member's claim                      | yes        | no          |
 
 The service's surface — the operations the requirements below constrain:
 
@@ -85,10 +79,6 @@ trait CellsService {
     async fn put_record(&self, identity: PdnId, cell: CellId, kind: RecordKind, payload: &[u8]) -> Result<RecordRef>;
     /// Appends an operation to an existing mergeable-document, whoever's name it sits under. Any member.
     async fn append_op(&self, identity: PdnId, cell: CellId, record: RecordRef, op: &[u8]) -> Result<()>;
-    /// Places the tombstone of a record of any kind. The member under whose name it sits, or an owner.
-    /// Replacing a claim or an immutable-document is `delete`, then `put_record`.
-    async fn delete(&self, identity: PdnId, cell: CellId, record: RecordRef) -> Result<()>;
-
     /// A claim's or an immutable-document's payload; `None` for a record the cell does not hold.
     async fn read(&self, identity: PdnId, cell: CellId, record: RecordRef) -> Result<Option<Vec<u8>>>;
     /// A mergeable-document's operations, each with its writer.
@@ -111,6 +101,14 @@ enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 
 The cells service SHALL create a cell for a hosted identity: it draws a random nonce, derives the cell id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and carries the given name with the cell. The name is a string, not an address — two cells of one identity MAY carry the same name, and only the cell id addresses a cell. Creating a cell for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
+**Example:** `create` calls on Alice's phone a1, which hosts Alice and not Erin; the nonces a1 draws are 16 bytes of `5a`, then 16 bytes of `a5`.
+
+| call | result |
+|---|---|
+| `create(Alice, "Family")` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
+| `create(Alice, "Family")` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells, both named "Family" |
+| `create(Erin, "Family")` | the unknown-identity error, and no store exists for Erin |
+
 #### Scenario: A created cell is listed with its creator as member
 
 - **WHEN** a hosted identity creates a cell named "Family"
@@ -129,6 +127,14 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
 Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+
+**Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `eead8ef96aa1254969d63c12631b799c`, no ticket — and Bob hands it to Carol; three presentations follow.
+
+| presented to b1 | b1 |
+|---|---|
+| a secret b1 never minted | refuses; nothing is written, and the pending invite stays live |
+| the invite's secret, by Carol's phone c1 | burns it, then writes into Bob's replica Carol's joined event, a plain member, and her device statement, and hands c1 both stores' write tickets; `join` on c1 returns caught up |
+| the same secret again | refuses, as it refused the never-minted one |
 
 #### Scenario: A newcomer joins and catches up
 
@@ -164,6 +170,18 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself by writing the identity's newest device statement into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
 
+**Example:** Bob's directory once Bob has joined "Family" on his phone b1, and what the family tablet t1, linked into Bob and hosting Erin too, does with it; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`.
+
+```
+cells/eead8ef96aa1254969d63c12631b799c                        the cell's record, written at the join
+tickets/cell/eead8ef96aa1254969d63c12631b799c/membership      the membership store's write ticket
+tickets/cell/eead8ef96aa1254969d63c12631b799c/records         the record store's write ticket
+announcement-key                                              Bob's announcement key pair, minted with Bob
+
+t1 opens both stores from these tickets and writes member/<bob>/devices/2 — b1 and t1 — into the membership store
+Erin's directory holds no cells/ entry and no tickets/cell/ kind, only an announcement-key of her own: list answers no such cell for Erin, and her read of the cell fails with the unknown-cell error
+```
+
 #### Scenario: A linked device reaches the cell
 
 - **WHEN** identity B joins a cell on its phone while B's laptop is linked into B
@@ -177,6 +195,17 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 ### Requirement: The creator is the first owner; owners promote members and demote other owners
 
 A created cell SHALL record its creating identity as the cell's first owner. An owner SHALL be able to promote any member to owner, and demoting an owner SHALL be available only to another owner. A promotion or a demotion by a member that is no owner, and a demotion of oneself, SHALL be refused with a typed error and change no state. A demoted owner remains a member. A member that joins again SHALL be a plain member, whatever role it held before, and its owner's acts SHALL be refused with a typed error until an owner promotes it anew.
+
+**Example:** role calls in "Family", in this order, Alice being its one owner and Bob and Carol plain members; `Family` stands for its cell id.
+
+| call | result |
+|---|---|
+| `act(Alice, Family, Promote(Bob))` | written: every member lists Alice and Bob as owners |
+| `act(Carol, Family, Demote(Bob))` | a typed error, nothing written |
+| `act(Alice, Family, Demote(Alice))` | a typed error, nothing written |
+| `act(Bob, Family, Demote(Alice))` | written: Alice a plain member, still a member |
+| `act(Bob, Family, Promote(Carol))` | written: Carol an owner |
+| Carol kicks Bob and Alice invites him again, then `act(Bob, Family, Promote(Alice))` | a typed error: Bob is a plain member until an owner promotes him anew |
 
 #### Scenario: The creator is listed as owner
 
@@ -212,6 +241,13 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 Renaming a cell SHALL be available only to an owner's device, and the new name SHALL become the name every member lists. A rename by a member that is no owner SHALL be refused with a typed error and change no state.
 
+**Example:** renaming "Family", whose owner is Alice and whose plain member is Carol, as Carol's phone c1 sees it; `Family` stands for its cell id.
+
+| call | on c1 |
+|---|---|
+| `rename(Carol, Family, "Carol's")` | a typed error; `list` still answers "Family" |
+| `rename(Alice, Family, "Walkers")` | once the rename arrives, `list` answers "Walkers" for `eead8ef96aa1254969d63c12631b799c` |
+
 #### Scenario: An owner renames the cell
 
 - **WHEN** owner A renames the cell "Family" to "Walkers" and the rename reaches a device of member C
@@ -225,6 +261,15 @@ Renaming a cell SHALL be available only to an owner's device, and the new name S
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
 Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices from the next session, per the cell stores' admission rule. A member that leaves SHALL tombstone the cell's record in its directory and forget both stores on its own devices, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+
+**Example:** kicks and a leave in "Family", in this order: Alice is an owner, Bob, Carol and Dave plain members, and the family tablet t1 hosts Bob and Carol; `Family` stands for its cell id.
+
+| call | result |
+|---|---|
+| `act(Bob, Family, Kick(Carol))` | a typed error, nothing written |
+| `act(Alice, Family, Kick(Alice))` | a typed error, nothing written |
+| `act(Alice, Family, Kick(Dave))` | written: Dave's devices are refused from their next session with each member device the kicked event has reached |
+| `act(Carol, Family, Leave)` on Carol's phone c1 | her left event written and `cells/eead8ef96aa1254969d63c12631b799c` tombstoned in her directory; both stores forgotten on c1, and on t1 once her directory syncs there, while Bob's replicas on t1 go on; her records and operations stay in the cell |
 
 #### Scenario: An owner kicks a member
 
@@ -253,7 +298,16 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 
 ### Requirement: A claim and an immutable-document are placed once; a mergeable-document is edited by every member
 
-The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. Deleting a record of any kind SHALL be available to the identity under whose name it sits and to any owner, and refused to any other member with a typed error. A claim or an immutable-document is replaced by deleting it and placing a new one, the new record under the replacer's name with a new id. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
+The cells service SHALL place a record as one of three kinds — claim, mergeable-document or immutable-document — under the placing identity's name, and every member SHALL read it back. A claim SHALL be written as an immutable entry: the service offers no operation that changes a stored claim's payload, and a write addressed at an existing claim SHALL be refused with a typed error, the stored payload surviving. An immutable-document SHALL be placed once, like a claim: a write addressed at an existing one SHALL be refused with a typed error, whoever the caller is, the placing identity included. An edit of a mergeable-document SHALL be accepted from any member, each operation under the writer's own signature; an edit by an identity that is no member SHALL fail with the unknown-cell error. Reading a mergeable-document SHALL return its operations as they are held, each with its writer, and the service computes no document state from them. Reading SHALL be by cell id, and reading a cell the identity is no member of SHALL fail with the unknown-cell error.
+
+**Example:** record calls in "Family", in this order: Alice is an owner, Bob and Carol plain members, and Erin, hosted on the family tablet t1 beside them, no member; Bob's note is a mergeable-document he placed earlier; `Family` stands for its cell id.
+
+| call | result |
+|---|---|
+| `put_record(Bob, Family, Claim, …)` | a `RecordRef` with member Bob, kind `Claim` and a fresh id; every member reads Bob's bytes |
+| `append_op(Bob, Family, that claim, …)` | a typed error: a claim is placed once |
+| `append_op(Carol, Family, Bob's note, …)` | written: `read_ops` lists it with Carol as its writer |
+| `append_op(Erin, Family, Bob's note, …)` | the unknown-cell error |
 
 #### Scenario: A claim round-trips unchanged
 
@@ -280,34 +334,18 @@ The cells service SHALL place a record as one of three kinds — claim, mergeabl
 - **WHEN** a hosted identity that is no member of the cell appends an operation to its mergeable-document
 - **THEN** the edit fails with the unknown-cell error and no member's device holds such an operation
 
-#### Scenario: An owner replaces a member's record
-
-- **WHEN** member B places a claim and an immutable-document, and owner A deletes each and places its own in their place
-- **THEN** every member reads A's records under ids different from B's, with A as their issuer and placing member, and B's records are no longer read
-
-#### Scenario: A replacement arrives in two halves
-
-- **WHEN** owner A replaces B's immutable-document, and a device of member C receives A's new record in one session and the tombstone on B's record only in a later one
-- **THEN** between the sessions C reads both records, and after the later session A's record alone, no member having acted in between
-
-#### Scenario: A member replaces its own record
-
-- **WHEN** member B, no owner, places an immutable-document, deletes it and places a new one
-- **THEN** every member reads the new immutable-document under a new id, and the old one is no longer read
-
-#### Scenario: A member deletes its own mergeable-document; a plain member deletes no other member's
-
-- **WHEN** member C, no owner, attempts to delete B's mergeable-document, and B then deletes it from B's own device
-- **THEN** C's attempt is refused with a typed error and every member still reads the document, and after B's deletion no member reads it
-
-#### Scenario: A plain member deletes no other member's record
-
-- **WHEN** member C, no owner, attempts to delete B's claim or B's immutable-document
-- **THEN** the attempt is refused with a typed error and every member still reads B's records
-
 ### Requirement: Hosted cells survive a restart
 
 A directory-configured runtime SHALL host again, after a restart, every cell its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's cells end with the process. The hosted cells SHALL be re-derived from each hosted identity's directory, as its connections are: every cell whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the cell's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no cell.
+
+**Example:** the family tablet t1 runs on a storage directory and hosts Bob and Carol, both members of "Family"; Carol left a second cell, `684aad236ce530cd7b5dedb6ab6b755a`, before t1 stops.
+
+| step | t1 |
+|---|---|
+| t1 stops | on disk, `cells/eead8ef96aa1254969d63c12631b799c` is live in Bob's directory and in Carol's, and `cells/684aad236ce530cd7b5dedb6ab6b755a` is tombstoned in Carol's |
+| Alice places a claim from her phone a1 meanwhile | — |
+| t1 starts on the same directory | opens Family's two stores for Bob and for Carol, each from the tickets in the identity's own directory, and nothing for `684aad236ce530cd7b5dedb6ab6b755a`; neither hosting record names a cell |
+| t1's first sessions | Alice's claim arrives, and Bob's and Carol's replicas converge inside the process |
 
 #### Scenario: A cell is hosted again after a restart
 
