@@ -25,7 +25,7 @@ With two stores per cell the tree serves each store over its own order. By the m
 
 ### Reachability beyond relays
 
-Two devices on different networks without a relay and without DNS do not reliably reach each other, and relays come in a change of their own. Beyond them, always-on member devices can serve as the cell's hubs, and whether the platform prefers them as contacts is open.
+Two devices on different networks without a relay and without DNS do not reliably reach each other, so a cell across networks rests on iroh relays, which the stack binds and the product is expected to run itself. Beyond them, always-on member devices can serve as the cell's hubs, and whether the platform prefers them as contacts is open.
 
 ### Swarm and cadence parameters for 200 nodes
 

@@ -368,7 +368,7 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 
 The gate SHALL judge by the point an entry names and by the membership state as of the session, and by nothing else: it SHALL admit an event or a record whose named point checks out, whoever carries it and whenever it arrives, and SHALL refuse or defer what the session's own state cannot resolve. The scenarios below are its consequences on honest devices — what the gate does, not what a cell wants — each named after the decision or the open question that keeps it.
 
-**Example:** three verdicts in "Family" beside what a cell would want of each.
+**Example:** verdicts in "Family" beside what a cell would want of each.
 
 | case | the gate | a cell wants | kept by |
 |---|---|---|---|
