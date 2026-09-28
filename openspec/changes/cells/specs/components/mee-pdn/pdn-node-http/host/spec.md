@@ -10,7 +10,7 @@ When enabled, the debug surface SHALL make identity creation and linking, connec
 | request | answer |
 |---|---|
 | `GET /debug/identities/<bob>/cells/eead8ef96aa1254969d63c12631b799c/records` | the records Bob's replica holds, from one `list_records` call |
-| `GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/records` | a client error: Erin is no member, whoever else the tablet hosts |
+| `GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/records` | 409: Erin is no member, whoever else the tablet hosts |
 
 #### Scenario: A whole scenario runs over HTTP alone
 - **WHEN** 2 hosts are driven only over HTTP through identity creation, establishment, a grant, a write, and a grantee read
@@ -35,8 +35,8 @@ The host SHALL report a runtime refusal with its allow-listed client-error statu
 
 | request | answer |
 |---|---|
-| `PUT /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/name` | a client error; the cell's name is unchanged |
-| `GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/members` | a client error other than 404 |
+| `PUT /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/name` | 403; the cell's name is unchanged |
+| `GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/members` | 409 |
 | `GET /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/records/<alice>/claim/<absent>` | 404 |
 
 #### Scenario: An unhosted identity is refused, not absent

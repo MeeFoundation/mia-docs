@@ -524,7 +524,7 @@ Cells are built in parallel with what exists. Connections, grants, subset-rbsr a
 
 ### D31. The debug surface covers the cells service whole
 
-The HTTP host serves every operation of the cells service under `/debug/`, one route each, each delegating to one call and adding no orchestration — the rules the host already keeps for identity, connections and data. A cell the calling identity is no member of is a client error other than 404, a refusal by role is a client error, and an absent record is 404. No route writes a raw entry, hands over a store ticket or forces reconciliation, so what a modified node does — a forged entry, an entry outside the key layout — is exercised in the data layer's own tests, what D34 leaves undefended nowhere, and the container stand exercises what the product path reaches: a three-member cell with its paired denials, a kick and a restart.
+The HTTP host serves every operation of the cells service under `/debug/`, one route each, each delegating to one call and adding no orchestration — the rules the host already keeps for identity, connections and data. A cell the calling identity is no member of is 409, as an issuer the identity holds nothing of is (`UnknownIssuer`); a refusal by role is 403, as a write outside a grant is (`WriteNotGranted`); an absent record is 404. A client reads the cells routes as it reads every other route, and a test that expects a refusal by role fails when the service does not take the caller for a member at all. No route writes a raw entry, hands over a store ticket or forces reconciliation, so what a modified node does — a forged entry, an entry outside the key layout — is exercised in the data layer's own tests, what D34 leaves undefended nowhere, and the container stand exercises what the product path reaches: a three-member cell with its paired denials, a kick and a restart.
 
 The routes take this shape; the host spec leaves paths free to change:
 
@@ -548,9 +548,9 @@ The routes take this shape; the host spec leaves paths free to change:
 
 ```
 PUT /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/name
-→ a client error, a refusal by role — 403 under G4's first option; the cell's name stays
+→ 403, a refusal by role; the cell's name stays
 GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/members
-→ a client error other than 404, Erin being no member — 409 under G4's first option
+→ 409, Erin being no member
 GET /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/records/<alice>/claim/<an id the cell does not hold>
 → 404
 ```
@@ -561,6 +561,9 @@ GET /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/records/<al
   - **Cons:** a scenario the surface cannot drive is tested across containers nowhere, and the host spec already asks the surface to cover the runtime's operations.
 - A route that writes raw entries, to exercise forgeries over HTTP.
   - **Cons:** a path the runtime's own callers lack, against the host's rule; forgeries belong to the data layer's tests, where the gate is reached directly.
+- 403 for a cell the identity is no member of, as for a refusal by role.
+  - **Pros:** the cell answers a non-member by its rules, as it answers a plain member's attempt at an owner's act.
+  - **Cons:** a client tells no member from no role by the body alone, and a test that expects a refusal by role passes when the service does not take the caller for a member. It hides nothing the chosen statuses reveal: the body still tells the two apart, and a session on the cell's store already refuses a non-member as it refuses a store not hosted (D32).
 
 ### D32. A session names two members, and the caller is looked up in the serving identity's own records
 
@@ -735,16 +738,3 @@ Grouped; each names its options and, where the team leans somewhere, the leaning
 
 - F2. The author-key-to-member binding: published by the member itself (D16); what a device does when two validly signed statements of one member conflict at one version. Two members of one cell hosted on one node no longer share an author key: a hosted identity owns its own author, persisted with its own replicas (ADR-0013), so each member's device statements list a key of its own and a membership act resolves to the one member that wrote it. What stays open is the conflict case — two statements of one version from two authors both stand, one per author at the key, while a second statement of one version from the same author replaces the first on every device it reaches — and that a node holding both identities' secrets can write as either — attribution on honest devices, never a defence against the node.
 - F5. Linkability: one `PdnId` across cells; per-cell pairwise identities (the KERI roadmap's later step). Two identities of one person on one node publish one node id in their device statements, so a member of cells with both sees that they share a device; an endpoint per identity would separate them (ADR-0013).
-
-### G. Operations
-
-- G4. The statuses the host gives the cells service's refusals. D31 fixes that a cell the calling identity is no member of is a client error other than 404, and that a refusal by role is a client error, and leaves the status open.
-  - The host's grouping as it stands: 409 for a cell the identity is no member of, as for an issuer the identity holds nothing of (`UnknownIssuer`), and 403 for a refusal by role, as for a write outside a grant (`WriteNotGranted`). A client reads the cells routes as it reads every other route.
-  - 403 for both: the cell answers a non-member by its rules, as it answers a plain member's attempt at an owner's act. A client then tells no member from no role by the body alone.
-
-**Example:** on the family tablet, which hosts both, Carol, a plain member of "Family", renames the cell, and Erin, no member, lists its members; `<carol>`, `<erin>`: 64 lowercase hex chars of each `PdnId`.
-
-| request | the host's grouping | 403 for both |
-|---|---|---|
-| `PUT /debug/identities/<carol>/cells/eead8ef96aa1254969d63c12631b799c/name` | 403 | 403 |
-| `GET /debug/identities/<erin>/cells/eead8ef96aa1254969d63c12631b799c/members` | 409 | 403 |
