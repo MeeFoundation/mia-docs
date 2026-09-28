@@ -12,12 +12,12 @@ The stand SHALL run, across three containers, a cell's creation, an invitation b
 |---|---|---|---|
 | 1 | creates "Family" and invites B | joins and invites C | joins; B's invite presented again is a client error |
 | 2 | places a claim and a note | | appends an operation to A's note |
-| 3 | | reads the claim and both operations | renames the cell and kicks B: two client errors |
+| 3 | | reads the claim and both operations | renames the cell and kicks B: two 403s |
 | 4 | renames the cell "Walkers": the name reads on every container | | |
 | 5 | promotes B | kicks C | |
 | 6 | places two records, one after the other | reads both | reads neither within the budget |
 | 7 | places a record while B's container is stopped | starts again on its state directory, lists "Walkers" and reads the record | |
-| 8 | creates a second cell and invites B | joins it, leaves it and restarts: lists no such cell, and requests addressing it are client errors | |
+| 8 | creates a second cell and invites B | joins it, leaves it and restarts: lists no such cell, and requests addressing it are 409 | |
 
 #### Scenario: Any member invites, and the cell reaches all three
 

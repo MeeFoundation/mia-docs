@@ -11,6 +11,7 @@ Asked why one option won, weigh the considerations in words — "access control 
 An option that breaks any of these is excluded, whatever the priorities below say for it.
 
 - Data reaches only a party entitled to it.
+- An honest node that can reach another honest node eventually receives everything the other node's records entitle it to.
 - A confirmed defect is never lost: it is fixed, or recorded where the next reader finds it.
 - A fix that contradicts a recorded decision comes with an explicit change to that decision.
 - An option with worse than linear complexity says so, and in what.
@@ -20,7 +21,7 @@ An option that breaks any of these is excluded, whatever the priorities below sa
 
 Ordered from the highest to the lowest; each outweighs every low value priority.
 
-1. Data eventually reaches every party entitled to it.
+1. Data reaches every party entitled to it in as many situations as it can be made to.
 2. A node is as hard to stall or exhaust as it can be made.
 3. The fact that data exists, or existed, reaches only a party entitled to it.
 4. A failure is visible and ends within a bound.
