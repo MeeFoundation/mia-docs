@@ -769,7 +769,7 @@ Additive: no existing store, ticket, grant or record changes shape — the direc
 
 Each question below leaves a part of the design without a rule an implementation can follow, or with a rule another decision contradicts; each names its options, strongest first, and none is decided. A question answered since its posing leaves the list, its answer recorded as a decision.
 
-### Where the membership store's signed material sits
+### Q1. Where the membership store's signed material sits
 
 The membership gate judges an entry by material its payload carries: a founding event by its nonce, announcement key and signature, which have to derive the cell id and verify (D25); a device statement by its device list and its signature under the announcement key a joined event carries (D16); and an entry whose author only a statement lists, by that list. The gate sees an entry's key, author, timestamp and content hash, and nothing more: the fork's per-session ingest check takes the signed entry alone, and a payload is downloaded only once its entry is inserted. That is why a record's membership reference sits in its key (D22) and the directory's cell record is read without its payload (D35); the membership gate, as written, needs what the fork does not hand it.
 
@@ -785,11 +785,11 @@ The membership gate judges an entry by material its payload carries: a founding 
 | verification in the fold | `member/<bob>/devices/2`, b2's author, a content hash | admitted unverified, and counted once its payload arrives and verifies | admitted if that payload arrived before the record store's session began; dropped and offered again by a later session otherwise |
 | payloads inline in the fork | the key and the statement's bytes | verified and admitted in the session | admitted in the session |
 
-### Verdicts that a later arrival reverses
+### Q2. Verdicts that a later arrival reverses
 
 The gate judges an entry once, over the events the device holds when the entry arrives, and a later event can turn that verdict around: a concurrent event at the very point the entry names, which outranks the event the device held there (D38); a promotion arriving late, which switches off the guard over demotions (D39); the departure of an author whose entry outside the key layout was admitted because its author was a current member as of the session (D27). A device that took the entry before the later event keeps it, a device that holds the later event first drops it, every session between the two offers the entry again, and the two stores never converge; unless the fold and the record view judge again what a device holds, the two also list different members and read different records, and neither the design nor the specs say whether they do. The gate's point check also reads each chain alone, while the guard reads every chain, so the owner the guard keeps has its acts at points after the demotion the guard ignores dropped by the gate — unless the gate applies the guard, and then a late promotion reverses those verdicts too.
 
-- Admission by what no later event reverses, meaning by the fold. The gate admits an entry whose key fits a layout and whose author resolves to a member's device — for a claim or an immutable-document, to the member under whose name it sits — and the fold and the record view judge every held entry over the whole event set, precedence and guard included: an act counts when its actor held the state it needs at the point it names, and a record reads when its writer was a member at the sequence it names. Every member device holds the same entries, and every list and read follows from them alone. What the gate drops today is held and ignored instead, a plain member's promoted event among them, which every member is trusted with already (D28); the deferral within a session shrinks to an entry whose author, or a statement whose announcement key, the session has not brought yet. It holds only while a device, once listed, stays listed — the question on a device a later version missed.
+- Admission by what no later event reverses, meaning by the fold. The gate admits an entry whose key fits a layout and whose author resolves to a member's device — for a claim or an immutable-document, to the member under whose name it sits — and the fold and the record view judge every held entry over the whole event set, precedence and guard included: an act counts when its actor held the state it needs at the point it names, and a record reads when its writer was a member at the sequence it names. Every member device holds the same entries, and every list and read follows from them alone. What the gate drops today is held and ignored instead, a plain member's promoted event among them, which every member is trusted with already (D28); the deferral within a session shrinks to an entry whose author, or a statement whose announcement key, the session has not brought yet. It holds only while a device, once listed, stays listed (Q5).
 - Verdicts at arrival, the fold and the record view judging again. Every device lists the same members and reads the same records, while the stores stay apart: an entry one device admitted is offered in every session to a device that dropped it, and each such session ends with the difference it began with.
 
 **Example:** in "Family", Alice and Carol are owners and Bob a plain member since his sequence 1; disconnected from each other, Alice promotes Bob and Carol kicks him, both at his sequence 2; Bob's phone b1 takes the promotion first and invites Dave, writing `member/<dave>/1/joined/2`; Alice's laptop a2 takes the promotion, then Dave's joined event, then the kick; Carol's phone c1 takes the kick and the promotion, then Dave's joined event; `<dave>`: 64 lowercase hex chars of Dave's `PdnId`.
@@ -799,7 +799,7 @@ The gate judges an entry once, over the events the device holds when the entry a
 | admission by what no later event reverses | holds Dave's joined event; once the kick arrives, the fold ignores it, the kick outranking the promotion at Bob's sequence 2 | holds it too, ignored the same way; the two stores hold the same entries |
 | verdicts at arrival, judged again | holds it, and its fold ignores it once the kick arrives | drops it, and every session with a2 offers it again |
 
-### Whether an entry names its writer
+### Q3. Whether an entry names its writer
 
 The gate reads an act's actor and an operation's writer from the entry's author, through the map the members' device statements build, and admits a statement by its signature under its member's announcement key alone: nothing in a statement proves that its member writes with the authors it lists. A modified member device can list, in its own member's statement, the author another member writes with; that author then resolves to two members, and which of them an operation or an act is read as is left open — another member's edit read as the modified device's member's, an owner's kick judged by a plain member's role. This touches entries another member wrote, so it lies outside what a member's own history takes on its word (D34).
 
@@ -815,7 +815,7 @@ The gate reads an act's actor and an operation's writer from the entry's author,
 | the author countersigns | dropped: a1's author signed no listing under Bob's `PdnId` | read as Alice's |
 | deferred | admitted | read as Alice's or as Bob's, whichever the map keeps |
 
-### What binds a member to its announcement key
+### Q4. What binds a member to its announcement key
 
 A member's device statements verify under the announcement key its join statement carries, and the join statement is signed by the joining device — but nothing says what that signature covers or under which key, and the gate's check of a joined event reads its actor alone, so no device verifies it. A member's chain can also hold several joined events, one per return, and nothing says which one's key the statements verify under when two carry different keys. An honest device never writes that, since an identity holds one announcement key pair, minted with it; a modified member device can: it invites a departed member again under a key of its own, writes a statement for it under that key, and places records and acts under the departed member's name at its new sequence — a record under another member's name, which the design keeps refused (D34).
 
@@ -829,7 +829,7 @@ A member's device statements verify under the announcement key its join statemen
 | the first key binds | dropped: its key is not the one Carol's first joined event carries, and no join statement under Carol's key signs it | dropped: Carol is no member at her sequence 3 |
 | the inviter's word | admitted: Carol a plain member again | admitted and read as Carol's |
 
-### Whether a device a later version missed stays listed
+### Q5. Whether a device a later version missed stays listed
 
 A member's devices resolve to the union of its statements at the highest version a device holds, so a version written from a view that missed a device leaves that device out until the device's own sweep writes the next version with itself added (D16). A device that never syncs again after such a version — a phone lost the day after its linking — stays out for good, and so do the entries it wrote: a device that folds with the later version finds that author on no member's list and drops them, while the devices that took them earlier keep them, and every session between the two offers them again.
 
@@ -843,7 +843,7 @@ A member's devices resolve to the union of its statements at the highest version
 | the union of every version | b1 to b5 | admitted |
 | the highest version | b1, b2, b3 and b5 | dropped; Carol's phone c1, which took it before version 4 reached it, keeps it, and every session between c1 and c2 offers it again |
 
-### What an interrupted join leaves
+### Q6. What an interrupted join leaves
 
 The inviting device writes the newcomer's joined event before the newcomer holds anything durable: the newcomer records the cell in its directory only once caught up, reading the sequence of its joined event from the store (D35), and the join returns then. A connection that drops after the inviter's write — before the reply arrives, or during the catch-up — or a `join` future its caller drops leaves a member that every member device lists and no device of it holds, with the secret burned; and nothing says what a new invite presented by an identity the cell already lists does: the fold ignores a second joined event of a member, so writing one changes nothing, and refusing the presentation leaves the member out for good.
 
@@ -858,9 +858,9 @@ The inviting device writes the newcomer's joined event before the newcomer holds
 | after c1 recorded the tickets, before b1 hears of it | Carol listed, and the armer catches c1 up | Carol listed nowhere: c1 holds a cell whose member devices refuse it, until a second invite writes her joined event |
 | during the catch-up, c1 then restarting | c1 holds both tickets and `cells/eead8ef96aa1254969d63c12631b799c/1`; the armer opens the cell and catches up | the same |
 
-### How the keys' segments are encoded
+### Q7. How the keys' segments are encoded
 
-The layouts of D21 name their segments and leave their encoding open: a founding event's actor sequence is written `…` everywhere, an operation's `<op>` holds three values in the place the layout draws as one segment, and neither the text form of a number, the scope of a writer's operation sequence nor the form of the id `put_record` mints is stated. A record's identity is its key without the trailing segment, so how many segments `<op>` takes decides where a mergeable-document's identity ends. Whatever the questions on the material in the key and on whether an entry names its writer add to a key takes the same form.
+The layouts of D21 name their segments and leave their encoding open: a founding event's actor sequence is written `…` everywhere, an operation's `<op>` holds three values in the place the layout draws as one segment, and neither the text form of a number, the scope of a writer's operation sequence nor the form of the id `put_record` mints is stated. A record's identity is its key without the trailing segment, so how many segments `<op>` takes decides where a mergeable-document's identity ends. Whatever Q1 and Q3 add to a key takes the same form.
 
 - One text form throughout. Every number is decimal with no leading zeros; a founding event's actor sequence is 0, the creator holding no point of its chain before its first event; `<op>` is one segment, the writer's author key as 64 lowercase hex characters, its membership sequence and its operation sequence joined by `.`; the operation sequence counts one author's operations on one mergeable-document from 1; and a record id is 16 random bytes, written as 32 lowercase hex characters, the size of the cell id. The keys read as this design prints them, and the fold parses every number it orders, since the store orders keys byte by byte and `10` sorts before `9`.
 - `<op>` as three segments. Every segment of every key holds one value, and a record's identity becomes the key without its last three segments for a mergeable-document and without its last one otherwise, so the cut depends on the kind.
