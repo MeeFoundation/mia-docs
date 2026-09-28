@@ -337,17 +337,11 @@ The gate SHALL judge by the point an entry names and by the membership state as 
 |---|---|---|---|
 | Alice's promotion of Carol, naming Alice's sequence 3, an event only devices that have since died ever held | defers it for ever | admitted | the actor's point, until a current owner promotes Carol anew |
 | Dave's phone d1 asks Alice's phone a1 for a session before Dave's joined event reaches a1 | refuses it | served | the session order, healed once the joined event arrives |
-| Bob's device statement reaches Carol's new laptop c2 in the session that brings Bob's joined event, but before it | drops it | admitted in that session | a statement judged on arrival, healed by the next session |
 
 #### Scenario: A newcomer is refused a session until its joined event arrives (cells D19)
 
 - **WHEN** D joined through member E, D's joined event has not reached a device of A, and D's device requests a session from A's device
 - **THEN** the session is refused as for an unhosted store, and served once the joined event reaches A's device
-
-#### Scenario: A device statement ahead of its join is dropped in that session (cells B16)
-
-- **WHEN** in one session a device of A receives B's device statement before the joined event carrying B's announcement key
-- **THEN** the statement is dropped in that session and admitted in the next
 
 #### Scenario: A dependency whose authoring device died is never resolved until re-issued (cells D23)
 
@@ -507,7 +501,7 @@ An entry in either store whose key fits neither store's layout, or fits one only
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL be admitted by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL be dropped silently on every member device. A statement that arrives before the event carrying the member's announcement key SHALL be deferred within the session and judged once that event is admitted, and so SHALL an entry whose author only a deferred statement lists. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
 
 **Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -533,6 +527,11 @@ A member's device-list statement — each device's node id beside the author the
 
 - **WHEN** a device of member M produces a device statement for member B signed by a key that is not B's announcement key
 - **THEN** no member device persists it, and B's device set stays what B's own statements say
+
+#### Scenario: A device statement ahead of its join waits for it in the session
+
+- **WHEN** in one session a device of A receives B's device statement, and an event authored by a device only that statement lists, before the joined event carrying B's announcement key
+- **THEN** both are deferred and persisted in that same session once the joined event arrives, while a statement for B signed by a key no joined event carries is persisted by no member device
 
 #### Scenario: An old version displaces nothing
 
