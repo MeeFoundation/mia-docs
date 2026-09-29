@@ -69,7 +69,7 @@ Creating a cell, on the creator's device:
                 text form: 32 lowercase hex characters
 3. signature  = Ed25519 sign(announcement_secret,
                              "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce)
-4. write the founding event at member/<pdn_id>/1/founded/<pdn_id>/…:
+4. write the founding event at member/<pdn_id>/1/founded/<pdn_id>/0:
    { nonce, announcement_pubkey, signature }   — pdn_id is the key's <pdnid>; cell_id is not stored
 5. cell_id goes to the identity's directory, the invite, links in notes
 
@@ -310,7 +310,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, and its announcement key derives the subject's `PdnId` and its join statement verifies under that key over the subject's sequence, by the joining steps above (cells D44), a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — counts when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId`, and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, and its announcement key derives the subject's `PdnId` and its join statement verifies under that key over the subject's sequence, by the joining steps above (cells D44), a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner, its `<aseq>` `0` — counts when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId`, and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
 
 **Example:** Bob's chain in "Family" as every member device holds it; the key's last two segments are the actor and the actor's sequence; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -329,6 +329,11 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 
 - **WHEN** owner A promotes B (B's sequence 2, after B's join at 1), demotes B (3) and promotes B again (4), and the three events reach a device of member C in the order 4, 2, 3
 - **THEN** C's device lists B by the highest sequence it holds after each arrival — an owner throughout — and as an owner once all three have arrived
+
+#### Scenario: A chain past sequence 9 folds in number order
+
+- **WHEN** B's chain holds a promoted event at B's sequence 9 and a demoted event at B's sequence 10, whose keys the store orders `…/10/…` before `…/9/…`
+- **THEN** every member device lists B as a plain member, the demotion at 10 applied after the promotion at 9
 
 #### Scenario: A role event from a plain member counts for nothing
 
@@ -465,15 +470,15 @@ A session between two member devices SHALL reconcile the membership store to con
 
 ### Requirement: The record store's key names the member and the kind
 
-A record SHALL sit under the name of the member that placed it, the key carrying the record's kind and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/immutable-document/<id>/<mseq>` for an immutable-document, `by/<pdnid>/mergeable-document/<id>/<op>` for each operation of a mergeable-document, `<op>` being the writer's `PdnId`, its author key, its membership sequence and its own operation sequence, the author counting only among the writer's devices. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without the trailing sequence, and a record SHALL be addressed by the cell id beside that key, never by either store's namespace id, which is the store's read capability.
+A record SHALL sit under the name of the member that placed it, the key carrying the record's kind and the writer's membership sequence at the time of writing: `by/<pdnid>/claim/<id>/<mseq>` for a claim, `by/<pdnid>/immutable-document/<id>/<mseq>` for an immutable-document, `by/<pdnid>/mergeable-document/<id>/<op>` for each operation of a mergeable-document, `<op>` being one segment, `<writer>.<author>.<mseq>.<opseq>` — the writer's `PdnId`, its author key, its membership sequence and its own operation sequence — the author counting only among the writer's devices. The operation sequence SHALL count one author's operations on one mergeable-document from 1, the writing device taking the one above the highest its replica holds under its author. Every segment of either store's keys SHALL be text: a number decimal with no leading zeros, a `PdnId` or an author key 64 lowercase hexadecimal characters, a record id the 16 random bytes `put_record` mints as 32; the store orders keys byte by byte, so the fold and the record view SHALL parse every number they order. `<pdnid>` SHALL be the member's identity, never a device. A record's identity SHALL be its key without its last segment, whatever its kind, and a record SHALL be addressed by the cell id beside that key, never by either store's namespace id, which is the store's read capability.
 
-**Example:** Bob's three records in "Family", placed from his phone b1 and from his laptop b2; Bob and Carol each joined at their sequence 1; `<bob>`: 64 lowercase hex chars of Bob's `PdnId`; `<claim>`, `<scan>`, `<note>`: the ids `put_record` minted for the three records.
+**Example:** Bob's three records in "Family", placed from his phone b1 and from his laptop b2; Bob and Carol each joined at their sequence 1; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `<claim>`, `<scan>`, `<note>`: 32 lowercase hex chars of the ids `put_record` minted for the three records; `<b1-author>`, `<c1-author>`: 64 lowercase hex chars of the authors Bob writes with on b1 and Carol on her phone c1.
 
 ```
-by/<bob>/claim/<claim>/1                         from b1
-by/<bob>/immutable-document/<scan>/1             from b2, under b2's author
-by/<bob>/mergeable-document/<note>/<op>          <op>: Bob, b1's author, Bob's sequence 1, that author's operation 1
-by/<bob>/mergeable-document/<note>/<op>          <op>: Carol, c1's author, Carol's sequence 1, that author's operation 1 — under Bob's name all the same
+by/<bob>/claim/<claim>/1                                       from b1
+by/<bob>/immutable-document/<scan>/1                           from b2, under b2's author
+by/<bob>/mergeable-document/<note>/<bob>.<b1-author>.1.1      Bob, b1's author, Bob's sequence 1, that author's operation 1
+by/<bob>/mergeable-document/<note>/<carol>.<c1-author>.1.1    Carol, c1's author, Carol's sequence 1, that author's operation 1 — under Bob's name all the same
 
 a listing under by/<bob>/ returns these four entries; each record's identity is its key without the last segment
 ```
@@ -482,6 +487,11 @@ a listing under by/<bob>/ returns these four entries; each record's identity is 
 
 - **WHEN** member B places a claim, an immutable-document and a mergeable-document with one operation, from two of B's devices
 - **THEN** their keys are `by/<B>/claim/<id>/<mseq>`, `by/<B>/immutable-document/<id>/<mseq>` and `by/<B>/mergeable-document/<id>/<op>`, the same `<B>` and the same `<mseq>` from either device, and a listing under B's prefix returns exactly them
+
+#### Scenario: An operation sequence continues after a restart
+
+- **WHEN** a device of member B appends three operations to a mergeable-document, its runtime restarts, and it appends a fourth
+- **THEN** the fourth operation's `<op>` carries operation sequence 4 under the same author, and every member device holds four operations of that author on the record
 
 ### Requirement: A claim is written only by its issuer
 

@@ -77,7 +77,7 @@ A cell is served by two stores, each a pdn-store namespace addressed through the
 
 ```
 membership store
-member/<alice>/1/founded/<alice>/…    Alice's founding event: Alice a member and an owner
+member/<alice>/1/founded/<alice>/0    Alice's founding event: Alice a member and an owner
 member/<alice>/devices/1              Alice's device statement, version 1: a1
 member/<bob>/1/joined/<alice>/1       Alice's invite act at her sequence 1, Bob's join statement inside: Bob a plain member
 member/<bob>/devices/1                Bob's device statement, version 1: b1
@@ -372,25 +372,31 @@ Every member device holds both stores whole and holds their write tickets; what 
 
 ### D21. The key layout of both stores
 
-The membership store: `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<actor>` the actor's `PdnId` and `<aseq>` its own sequence at the time (D23, D43), so the fold reads the kind, the actor and the actor's point from the key as the record view reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, and resolve by precedence (D38). The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is the writer's `PdnId`, its author key, its membership sequence and its own operation sequence (D43), so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). A record's identity is its key without that trailing sequence, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The record view reads from the key what it enforces (D10): the member, the record's kind and, for an operation, its writer; it reads from the entry only its author, which counts only among the devices of the member the key names (D43). Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
+The membership store: `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — the member's membership events (D3): founded, joined, left, kicked, promoted, demoted, with `<actor>` the actor's `PdnId` and `<aseq>` its own sequence at the time (D23, D43), so the fold reads the kind, the actor and the actor's point from the key as the record view reads a record's from its key; `member/<pdnid>/devices/<version>` — the device-list statements (D16), one key per version, resolved by the union of the validly signed statements at the highest version. Events at one sequence of one subject all stand, whoever wrote them, and resolve by precedence (D38). The membership store holds no tombstones. The record store: `by/<pdnid>/claim/<id>/<mseq>` — a claim; `by/<pdnid>/immutable-document/<id>/<mseq>` — an immutable-document, one entry; `by/<pdnid>/mergeable-document/<id>/<op>` — one entry per operation of a mergeable-document, where `<op>` is one segment, `<writer>.<author>.<mseq>.<opseq>`: the writer's `PdnId`, its author key, its membership sequence and its own operation sequence (D43), so two writers' operations never share a key and one writer's never collide. `<mseq>` is the sequence of the writer's own membership events at the time of writing — the state the entry is judged against (D22). Every segment is text: a number is decimal with no leading zeros, a `PdnId` or an author key is 64 lowercase hexadecimal characters, and a record id — 16 random bytes `put_record` mints — is 32, the size of the cell id. The founding event's `<aseq>` is `0`, the creator holding no point of its chain before its first event. An operation sequence counts one author's operations on one mergeable-document from 1, the writing device taking the one above the highest its replica holds under its author, so a restart continues the count. The store orders keys byte by byte, and `10` sorts before `9`, so the fold and the record view parse every number they order. A record's identity is its key without its last segment, whatever its kind, and a record is addressed by the cell id and that key — member, kind and id — never by a store's namespace id, which is the read capability (Invariant 3). `<pdnid>` is the member under whose name the record sits — the identity, not a device, so the key outlives the devices that write under it. The record view reads from the key what it enforces (D10): the member, the record's kind and, for an operation, its writer; it reads from the entry only its author, which counts only among the devices of the member the key names (D43). Everything else — a record's title, a link to another record — is payload. An entry whose key fits neither layout, or fits one only in part, is kept and used by nothing (D27).
 
-**Example:** keys in the two stores of "Family" and what the fold and the record view read from each; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `<id>`: the id `put_record` minted.
+**Example:** keys in the two stores of "Family" and what the fold and the record view read from each; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `<id>`: 32 lowercase hex chars of the id `put_record` minted; `<b2-author>`: 64 lowercase hex chars of the author Bob writes with on his laptop b2.
 
 ```
 membership store
-member/<carol>/1/joined/<bob>/2             Carol's sequence 1, joined by Bob at his sequence 2, from b1, one of Bob's devices
-member/<carol>/devices/1                    Carol's device statement, version 1
+member/<alice>/1/founded/<alice>/0                          Alice's founding event: her sequence 1, no point of her chain before it
+member/<carol>/1/joined/<bob>/2                             Carol's sequence 1, joined by Bob at his sequence 2, from b1, one of Bob's devices
+member/<carol>/devices/1                                    Carol's device statement, version 1
 record store
-by/<carol>/claim/<id>/1                     a claim under Carol's name, written at her sequence 1
-by/<carol>/immutable-document/<id>/1        an immutable-document, its one entry
-by/<carol>/mergeable-document/<id>/<op>     one operation; <op>: Bob, b2's author, Bob's sequence 2, that author's operation 7
-ext/anything                                fits neither layout: kept, used by nothing (D27)
+by/<carol>/claim/<id>/1                                     a claim under Carol's name, written at her sequence 1
+by/<carol>/immutable-document/<id>/1                        an immutable-document, its one entry
+by/<carol>/mergeable-document/<id>/<bob>.<b2-author>.2.7    one operation: Bob, b2's author, Bob's sequence 2, that author's operation 7
+ext/anything                                                fits neither layout: kept, used by nothing (D27)
 ```
 
 **Rejected alternatives:**
 
 - The writer's author key as the key prefix.
   - **Cons:** devices come and go while the member stays — a record keyed by a device moves with every linking; the author-to-member map already bridges the two.
+- `<op>` as four segments.
+  - **Cons:** a record's identity becomes its key without its last four segments for a mergeable-document and without its last one otherwise, so the cut depends on the kind.
+- Numbers as fixed-width big-endian hex, 16 characters for a 64-bit number.
+  - **Pros:** keys sort in number order under the store's byte order.
+  - **Cons:** the fold reads a member's chain whole and needs no such order; every key holding a number grows, and no key reads as the examples print it.
 
 ### D22. A record names the membership state it was authored under, and is judged against it
 
@@ -425,7 +431,7 @@ What the reference proves is, as for records (D22), that the event is after the 
 
 | arrives | needs | verdict on c2 |
 |---|---|---|
-| `member/<alice>/1/founded/<alice>/…` | to derive the cell id c2 holds, and a signature under the announcement key it names | counts |
+| `member/<alice>/1/founded/<alice>/0` | to derive the cell id c2 holds, and a signature under the announcement key it names | counts |
 | `member/<alice>/devices/1`, listing a1 | a signature under the announcement key of Alice's founding event | counts |
 | `member/<bob>/1/joined/<alice>/1`, by a1's author | Alice a member at her sequence 1 | counts |
 | `member/<bob>/devices/1`, listing b1 | a signature under the announcement key in Bob's joined event | counts |
@@ -903,22 +909,6 @@ The inviting device writes the newcomer's joined event before the newcomer holds
 | before b1's reply reaches c1 | Carol listed on every member device, c1 holding nothing; a second invite from Bob writes nothing and hands c1 both tickets | Carol listed nowhere, b1 waiting for an acknowledgement that never comes; a second invite joins her as a first one does |
 | after c1 recorded the tickets, before b1 hears of it | Carol listed, and the armer catches c1 up | Carol listed nowhere: c1 holds a cell whose member devices refuse it, until a second invite writes her joined event |
 | during the catch-up, c1 then restarting | c1 holds both tickets and `cells/9cbcbe4da7cc35a44360d64e45621957/1`; the armer opens the cell and catches up | the same |
-
-### Q7. How the keys' segments are encoded
-
-The layouts of D21 name their segments and leave their encoding open: a founding event's actor sequence is written `…` everywhere, an operation's `<op>` holds four values — the writer's `PdnId`, the author key, the membership sequence and the operation sequence — in the place the layout draws as one segment, and neither the text form of a number, the scope of a writer's operation sequence nor the form of the id `put_record` mints is stated. A record's identity is its key without the trailing segment, so how many segments `<op>` takes decides where a mergeable-document's identity ends.
-
-- One text form throughout. Every number is decimal with no leading zeros; a founding event's actor sequence is 0, the creator holding no point of its chain before its first event; `<op>` is one segment, the writer's `PdnId` and author key as 64 lowercase hex characters each, its membership sequence and its operation sequence joined by `.`; the operation sequence counts one author's operations on one mergeable-document from 1; and a record id is 16 random bytes, written as 32 lowercase hex characters, the size of the cell id. The keys read as this design prints them, and the fold parses every number it orders, since the store orders keys byte by byte and `10` sorts before `9`.
-- `<op>` as four segments. Every segment of every key holds one value, and a record's identity becomes the key without its last four segments for a mergeable-document and without its last one otherwise, so the cut depends on the kind.
-- Numbers as fixed-width big-endian hex, 16 characters for a 64-bit number. Keys sort in number order under the store's byte order, which the fold does not need, since it reads a member's chain whole; every key holding a number grows, and no key reads as the examples print it.
-
-**Example:** two keys of "Family" under each option — Alice's founding event, and Bob's operation 7 from his phone b1 on the shopping list Alice placed, written at his membership sequence 2; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<list>`: the list's record id; `<b1-author>`: 64 lowercase hex chars of the author Bob writes with on b1.
-
-| option | Alice's founding event | Bob's operation |
-|---|---|---|
-| one text form throughout | `member/<alice>/1/founded/<alice>/0` | `by/<alice>/mergeable-document/<list>/<bob>.<b1-author>.2.7` |
-| `<op>` as four segments | `member/<alice>/1/founded/<alice>/0` | `by/<alice>/mergeable-document/<list>/<bob>/<b1-author>/2/7` |
-| fixed-width numbers | `member/<alice>/0000000000000001/founded/<alice>/0000000000000000` | `by/<alice>/mergeable-document/<list>/<bob>.<b1-author>.0000000000000002.0000000000000007` |
 
 ### Q8. Whether a listed device vouches for its listing
 
