@@ -4,9 +4,9 @@ Scope: the cell as a platform primitive — a keyless id, two stores per cell �
 
 ## 1. Vocabulary and types
 
-- [x] 1.1 `CellId` in `pdn-types`, 16 bytes, from a `define_byte_id_16!` beside the existing macro renamed `define_byte_id_32!`; its derivation per D25
+- [x] 1.1 `CellId` in `pdn-types`, 16 bytes, from a `define_byte_id_16!` beside the existing macro renamed `define_byte_id_32!`; its derivation per D25 in `data-layer`, beside the announcement key pair and everything derived from it or signed by it, their context strings side by side
 - [x] 1.2 Glossary entry `architecture/language/cell.md`, covering the cell, the record with its three kinds, the owner role, and the membership acts with the events they write — invite and joined, leave and left, kick and kicked, promote and promoted, demote and demoted — linked from the specs' first use
-- [x] 1.3 `pdn-types`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — beside the record's identity, its id and the membership sequence; `data-layer`: the key layout of both stores per D21, beside the stores whose keys they are, since the fold and the record view parse them and data-layer sees only `pdn-types` — every segment text, numbers decimal and parsed wherever they order, the founding event's actor sequence `0`, `<op>` one segment — every act naming its actor and every operation its writer (D43)
+- [x] 1.3 `pdn-types`: the record kinds — claim, mergeable-document, immutable-document (D4, D17) — beside the record's identity and its id; `data-layer`: the membership sequence and the key layout of both stores per D21, beside the stores whose keys they are, since the fold and the record view parse them and data-layer sees only `pdn-types` — every segment text, numbers decimal and parsed wherever they order, the founding event's actor sequence `0`, `<op>` one segment — every act naming its actor and every operation its writer (D43)
 - [x] 1.4 `pdn-node` identity creation: the announcement key pair minted first and the `PdnId` derived from its public key per D44 (runtime core delta)
 
 ## 2. data-layer: the cell's stores
