@@ -614,14 +614,14 @@ An entry in either store whose key fits neither store's layout, or fits one only
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL count by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL count for nothing on every member device, held as every entry is. A statement SHALL count once its payload has arrived and the event carrying the member's announcement key is held, whatever order the two arrive in, and an entry whose author only that statement lists SHALL read from then on. Device resolution SHALL follow the union of every validly signed statement at the highest version among the member's statements a device holds, whichever author wrote each and never by entry timestamps, so an older statement written later displaces nothing and two statements written at one version by two authors list every device either names.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL count by the signature embedded in it — made by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement — verified against the announcement key the member's join statement, or the creator's founding event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's announcement key SHALL count for nothing on every member device, held as every entry is. A statement SHALL count once its payload has arrived and the event carrying the member's announcement key is held, whatever order the two arrive in, and an entry whose author only that statement lists SHALL read from then on. Device resolution SHALL follow the union of every validly signed statement of the member a device holds, whatever its version, whichever author wrote each and never by entry timestamps, so a device that a later version leaves out stays listed by the version that named it, and two statements written at one version by two authors list every device either names.
 
 **Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
 | entry | written by | signed by | every member device |
 |---|---|---|---|
 | `member/<bob>/devices/1`: b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's announcement key | counts it: the writer is not the member |
-| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's announcement key | counts it, whoever relays it, and resolves Alice-leisure's devices by version 2 |
+| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's announcement key | counts it, whoever relays it, and adds a3 to Alice-leisure's devices |
 | `member/<bob>/devices/2` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding version 1 alone | Bob's announcement key | counts both and resolves Bob's devices to b1, b2 and b3 |
 | `member/<bob>/devices/3`: b1, b2, b3 and d1 | d1 | Dave's announcement key | holds it and counts it for nothing |
 | `member/<alice-work>/devices/1`: a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's announcement key | counts it: a3 stands under two authors, one per member |
@@ -649,7 +649,12 @@ A member's device-list statement — each device's node id beside the author the
 #### Scenario: An old version displaces nothing
 
 - **WHEN** a device of B holding version 2 of B's statement writes it into a replica already holding version 3
-- **THEN** device resolution still follows version 3 on every member device
+- **THEN** every member device still lists every device version 3 names
+
+#### Scenario: A device a later version misses stays listed (cells D16)
+
+- **WHEN** version 3 of B's statement lists B's device X, X places a claim under B's name and never syncs again, and another device of B, which never saw version 3, writes version 4 without X
+- **THEN** every member device lists X among B's devices and reads X's claim as B's, while a device named only by a statement under a key that is not B's stays off the list
 
 #### Scenario: Two statements at one version list both devices
 

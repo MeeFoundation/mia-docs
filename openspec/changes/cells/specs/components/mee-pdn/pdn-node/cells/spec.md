@@ -184,10 +184,10 @@ Alice-work's directory holds no cells/ entry and no tickets/cell/ kind for Famil
 - **WHEN** identity B joins a cell on its phone while B's laptop is linked into B
 - **THEN** the laptop eventually lists the cell, reads its entries, and its own device is served by the other members
 
-#### Scenario: A device a later version missed puts itself back
+#### Scenario: A device a later version missed stays listed
 
 - **WHEN** a device D of identity B has written a version of B's device statement listing itself, and another device of B that has not seen it writes the next version without D
-- **THEN** D's first sync after that version reaches it is preceded by a statement at the version after it, listing D beside every device the version that missed D lists, and the other members' devices admit D's entries again
+- **THEN** D's first sync after that version reaches it is preceded by no statement of D's, and the other members' devices keep admitting D's entries throughout
 
 #### Scenario: A co-located non-member identity does not reach the cell
 
