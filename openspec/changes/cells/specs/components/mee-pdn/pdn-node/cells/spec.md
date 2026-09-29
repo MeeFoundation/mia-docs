@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
+The cells service of the runtime: creating a [cell](../../../../architecture/language/cell.md) for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
 
 **Cell**
 
@@ -103,7 +103,7 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 | call | result |
 |---|---|
 | `create(Alice)` | `9cbcbe4da7cc35a44360d64e45621957`; `members` answers Alice alone, an owner |
-| `create(Alice)` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells |
+| `create(Alice)` again | `b61cdcf20d79379e475d57d1c04db7a4`: another nonce, another id; `list` answers both cells |
 | `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
 #### Scenario: A created cell is listed with its creator as member
