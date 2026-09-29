@@ -11,7 +11,8 @@ enum MembershipAct {
     /// Derives the cell id and is checked against it by the steps below.
     Found   { nonce: [u8; 16], announcement_key: PublicKey, signature: Signature },
     /// Written by the inviting device once the newcomer's one-time secret is verified and burned, never when the invite is minted.
-    /// Any member; subject ≠ actor; `announcement_key` and `subject_signature` are the newcomer's join statement. Held as `Joined`.
+    /// Any member; subject ≠ actor; `announcement_key` and `subject_signature` are the newcomer's join statement, made and
+    /// counted by the joining steps below. Held as `Joined`.
     Invite  { subject: PdnId, subject_seq: Seq, actor_seq: Seq, announcement_key: PublicKey, subject_signature: Signature },
     /// The member itself; subject = actor.
     Leave   { subject_seq: Seq, actor_seq: Seq },
@@ -47,16 +48,20 @@ struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicK
 
 /// The fold's check of one event, over everything the device holds:
 ///   Founded          → seq == 1 and the receiving steps below pass
-///   Joined           → by != subject and state(by, by_seq).member
+///   Joined           → by != subject, state(by, by_seq).member, and the joining steps below pass
 ///   Left             → by == subject
 ///   Promoted         → state(by, by_seq).owner
 ///   Kicked | Demoted → by != subject and state(by, by_seq).owner
 /// and for every kind: the author among by's devices, and by's chain held up to by_seq — else the event counts once it is.
 ```
 
-The cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
+The `PdnId` (cells D44), the cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
 
 ```text
+Creating an identity, on its first device:
+1. announcement key pair = a fresh Ed25519 key pair
+2. pdn_id     = BLAKE3 derive_key(context "pdn/pdn-id/v1", announcement_pubkey[32]), all 32 bytes
+
 Creating a cell, on the creator's device:
 1. nonce      = 16 random bytes
 2. cell_id    = BLAKE3 derive_key(context "pdn/cell-id/v1",
@@ -70,7 +75,24 @@ Creating a cell, on the creator's device:
 
 Counting a founding event, on every member device, once its payload has arrived (a fresh device's first session included):
 1. recompute cell_id from the event's pdn_id, announcement_pubkey, nonce → must equal the cell id the device holds
-2. verify signature under announcement_pubkey over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce
+2. recompute pdn_id from announcement_pubkey → must equal the key's <pdnid>
+3. verify signature under announcement_pubkey over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce
+4. any check fails → the event counts for nothing, whatever order it arrived in
+```
+
+The join statement (cells D44):
+
+```text
+Joining, in the join dialogue:
+1. the inviting device, once it has burned the secret, names subject_seq: the sequence after the highest it holds in the newcomer's chain
+2. subject_signature = Ed25519 sign(announcement_secret, on the newcomer's device,
+                                    "pdn/cell-join/v1" ‖ pdn_id ‖ announcement_pubkey ‖ cell_id[16] ‖ subject_seq[8])
+3. the inviting device writes the invite act at member/<pdn_id>/<subject_seq>/joined/<actor>/<actor_seq>:
+   { announcement_pubkey, subject_signature }   — pdn_id and subject_seq are the key's; cell_id is not stored
+
+Counting a joined event, on every member device, once its payload has arrived:
+1. recompute pdn_id from announcement_pubkey → must equal the key's <pdnid>
+2. verify subject_signature under announcement_pubkey over "pdn/cell-join/v1" ‖ pdn_id ‖ announcement_pubkey ‖ cell_id ‖ subject_seq
 3. either check fails → the event counts for nothing, whatever order it arrived in
 ```
 
@@ -123,18 +145,19 @@ A cell SHALL be served by exactly two pdn-store namespaces — its membership st
 
 A cell SHALL be identified by a 16-byte cell id, derived on the creator's device and checked on every member device that receives the founding event, by the cell id steps above. The id SHALL carry no key material and SHALL NOT equal either store's namespace id: knowing the cell id grants no access, and no operation on a cell requires a signature by the cell — every write into either store is signed by the writing device's author key, and every membership act is a member's act.
 
-**Example:** the id of "Family", which Alice creates; her `PdnId` is 32 bytes of `11`, her announcement key the public key of the secret made of 32 bytes of `33`, and the nonce her device draws 16 bytes of `5a`.
+**Example:** the id of "Family", which Alice creates; her announcement key is the public key of the secret made of 32 bytes of `33`, her `PdnId` derives from it, and the nonce her device draws is 16 bytes of `5a`.
 
 ```
-pdn_id                1111111111111111111111111111111111111111111111111111111111111111
 announcement_pubkey   17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce
+pdn_id                65bcff20d2b149925daa94e3750937044e8ef27385d24cb6cb7bf4182b408ba5
+                      BLAKE3 derive_key("pdn/pdn-id/v1", announcement_pubkey)
 nonce                 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a
-cell_id               eead8ef96aa1254969d63c12631b799c
+cell_id               9cbcbe4da7cc35a44360d64e45621957
                       the first 16 bytes of BLAKE3 derive_key("pdn/cell-id/v1", pdn_id ‖ announcement_pubkey ‖ nonce)
-signature             6eaf69a517c28cd7…d40e03370f, 64 bytes of Ed25519
+signature             00ec508b9ba4af7b…34fb0cb808, 64 bytes of Ed25519
                       over "pdn/cell-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce, 100 bytes
 a founding event in Alice's chain under another announcement key, d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48,
-with the same nonce, derives 816954cae150f2652ecaeceab07ae4ac, and every device holding eead8ef96aa1254969d63c12631b799c counts it for nothing
+with the same nonce, derives 12849b66c608a62f31430f934efc083e, its key deriving another pdn_id than Alice's, and every device holding 9cbcbe4da7cc35a44360d64e45621957 counts it for nothing
 both stores' namespace ids are 32-byte public keys of their own, and neither is the cell id
 ```
 
@@ -287,7 +310,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — counts when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, and its announcement key derives the subject's `PdnId` and its join statement verifies under that key over the subject's sequence, by the joining steps above (cells D44), a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner — counts when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId`, and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
 
 **Example:** Bob's chain in "Family" as every member device holds it; the key's last two segments are the actor and the actor's sequence; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -345,6 +368,21 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 #### Scenario: A departed member does not readmit itself
 
 - **WHEN** C left at C's sequence 2, and a device of member D relays a joined event in C's chain at C's sequence 3, authored by C's device and naming C's sequence 1
+- **THEN** every member device holds it, counts it for nothing, and lists C as no member
+
+#### Scenario: A departed member readmitted under a key that does not derive its `PdnId` stays out (cells D44)
+
+- **WHEN** C left at C's sequence 2, and a device of member B writes a joined event in C's chain at C's sequence 3 under an announcement key B's device minted, with a join statement that verifies under that key, and a device statement for C listing B's device under the same key
+- **THEN** every member device holds both, counts neither, and lists C as no member
+
+#### Scenario: A second joined event at a member's first sequence changes nothing (cells D44)
+
+- **WHEN** a device of member B writes a joined event under an announcement key B's device minted at C's sequence 1, beside the joined event that brought C in, and another in the chain of an identity E that was never a member
+- **THEN** every member device holds both, counts neither, resolves C's devices by C's own statements alone, and lists E as no member
+
+#### Scenario: A join statement copied from an earlier join counts for nothing (cells D44)
+
+- **WHEN** C left at C's sequence 2, and a device of member B writes a joined event at C's sequence 3 carrying C's announcement key and C's join statement from C's sequence 1
 - **THEN** every member device holds it, counts it for nothing, and lists C as no member
 
 #### Scenario: A founding event that does not derive the cell id counts for nothing

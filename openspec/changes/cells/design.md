@@ -41,10 +41,10 @@ The cell id is a 16-byte identifier derived at creation from the creator's annou
 | act | signed by |
 |---|---|
 | the founding event | Alice's announcement key, in an entry by a1's author |
-| Bob's joined event, written by Alice's invite act | a1's author; Bob's join statement inside it, signed by b1 |
+| Bob's joined event, written by Alice's invite act | a1's author; Bob's join statement inside it, signed by Bob's announcement key on b1 |
 | Bob's claim | b1's author |
 | Alice's kick of Bob | a1's author |
-| the cell id `eead8ef96aa1254969d63c12631b799c` | nothing: 16 bytes derived from Alice's announcement key and a nonce, with no key pair behind them |
+| the cell id `9cbcbe4da7cc35a44360d64e45621957` | nothing: 16 bytes derived from Alice's announcement key and a nonce, with no key pair behind them |
 
 **Rejected alternatives:**
 
@@ -271,7 +271,7 @@ A record's authorship is cryptographic — the author signature on its entries �
 
 ### D16. A member's devices are announced by the member itself, under its announcement key
 
-Each identity holds a device-announcement key pair, minted with the identity. The secret lives in its private metadata store at a fixed path and reaches every new device at linking, beside the store tickets; the cell's own write tickets sit there under per-cell kinds, beside the records of each cell that the identity's joining writes and its leave tombstones, keyed by the identity's membership sequence (D35). The identity's other devices open on demand every cell whose record is live, and a restarted runtime re-derives its hosted cells from the same records, as it re-derives connections from theirs (private metadata store spec). The cell holds two things about a member's devices: a join statement binding the member's `PdnId` to its announcement public key — signed by the joining device, carried in the join dialogue, written by the inviter in its invite act, its root the inviter's word exactly as D26 states, and for the creator the founding event (D25) — and the member's device-list statements: each of the member's devices with its node id and the author the member writes with on it — one author per hosted identity on a device (ADR-0013), so a node hosting two members appears under one node id with two authors — a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event the same key signs (D25).
+Each identity holds a device-announcement key pair, minted with the identity, and its `PdnId` derives from the pair's public key (D44). The secret lives in its private metadata store at a fixed path and reaches every new device at linking, beside the store tickets; the cell's own write tickets sit there under per-cell kinds, beside the records of each cell that the identity's joining writes and its leave tombstones, keyed by the identity's membership sequence (D35). The identity's other devices open on demand every cell whose record is live, and a restarted runtime re-derives its hosted cells from the same records, as it re-derives connections from theirs (private metadata store spec). The cell holds two things about a member's devices: a join statement binding the member's `PdnId` to its announcement public key — signed by the announcement secret on the joining device, carried in the join dialogue, written by the inviter in its invite act (D44), and for the creator the founding event (D25) — and the member's device-list statements: each of the member's devices with its node id and the author the member writes with on it — one author per hosted identity on a device (ADR-0013), so a node hosting two members appears under one node id with two authors — a version counter inside the signed bytes, the whole statement signed by the announcement key over the prefix `pdn/cell-devices/v1` followed by the statement, the prefix keeping it apart from the founding event and the join statement the same key signs (D25, D44).
 
 A statement is self-contained proof, so who writes it into the store does not matter: the fold counts an entry in the membership device area by the embedded signature against the announcement key from the join statement, once its payload has arrived (D41), never by the entry's author. A freshly linked device therefore registers itself — it holds the write ticket and the announcement secret, writes the next version, the member's device list with itself added, into its local replica of every cell the identity is a member of, and ordinary sync spreads it through the identity's own devices, which serve the new device by the identity's own directory before any statement lists it (D32), and from them through any member, with no waiting on another member being online. Before syncing a cell replica, each of the identity's devices checks that the member's device list names it with the author its identity writes with there, and when it does not, writes the next version: that list with itself added. The sweep heals an interrupted fan-out, a cell joined after a linking, a device linked before the join, and a version a sibling wrote from a view that missed this device; only the device itself knows the author it writes with, so only it puts itself back (D32).
 
@@ -421,7 +421,7 @@ Every membership event names, in its key (D21), the sequence of its actor's own 
 
 What the reference proves is, as for records (D22), that the event is after the actor's named point, not before the point at which the actor lost the state the event needs; an act a narrowed member writes under its old point counts (D34).
 
-**Example:** Carol's new laptop c2, freshly linked, holds `eead8ef96aa1254969d63c12631b799c` from Carol's directory and nothing of the membership store; Alice founded the cell on a1, invited and promoted Bob, and Bob invited Carol from b1, and c2's first session brings the store in this order; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `…`: the founding event's actor sequence.
+**Example:** Carol's new laptop c2, freshly linked, holds `9cbcbe4da7cc35a44360d64e45621957` from Carol's directory and nothing of the membership store; Alice founded the cell on a1, invited and promoted Bob, and Bob invited Carol from b1, and c2's first session brings the store in this order; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `…`: the founding event's actor sequence.
 
 | arrives | needs | verdict on c2 |
 |---|---|---|
@@ -442,14 +442,14 @@ What the reference proves is, as for records (D22), that the event is after the 
 
 ### D25. The cell id is derived from its creator's announcement key and a random nonce
 
-At creation the creator's device draws a 16-byte random nonce and derives the cell id as the first 16 bytes of BLAKE3 in its key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key (D16) and the nonce — BLAKE3 being the hash iroh and pdn-store already use, and the context keeping this derivation apart from any other hash of the same bytes. The founding event carries those three fields and a signature by the announcement secret over the prefix `pdn/cell-founding/v1` followed by the three, the prefix keeping it apart from the device-list statements the same key signs (D16). A device holding the cell id — from its identity's directory, an invite or a link in a note — counts a founding event only when its three fields derive that id and its signature verifies under the key it names, and counts no other founding event, whatever order it arrives in; a device holding nothing checks the root of the membership store against the id it already holds (D23). A newcomer learns the id from its inviter, as it learns everything else at join (D26). Without the founding event, which only member devices hold, the id reveals nothing of its creator. The id is 16 bytes, the size of a UUID, written as text as 32 lowercase hexadecimal characters, and the byte-id type in pdn-types is defined to that size. The id travels in notes to other cells' members, so it never equals either store's namespace id, the read capability (Invariant 3). With KERI the creator's autonomic identifier takes the announcement key's place in the derivation.
+At creation the creator's device draws a 16-byte random nonce and derives the cell id as the first 16 bytes of BLAKE3 in its key-derivation mode, under the context string `pdn/cell-id/v1`, over the creator's `PdnId`, the creator's announcement public key (D16) and the nonce — BLAKE3 being the hash iroh and pdn-store already use, and the context keeping this derivation apart from any other hash of the same bytes. The founding event carries those three fields and a signature by the announcement secret over the prefix `pdn/cell-founding/v1` followed by the three, the prefix keeping it apart from the device-list statements the same key signs (D16). A device holding the cell id — from its identity's directory, an invite or a link in a note — counts a founding event only when its three fields derive that id, its announcement key derives its `PdnId` (D44) and its signature verifies under that key, and counts no other founding event, whatever order it arrives in; a device holding nothing checks the root of the membership store against the id it already holds (D23). A newcomer learns the id from its inviter, as it learns everything else at join (D26). Without the founding event, which only member devices hold, the id reveals nothing of its creator. The id is 16 bytes, the size of a UUID, written as text as 32 lowercase hexadecimal characters, and the byte-id type in pdn-types is defined to that size. The id travels in notes to other cells' members, so it never equals either store's namespace id, the read capability (Invariant 3). With KERI the creator's autonomic identifier takes the announcement key's place in the derivation.
 
-**Example:** Alice's laptop a2, freshly linked, holds `eead8ef96aa1254969d63c12631b799c` from Alice's directory and nothing of the membership store; its first session is with a modified b1 that withholds Alice's founding event and serves one in Bob's chain instead. Alice's `PdnId` is 32 bytes of `11`, Bob's 32 bytes of `22`.
+**Example:** Alice's laptop a2, freshly linked, holds `9cbcbe4da7cc35a44360d64e45621957` from Alice's directory and nothing of the membership store; its first session is with a modified b1 that withholds Alice's founding event and serves one in Bob's chain instead. Alice's and Bob's `PdnId`s derive from their announcement keys (D44).
 
 | founding event a2 is served | its fields derive | on a2 |
 |---|---|---|
-| by b1: Bob's `PdnId`, Bob's announcement key `d759793b…25ad2c48`, nonce `5a5a…5a5a` | `2330030fdb2d54d0faa282b87adeaa75` | held and counted for nothing, and so is every event of the chain b1 invents |
-| by c1, next: Alice's `PdnId`, her announcement key `17cb79fb…e18080ce`, nonce `5a5a…5a5a`, signed by that key | `eead8ef96aa1254969d63c12631b799c` | counts, and the rest of the store is verified from it |
+| by b1: Bob's `PdnId`, Bob's announcement key `d759793b…25ad2c48`, nonce `5a5a…5a5a` | `211891a43656908e3d5804f5c25a38f4` | held and counted for nothing, and so is every event of the chain b1 invents |
+| by c1, next: Alice's `PdnId`, her announcement key `17cb79fb…e18080ce`, nonce `5a5a…5a5a`, signed by that key | `9cbcbe4da7cc35a44360d64e45621957` | counts, and the rest of the store is verified from it |
 
 **Rejected alternatives:**
 
@@ -470,16 +470,16 @@ At creation the creator's device draws a 16-byte random nonce and derives the ce
 
 ### D26. A newcomer joins through a one-time-secret dialogue with a member device
 
-Any member's device mints an invite — a QR code or an invite link carrying the inviting device's address, a one-time short-lived secret and the cell id, no ticket; minting writes nothing to either store. The newcomer's device dials the inviting device on a dedicated ALPN and presents the secret; the inviting device verifies and burns it before any state changes, receives the newcomer's signed join statement and its first device statement (D16), writes the invite act — held in the newcomer's chain as its joined event, carrying the join statement — beside the device statement, and hands over both stores' write tickets — the shape of the pairing dialogue that establishes a connection (ADR-0011). The statement lets the inviting device serve the newcomer's first session (D32), so the join returns caught up. The pending secret records the identity it was minted for, and the invite act goes into that identity's replica — a node hosting two members holds the cell twice. Between two identities of one node the dialogue runs inside the process, as pairing does between them, with the secret verified and burned the same way; the dialogue is written once, generic over its streams. Both devices are online at once and reach each other through iroh relays, since two devices on different networks without a relay and without DNS do not reliably reach each other; the stack binds relays through `Connectivity` in `SpawnOptions`, and the product is expected to run relays of its own. Whoever presents a live secret first joins under the `PdnId` it names; the `PdnId` is the inviter's word, and proving it is the invited identity is KERI's proof step — challenge-response and an exchange of key event logs — in the same dialogue, the slot pairing and linking keep for it; until then that gap is accepted. Inviting a party that is offline is pending-invite machinery with polling, which ADR-0011 leaves possible and a later change builds.
+Any member's device mints an invite — a QR code or an invite link carrying the inviting device's address, a one-time short-lived secret and the cell id, no ticket; minting writes nothing to either store. The newcomer's device dials the inviting device on a dedicated ALPN and presents the secret; the inviting device verifies and burns it before any state changes, names the sequence the newcomer's joined event takes, receives the newcomer's join statement signed over it and its first device statement (D16, D44), writes the invite act — held in the newcomer's chain as its joined event, carrying the join statement — beside the device statement, and hands over both stores' write tickets — the shape of the pairing dialogue that establishes a connection (ADR-0011). The statement lets the inviting device serve the newcomer's first session (D32), so the join returns caught up. The pending secret records the identity it was minted for, and the invite act goes into that identity's replica — a node hosting two members holds the cell twice. Between two identities of one node the dialogue runs inside the process, as pairing does between them, with the secret verified and burned the same way; the dialogue is written once, generic over its streams. Both devices are online at once and reach each other through iroh relays, since two devices on different networks without a relay and without DNS do not reliably reach each other; the stack binds relays through `Connectivity` in `SpawnOptions`, and the product is expected to run relays of its own. Whoever presents a live secret first joins, under a `PdnId` its join statement proves its own (D44): the invite is a bearer one, and whom it reaches is the inviter's choice. Inviting a party that is offline is pending-invite machinery with polling, which ADR-0011 leaves possible and a later change builds.
 
 **Example:** Carol joins "Family" on Bob's invitation; Bob's phone b1 mints the invite, and Carol's phone c1 presents it.
 
 | step | b1, inviting as Bob | c1, joining as Carol |
 |---|---|---|
-| 1 | mints the invite: b1's address, a one-time secret, `eead8ef96aa1254969d63c12631b799c`, no ticket; writes nothing into either store | reads it from a QR code |
+| 1 | mints the invite: b1's address, a one-time secret, `9cbcbe4da7cc35a44360d64e45621957`, no ticket; writes nothing into either store | reads it from a QR code |
 | 2 | | dials b1 on the join dialogue's own ALPN, beside `/pdn/pairing/0` and `/pdn/linking/0`, and presents the secret |
-| 3 | verifies and burns the secret, before any state changes | |
-| 4 | | sends Carol's signed join statement and her first device statement, listing c1 |
+| 3 | verifies and burns the secret, before any state changes, and names Carol's sequence 1 | |
+| 4 | | sends Carol's join statement, signed by her announcement key over her `PdnId`, the key, the cell id and her sequence 1, and her first device statement, listing c1 |
 | 5 | writes into Bob's replica the invite act — Carol's joined event, her join statement inside — and her device statement, and hands c1 both stores' write tickets | |
 | 6 | serves c1's first session, since Carol's statement lists c1 | catches up, and the join returns |
 
@@ -568,14 +568,14 @@ The routes take this shape; the host spec leaves paths free to change:
 | `GET …/records/{member}/{kind}/{id}/ops`  | `read_ops`     |
 | `GET …/cells/{cell}/unknown`              | `list_unknown` |
 
-**Example:** requests to the host on Alice's tablet a3, which hosts Alice-leisure, the owner of "Family" (`eead8ef96aa1254969d63c12631b799c`), and Alice-work, a plain member of "Wedding" (`f942dfc21acd0218d48f61f714ddfff3`) and no member of "Family"; `<alice-leisure>`, `<alice-work>`, `<bob>`: 64 lowercase hex chars of each `PdnId`.
+**Example:** requests to the host on Alice's tablet a3, which hosts Alice-leisure, the owner of "Family" (`9cbcbe4da7cc35a44360d64e45621957`), and Alice-work, a plain member of "Wedding" (`f942dfc21acd0218d48f61f714ddfff3`) and no member of "Family"; `<alice-leisure>`, `<alice-work>`, `<bob>`: 64 lowercase hex chars of each `PdnId`.
 
 ```
 POST /debug/identities/<alice-work>/cells/f942dfc21acd0218d48f61f714ddfff3/acts   Kick(<bob>)
 → 403, a refusal by role; Bob stays a member
-GET /debug/identities/<alice-work>/cells/eead8ef96aa1254969d63c12631b799c/members
+GET /debug/identities/<alice-work>/cells/9cbcbe4da7cc35a44360d64e45621957/members
 → 409, Alice-work being no member of "Family"
-GET /debug/identities/<alice-leisure>/cells/eead8ef96aa1254969d63c12631b799c/records/<bob>/claim/<an id the cell does not hold>
+GET /debug/identities/<alice-leisure>/cells/9cbcbe4da7cc35a44360d64e45621957/records/<bob>/claim/<an id the cell does not hold>
 → 404
 ```
 
@@ -639,9 +639,9 @@ The identity's directory records each cell under `cells/<cell-id-hex>/<seq>`, wh
 
 | real time | device | writes | entry timestamp | Bob's devices hold "Family" |
 |---|---|---|---|---|
-| 10:00 | b1 | `cells/eead8ef96aa1254969d63c12631b799c/1`, non-empty: joined at his sequence 1 | 10:00 | yes |
-| 11:00 | b2 | `cells/eead8ef96aa1254969d63c12631b799c/2`, the tombstone: left at his sequence 2 | 09:40 | no, once the directory syncs |
-| 12:00 | b1, on a new invite | `cells/eead8ef96aa1254969d63c12631b799c/3`, non-empty: joined at his sequence 3 | 12:00 | yes |
+| 10:00 | b1 | `cells/9cbcbe4da7cc35a44360d64e45621957/1`, non-empty: joined at his sequence 1 | 10:00 | yes |
+| 11:00 | b2 | `cells/9cbcbe4da7cc35a44360d64e45621957/2`, the tombstone: left at his sequence 2 | 09:40 | no, once the directory syncs |
+| 12:00 | b1, on a new invite | `cells/9cbcbe4da7cc35a44360d64e45621957/3`, non-empty: joined at his sequence 3 | 12:00 | yes |
 
 **Rejected alternatives:**
 
@@ -660,7 +660,7 @@ A member that leaves, and a member whose device learns that it was kicked, forge
 
 | step | Carol's devices | b1 |
 |---|---|---|
-| Carol leaves on c1 | c1 writes her left event at her sequence 3 and `cells/eead8ef96aa1254969d63c12631b799c/3` as the directory's tombstone, forgets the record store, keeps the membership store; c2 does the same once Carol's directory syncs | — |
+| Carol leaves on c1 | c1 writes her left event at her sequence 3 and `cells/9cbcbe4da7cc35a44360d64e45621957/3` as the directory's tombstone, forgets the record store, keeps the membership store; c2 does the same once Carol's directory syncs | — |
 | an hour later c1 reaches b1 | a session on the membership store over the past of Carol's left event: c1 sends the left event and takes what of that past it lacks | takes the left event; Dave's joined event, outside that past, is not sent |
 | c1 asks b1 for the record store | refused with `00 00 00 02 02 00` | |
 | Alice places a record | receives nothing | receives it |
@@ -762,7 +762,7 @@ No entry of either store, no fold and no folded membership carries a version: ev
 
 ### D41. The fold verifies what a membership entry's payload carries, once it has arrived
 
-The membership fold reads a membership entry's payload once the payload has arrived, and counts the entry only when what it carries verifies: a founding event when its `PdnId`, announcement key and nonce derive the cell id and its signature verifies under that key (D25), a joined event when its join statement does, a device statement when its signature verifies under the announcement key its member's joined or founding event carries (D16); an entry whose author only a statement lists reads once that statement counts. An entry whose payload has not arrived counts for nothing yet, and one whose material does not verify counts for nothing for good; either is held like every entry (D42). Every key stays as D21 lays it out, with nothing of the signed material in it. The fold works as the validation of a key event log does: an event waits until what it rests on is held and counts then, and a member contradicting itself shows only while both versions of an event are held side by side — the fold a member's entries go through once they anchor in the member's log (D34).
+The membership fold reads a membership entry's payload once the payload has arrived, and counts the entry only when what it carries verifies: a founding event when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId` and its signature verifies under that key (D25, D44), a joined event when its announcement key derives its member's `PdnId` and its join statement verifies under that key (D44), a device statement when its signature verifies under the announcement key its member's joined or founding event carries (D16); an entry whose author only a statement lists reads once that statement counts. An entry whose payload has not arrived counts for nothing yet, and one whose material does not verify counts for nothing for good; either is held like every entry (D42). Every key stays as D21 lays it out, with nothing of the signed material in it. The fold works as the validation of a key event log does: an event waits until what it rests on is held and counts then, and a member contradicting itself shows only while both versions of an event are held side by side — the fold a member's entries go through once they anchor in the member's log (D34).
 
 **Example:** Bob's laptop b2, just linked, writes version 2 of Bob's device statement into "Family" and places a claim, and Carol's phone c1 takes both from Bob's phone b1 in one session.
 
@@ -819,6 +819,31 @@ A membership act's key names its actor beside the actor's sequence — `member/<
 - The writer resolved from the author, the defence deferred with a member's own history (D34).
   - **Cons:** it touches entries other members wrote: a member's modified device reads another member's edits as its own member's, and an owner's kick by a plain member's role.
 
+### D44. A member's `PdnId` derives from its announcement key, and its join statement proves it
+
+An identity's `PdnId` is the 32 bytes of BLAKE3 in its key-derivation mode, under the context string `pdn/pdn-id/v1`, over the identity's announcement public key. It is derived when the identity and its announcement key pair are minted (D16). This is the cell id's hash (D25) without a nonce, since every identity mints a key pair of its own; the key pair does not rotate before KERI (D16), so the name stays the identity's for its life. The join statement is a signature by the newcomer's announcement secret over the prefix `pdn/cell-join/v1` followed by the newcomer's `PdnId`, its announcement key, the cell id and the sequence of its chain that the joined event takes; the prefix keeps it apart from the founding event and the device-list statements the same key signs (D16, D25). In the join dialogue the inviting device, once it has burned the secret, names that sequence — the one after the highest it holds in the newcomer's chain — and the newcomer's device signs over it (D26). The fold counts a founding or joined event only when the announcement key it carries derives the `PdnId` its key names, and a joined event only when its join statement verifies under that key as well (D41). A `PdnId` therefore has one announcement key in every cell, a member joins and returns only through a statement its own devices sign, and a statement copied from an earlier join verifies at no other sequence. With KERI, `PdnId` names the autonomic identifier, which derives from the identity's inception event, and the fold verifies the join statement against the identity's key event log (ADR-0003).
+
+**Example:** Carol left "Family" at her sequence 2 and Dave has never been in it; Bob's modified phone b1 writes every entry but the last; `<carol>`, `<dave>`: 64 lowercase hex chars of each `PdnId`, derived from their announcement keys `<k-carol>` and `<k-dave>`; `<k-b1>`: a key b1 minted; `…`: the actor's sequence.
+
+| entry | on every honest member device |
+|---|---|
+| `member/<carol>/3/joined/<bob>/…`, carrying `<k-b1>` | counts for nothing: `<k-b1>` does not derive `<carol>` |
+| `member/<carol>/1/joined/<bob>/…`, carrying `<k-b1>`, beside Alice's invite at Carol's sequence 1 | counts for nothing, likewise; Carol's sequence 1 stands on Alice's invite |
+| `member/<carol>/3/joined/<bob>/…`, carrying `<k-carol>` and Carol's join statement from her sequence 1 | counts for nothing: the statement signs sequence 1 |
+| `member/<dave>/1/joined/<bob>/…`, carrying `<k-b1>` | counts for nothing: no key b1 holds derives `<dave>` |
+| `member/<carol>/3/joined/<alice>/…`, from Carol's own join dialogue with Alice's phone a1 | counts: Carol a plain member again |
+
+**Rejected alternatives:**
+
+- The key of the member's first joined event binding it, the `PdnId` random.
+  - **Cons:** the fold reads no order but the sequence, so a modified member device writes a second joined event at the member's first sequence under a key of its own, and every rule for two keys at one point hands the member over: both keys counting lets that device write as the member, a tie-break by key lets it mint a key that wins, and neither counting takes the member out of the cell.
+- The inviter's word: the join statement dropped, the key of the member's latest joined event verifying its statements.
+  - **Cons:** a modified member device writes as any departed member, and, through a second joined event at a member's latest point, as any member.
+- The announcement public key itself as the `PdnId`.
+  - **Cons:** a `PdnId` that is also a verifying key invites code to verify with it directly, skipping the derivation that KERI's autonomic identifier replaces.
+- A join statement signing no sequence.
+  - **Cons:** a modified member device copies a departed member's statement from its earlier join into a new invite act and readmits the member without its consent.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
@@ -833,7 +858,7 @@ A membership act's key names its actor beside the actor's sequence — `member/<
 - [Storage per device grows with every cell] → records and their payloads replicate to every member device, and no quota bounds a cell; load tests measure it.
 - [Reachability] → two devices on different networks without a relay and without DNS do not reliably reach each other, so a join and a swarm across networks rest on iroh relays — without them a join fails and a swarm fragments; the stack binds relays, the product is expected to run relays of its own, and the test suites and the container stand run on direct paths (D26).
 - [Concurrent editing loses edits] → a mergeable-document keeps every operation under its own key and so no edit is lost below the merge that shows them as one document, which sits above the data layer (D17); an immutable-document is never edited.
-- [The join is bearer-level] → the invitation carries no ticket and the secret burns on first use, but whoever presents it first joins under the `PdnId` it names — asserted, not proven; accepted until KERI's proof step slots into the same dialogue (D26).
+- [The join is bearer-level] → the invitation carries no ticket and the secret burns on first use, but whoever presents it first joins, under a `PdnId` its join statement proves its own; whom the invite reaches is the only check of who joins (D26, D44).
 - [Forgeries are held and relayed] → a member's modified device can write entries under another member's name, or acts its role does not allow, and every member device holds and relays them and spends the fold's and the record view's time reading them, while none counts them; accepted, as the storage a member fills under its own name is (D28, D42).
 - [A later build reads a cell otherwise] → devices of one cell on two builds whose rules differ can reach two memberships and two sets of readable records from the same entries; accepted while cells run inside the company alone: a cell that splits is recreated and its content lost (D40).
 - [A record placed stays] → no member and no owner deletes or replaces a record: a mistake, a member's junk and a departed member's records stay for every member, and a corrected claim sits beside the old one; accepted while cells serve load testing (D14).
@@ -849,20 +874,6 @@ Additive: no existing store, ticket, grant or record changes shape — the direc
 ## Open Questions
 
 Each question below leaves a part of the design without a rule an implementation can follow, or with a rule another decision contradicts; each names its options, strongest first, and none is decided. A question answered since its posing leaves the list, its answer recorded as a decision.
-
-### Q4. What binds a member to its announcement key
-
-A member's device statements verify under the announcement key its join statement carries, and the join statement is signed by the joining device — but nothing says what that signature covers or under which key, and the fold's check of a joined event reads its actor alone, so no device verifies it. A member's chain can also hold several joined events, one per return, and nothing says which one's key the statements verify under when two carry different keys. An honest device never writes that, since an identity holds one announcement key pair, minted with it; a modified member device can: it invites a departed member again under a key of its own, writes a statement for it under that key, and places records and acts under the departed member's name at its new sequence — a record under another member's name, which counts for nothing under the design (D34).
-
-- The first key binds, and the join statement proves it. The join statement is a signature by the newcomer's announcement secret over a fixed prefix, the cell id, the newcomer's `PdnId` and its announcement key; the fold verifies it on every joined event; and a joined event whose key differs from the one the member's first joined or founding event carries counts for nothing. A member then returns only under its own key, through a join statement only its own devices can sign.
-- The inviter's word, as D26 takes a newcomer's `PdnId`. The join statement goes, the key of the member's latest joined event verifies its statements, and a departed member readmitted under another key by a modified member device is accepted with the rest of the join's gap until KERI.
-
-**Example:** Carol left "Family" at her sequence 2; Bob's modified phone b1 writes an invite act for Carol at her sequence 3 carrying an announcement key b1 minted, a statement for Carol listing b1 under that key, and a claim under Carol's name naming her sequence 3; `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`; `…`: Bob's sequence; `<id>`: an id b1 minted.
-
-| option | `member/<carol>/3/joined/<bob>/…` on every honest member device | `by/<carol>/claim/<id>/3` |
-|---|---|---|
-| the first key binds | counts for nothing: its key is not the one Carol's first joined event carries, and no join statement under Carol's key signs it | read by none: Carol is no member at her sequence 3 |
-| the inviter's word | counts: Carol a plain member again | read as Carol's |
 
 ### Q5. Whether a device a later version missed stays listed
 
@@ -891,7 +902,7 @@ The inviting device writes the newcomer's joined event before the newcomer holds
 |---|---|---|
 | before b1's reply reaches c1 | Carol listed on every member device, c1 holding nothing; a second invite from Bob writes nothing and hands c1 both tickets | Carol listed nowhere, b1 waiting for an acknowledgement that never comes; a second invite joins her as a first one does |
 | after c1 recorded the tickets, before b1 hears of it | Carol listed, and the armer catches c1 up | Carol listed nowhere: c1 holds a cell whose member devices refuse it, until a second invite writes her joined event |
-| during the catch-up, c1 then restarting | c1 holds both tickets and `cells/eead8ef96aa1254969d63c12631b799c/1`; the armer opens the cell and catches up | the same |
+| during the catch-up, c1 then restarting | c1 holds both tickets and `cells/9cbcbe4da7cc35a44360d64e45621957/1`; the armer opens the cell and catches up | the same |
 
 ### Q7. How the keys' segments are encoded
 

@@ -8,7 +8,7 @@ A cell is addressed by its cell id alone, 16 bytes written as 32 lowercase hexad
 
 | cell id | members |
 |---|---|
-| `eead8ef96aa1254969d63c12631b799c` | Alice, Bob, Carol |
+| `9cbcbe4da7cc35a44360d64e45621957` | Alice, Bob, Carol |
 | `684aad236ce530cd7b5dedb6ab6b755a` | Alice, Bob |
 | Nothing on the platform tells Alice that the first is her family's and the second the one about her and Bob. | |
 
@@ -86,7 +86,7 @@ Either way the rule is one admission check over the writer's role at the point i
 | option | what Carol's phone shows before she joins |
 |---|---|
 | the invite carries the name | "Join Family?" |
-| it carries none | "Join `eead8ef96aa1254969d63c12631b799c`?" |
+| it carries none | "Join `9cbcbe4da7cc35a44360d64e45621957`?" |
 
 ## Operating conditions
 

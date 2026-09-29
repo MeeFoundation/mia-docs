@@ -13,8 +13,8 @@ The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with t
 | `tickets/data` | the ticket to Bob's own data namespace |
 | `tickets/connection-metadata/<alice-hex>/own` | the write ticket to Bob's store toward Alice |
 | `tickets/connection-metadata/<alice-hex>/peer` | the read ticket to Alice's store toward Bob |
-| `tickets/cell/eead8ef96aa1254969d63c12631b799c/membership` | the write ticket to the membership store of "Family" |
-| `tickets/cell/eead8ef96aa1254969d63c12631b799c/records` | the write ticket to its record store |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/membership` | the write ticket to the membership store of "Family" |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/records` | the write ticket to its record store |
 
 #### Scenario: A published ticket round-trips
 
@@ -46,7 +46,7 @@ The directory carries the identity's own device-internal state — its device se
 |---|---|
 | `devices/<b1-hex>`, `devices/<b2-hex>` | yes |
 | `connections/<alice-hex>` | yes |
-| `cells/eead8ef96aa1254969d63c12631b799c/1` | yes |
+| `cells/9cbcbe4da7cc35a44360d64e45621957/1` | yes |
 | `announcement-key` | yes |
 | the tickets to Bob's own stores, to the connection's metadata pair and to both stores of "Family" | yes |
 | the ticket to Alice's data namespace, which her grant carries | no: it sits in the connection metadata store Alice writes toward Bob |
@@ -89,10 +89,10 @@ A cell the identity creates or joins SHALL be recorded by a directory entry at p
 
 | real time | device | act | entry | entry timestamp |
 |---|---|---|---|---|
-| 10:00 | b1 | Bob joins "Family", at his sequence 1 | `cells/eead8ef96aa1254969d63c12631b799c/1`, b1's author, non-empty | 10:00 |
-| 11:00 | b2 | Bob leaves it, at his sequence 2 | `cells/eead8ef96aa1254969d63c12631b799c/2`, b2's author, length 0: the tombstone | 09:40 |
+| 10:00 | b1 | Bob joins "Family", at his sequence 1 | `cells/9cbcbe4da7cc35a44360d64e45621957/1`, b1's author, non-empty | 10:00 |
+| 11:00 | b2 | Bob leaves it, at his sequence 2 | `cells/9cbcbe4da7cc35a44360d64e45621957/2`, b2's author, length 0: the tombstone | 09:40 |
 | after sync both read the tombstone at the highest sequence: neither lists the cell as held | | | | |
-| 12:00 | b1 | Bob joins again on a new invite, at his sequence 3 | `cells/eead8ef96aa1254969d63c12631b799c/3`, b1's author, non-empty: the cell is held on both again | 12:00 |
+| 12:00 | b1 | Bob joins again on a new invite, at his sequence 3 | `cells/9cbcbe4da7cc35a44360d64e45621957/3`, b1's author, non-empty: the cell is held on both again | 12:00 |
 
 #### Scenario: A created cell is recorded on the identity's other devices
 

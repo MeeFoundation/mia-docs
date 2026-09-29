@@ -102,7 +102,7 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 | call | result |
 |---|---|
-| `create(Alice)` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
+| `create(Alice)` | `9cbcbe4da7cc35a44360d64e45621957`; `members` answers Alice alone, an owner |
 | `create(Alice)` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells |
 | `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
@@ -123,9 +123,9 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes, write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's join statement, signed over that sequence by the joining steps of the [cell stores](../../data-layer/cell-store/spec.md) spec, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
-**Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `eead8ef96aa1254969d63c12631b799c`, no ticket — and Bob hands it to Carol; three presentations follow.
+**Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `9cbcbe4da7cc35a44360d64e45621957`, no ticket — and Bob hands it to Carol; three presentations follow.
 
 | presented to b1 | b1 |
 |---|---|
@@ -170,9 +170,9 @@ A cell created or joined on one device of an identity SHALL become reachable fro
 **Example:** Alice-leisure's directory once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
 ```
-cells/eead8ef96aa1254969d63c12631b799c/1                      the cell's record at the founding, Alice-leisure's sequence 1
-tickets/cell/eead8ef96aa1254969d63c12631b799c/membership      the membership store's write ticket
-tickets/cell/eead8ef96aa1254969d63c12631b799c/records         the record store's write ticket
+cells/9cbcbe4da7cc35a44360d64e45621957/1                      the cell's record at the founding, Alice-leisure's sequence 1
+tickets/cell/9cbcbe4da7cc35a44360d64e45621957/membership      the membership store's write ticket
+tickets/cell/9cbcbe4da7cc35a44360d64e45621957/records         the record store's write ticket
 announcement-key                                              Alice-leisure's announcement key pair, minted with her
 
 a3 opens both stores from these tickets and writes member/<alice-leisure>/devices/2 — a1 and a3 — into the membership store
