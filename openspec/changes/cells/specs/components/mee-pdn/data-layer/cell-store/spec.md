@@ -42,8 +42,9 @@ enum MembershipEvent {
     Demoted  { seq: Seq, by: PdnId, by_seq: Seq },                              // by an owner other than the member
 }
 
-/// Folding a chain up to a sequence: Founded makes a member and an owner, Joined a plain member, Promoted an owner, Demoted a plain member,
-/// Left and Kicked no member; a transition the state does not allow (Promoted of no member, Joined of a member) is ignored.
+/// Folding a chain up to a sequence, as far as the first sequence holding no entry: Founded makes a member and an owner, Joined a plain
+/// member, Promoted an owner, Demoted a plain member, Left and Kicked no member; at each sequence only the events whose transition the
+/// state allows compete, the highest-ranking taking effect, and the rest count for nothing (Promoted of no member, Joined of a member).
 struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicKey>, devices: Vec<MemberDevice> }
 
 /// The fold's check of one event, over everything the device holds:
@@ -52,10 +53,12 @@ struct MemberState { member: bool, owner: bool, announcement_key: Option<PublicK
 ///   Left             → by == subject
 ///   Promoted         → state(by, by_seq).owner
 ///   Kicked | Demoted → by != subject and state(by, by_seq).owner
-/// and for every kind: the author among by's devices, and by's chain held up to by_seq — else the event counts once it is.
+/// and for every kind: the author among by's devices, and by's chain held up to by_seq, every sequence of it holding an entry — else the
+/// event counts once it is; an event whose transition the state before its sequence does not allow counts for nothing without
+/// waiting on its actor, and events left waiting on each other's outcome in a loop count for nothing.
 ```
 
-The `PdnId` (cells D44), the cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields:
+The `PdnId` (cells D44), the cell id and the founding event (cells D25), `‖` being byte concatenation of fixed-size fields, numbers as big-endian bytes:
 
 ```text
 Creating an identity, on its first device:
@@ -84,7 +87,7 @@ The join statement (cells D44):
 
 ```text
 Joining, in the join dialogue:
-1. the inviting device, once it has burned the secret, names subject_seq: the sequence after the highest it holds in the newcomer's chain
+1. the inviting device, once it has burned the secret, names subject_seq: the first sequence of the newcomer's chain it holds no entry at
 2. subject_signature = Ed25519 sign(announcement_secret, on the newcomer's device,
                                     "pdn/cell-join/v1" ‖ pdn_id ‖ announcement_pubkey ‖ cell_id[16] ‖ subject_seq[8])
 3. the inviting device writes the invite act at member/<pdn_id>/<subject_seq>/joined/<actor>/<actor_seq>:
@@ -94,6 +97,20 @@ Counting a joined event, on every member device, once its payload has arrived:
 1. recompute pdn_id from announcement_pubkey → must equal the key's <pdnid>
 2. verify subject_signature under announcement_pubkey over "pdn/cell-join/v1" ‖ pdn_id ‖ announcement_pubkey ‖ cell_id ‖ subject_seq
 3. either check fails → the event counts for nothing, whatever order it arrived in
+```
+
+A device-list statement (cells D16):
+
+```text
+Writing one, on a device of the member:
+1. signature  = Ed25519 sign(announcement_secret, "pdn/cell-devices/v1" ‖ version[8] ‖ (node_id[32] ‖ author[32])…)
+2. write it at member/<pdn_id>/devices/<version>: { devices, signature }   — version is the key's
+
+Counting one, on every member device, once its payload has arrived:
+1. the announcement key: the one a held founding or joined event in the member's chain carries that derives the member's pdn_id
+   → none held yet: the statement counts once one is
+2. verify signature under that key over "pdn/cell-devices/v1" ‖ version ‖ devices, version being the key's
+3. the check fails → the statement counts for nothing, whatever order it arrived in
 ```
 
 ## ADDED Requirements
@@ -336,7 +353,7 @@ Access to a cell's stores SHALL rest on membership alone: no connection between 
 
 ### Requirement: The membership store holds each member's event sequence, append-only
 
-The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the sequence after the highest it holds in the subject's chain and naming as `<aseq>` the highest sequence it holds in the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, and its announcement key derives the subject's `PdnId` and its join statement verifies under that key over the subject's sequence, by the joining steps above (cells D44), a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner, its `<aseq>` `0` — counts when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId`, and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>`, SHALL count once it does, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined — applied to the subject's state before that sequence, the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
+The membership store SHALL hold, per member, one sequence of membership events under `member/<pdnid>/<seq>/<kind>/<actor>/<aseq>` — founded, joined, left, kicked, promoted, demoted — with the sequence number inside the signed bytes, `<actor>` the actor's `PdnId`, among whose devices the entry's author has to be, and `<aseq>` the actor's own sequence at the time of acting — the writing device placing the event at the first sequence of the subject's chain at which it holds no entry and naming as `<aseq>` the last sequence before the first such one of the actor's chain — and the member's device-list statements under `member/<pdnid>/devices/<version>`, one key per version. An event SHALL count as its actor's chain folded up to `<aseq>` allows: a joined event counts when the actor was a member there and is not the subject, and its announcement key derives the subject's `PdnId` and its join statement verifies under that key over the subject's sequence, by the joining steps above (cells D44), a promoted event when the actor was an owner there, a kicked or demoted event when the actor was an owner there and is not the subject, a left event when the actor is the subject itself; the founding event — the creator's first, self-authored, making it a member and an owner, its `<aseq>` `0` — counts when its `PdnId`, announcement key and nonce derive the cell id, its announcement key derives its `PdnId`, and its signature verifies under that key, and is the root of every verification; an event whose payload has not arrived, or whose actor's chain the device does not hold up to `<aseq>` — a sequence being held once any entry at it is, whatever it counts for — SHALL count once it does, events left waiting on each other's outcome in a loop SHALL count for nothing, and an event failing its check SHALL count for nothing on every member device, held as every entry is. Honest devices overwrite and delete no entry in the membership store — the store holds no tombstones. A member's membership state and role SHALL be folded by walking its events in sequence order on every member device, as far as the first sequence at which the device holds no entry, an event beyond it waiting until the sequences below it arrive, whatever order the events arrived in and never by entry timestamp: a join makes it a plain member, a promotion an owner, a demotion a plain member, a leave or a kick no member, a later join a plain member again. Events at one sequence of one subject SHALL all be held, and among those whose transition the subject's state before that sequence allows the fold SHALL take effect with the one that ranks highest — kicked, then left, then demoted, then promoted, then joined, the founding event above a joined event — an event that state does not allow counting for nothing and the same event written twice counting once. When the folded membership holds no owner and the roles of some of its former owners ended in demotions, the fold SHALL take those demotions in the order of their actors' `PdnId`, lowest first, each against the former owners it has not yet removed, and SHALL ignore every one that would remove the last of them.
 
 **Example:** Bob's chain in "Family" as every member device holds it; the key's last two segments are the actor and the actor's sequence; `<alice>`, `<bob>`, `<carol>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -354,7 +371,17 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 #### Scenario: A role flip resolves by sequence whatever the arrival order
 
 - **WHEN** owner A promotes B (B's sequence 2, after B's join at 1), demotes B (3) and promotes B again (4), and the three events reach a device of member C in the order 4, 2, 3
-- **THEN** C's device lists B by the highest sequence it holds after each arrival — an owner throughout — and as an owner once all three have arrived
+- **THEN** C's device lists B as a plain member while the promotion at 4 waits for the sequences below it, as an owner once 2 arrives, and as an owner once all three have arrived
+
+#### Scenario: An event placed at a member's joining point changes nothing
+
+- **WHEN** a device of owner A writes a kicked event at member B's sequence 1, beside the invite act that brought B in, after B invited C
+- **THEN** every member device holds the kicked event, counts it for nothing, and lists B and C as members
+
+#### Scenario: An entry far beyond a chain waits and blocks nothing
+
+- **WHEN** a device of member D writes an event in owner A's chain at A's sequence 1,000,000, and A's device then promotes member B
+- **THEN** every member device holds D's entry without counting it, counts A's promotion, and lists B as an owner
 
 #### Scenario: A chain past sequence 9 folds in number order
 
