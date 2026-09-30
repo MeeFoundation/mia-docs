@@ -26,7 +26,7 @@ This design records the decisions taken for the platform side of cells and the q
 - Defence against a member's device contradicting its own member's history — acts under a point the member has lost, rewrites of its own entries, two events at one point: it rests on anchored signatures over the platform's key event logs (D34).
 - The merge of a mergeable-document's operations into one document, their encoding and the editing UX: cells store, admit and reconcile the operations and hand them back with their writers (D17).
 - Deleting or replacing a record: a record placed stays for every member (D14).
-- Tuning for scale — a cached fingerprint tree, swarm parameters, payloads on demand, quotas: every payload replicates with its entry, the fork's defaults hold, and load tests measure them.
+- Tuning for scale — a cached fingerprint tree, swarm parameters, payloads on demand, quotas: every payload replicates with its entry, the fork's defaults hold, and load tests measure them; the cell stores' pass takes the cadence D45 sets, whose numbers load tests revisit.
 - Shedding a member entirely: a kick takes admission away, and what a kicked member keeps stays with it (D20, D28).
 - A listed device's consent to its listing: a member's device statement names any node id the member's announcement key signs for, and member devices dial it (D7, D16).
 - Versions of entries, of the fold or of the folded membership, and moving a cell from one build's rules to another's (D40).
@@ -862,6 +862,29 @@ An identity's `PdnId` is the 32 bytes of BLAKE3 in its key-derivation mode, unde
 - A join statement signing no sequence.
   - **Cons:** a modified member device copies a departed member's statement from its earlier join into a new invite act and readmits the member without its consent.
 
+### D45. A cell store's periodic pass runs every 5 minutes and reaches at most 5 peers drawn at random
+
+Inside a cell a write reaches the member devices through the swarm — a content-free announcement and the pull it triggers (D7) — and a device that comes back catches up in the session its first swarm neighbour opens; the periodic reconcile pass is the safety net under both, for an announcement gossip lost. For each of a cell's two stores the pass runs at an interval of its own, `SpawnOptions::cell_reconcile_interval`, 5 minutes by default, and each run reconciles with at most 5 peers drawn at random, afresh on every run, from the store's contacts and the peers the engine recorded. Any member device serves the cell whole, so an entry a device missed reaches it from whichever drawn device holds it, and draws that differ from run to run spread a missed entry through the cell in a handful of runs. Data namespaces, directories and connection metadata stores keep `SpawnOptions::reconcile_interval` and every contact, a grantee's only data path being the reconciliation it initiates; the pass between two co-located members opens its sessions when something has moved, as the in-process sessions spec states. A run costs a device at most 5 sessions per store of every cell it holds, whatever the cell's size, and the load tests of cells revisit both numbers.
+
+**Example:** Bob's phone b1 holds 50 cells, each of 100 members on 2 devices, beside Bob's data namespace, which his laptop b2 holds too.
+
+| replica on b1 | one run reaches | runs per hour |
+|---|---|---|
+| each store of the 50 cells, 199 contacts each | at most 5 of them, drawn afresh | 12 |
+| Bob's data namespace | b2, its one contact | 360 |
+| At most 6,000 cell sessions an hour on b1, where every contact every 10 s would be 7,164,000; a write in "Family" whose announcement b1 missed reaches it at the first run whose draw holds a device that took the write. | | |
+
+**Rejected alternatives:**
+
+- The pass of every other replica: every 10 s, over every contact.
+  - **Cons:** every device reconciles with every device of every cell it holds, so a cell's sessions grow with the square of its devices, each a linear fingerprint scan — 39 ms a pass over a quiet store of 100,000 entries.
+- A longer interval over every contact.
+  - **Cons:** each run still reaches every device of the cell; only the rate falls.
+- No periodic pass for a cell's stores.
+  - **Cons:** an announcement gossip lost waits for the next write or the next neighbour met, which a quiet two-member cell may not see for weeks.
+- One peer drawn per run.
+  - **Cons:** a draw that lands on an offline device wastes the run, and a missed entry spreads through the cell in more runs.
+
 ## Risks / Trade-offs
 
 - [Every member holds the whole cell in plaintext] → accepted by definition; content encryption is a separate layer; the trust boundary is the member set (D28).
@@ -870,6 +893,7 @@ An identity's `PdnId` is the 32 bytes of BLAKE3 in its key-derivation mode, unde
 - [Membership is a multi-writer set] → its events order by per-member sequence numbers, never by timestamp (D3, D21); two owners' concurrent events on one member at one sequence — a kick beside a promotion or a demotion — resolve by precedence, the narrowest first (D38); a member-signed founding chain gives membership a root but no total order.
 - [Authorship is a transport-level binding] → author keys are held per hosted identity on a device (ADR-0013); the binding of an author key to a member is what the member publishes under its announcement key (D16), verifiable by anyone holding the join statement; the fold and the record view enforce it on every honest device; a modified member device can forge entries under the name of a member it does not host, which every honest device holds and counts for nothing, while a node acts as every identity it hosts, holding the secrets of each (threat model); what it can still do under its own name after departing is D34. Signed claims come with KERI.
 - [Range fingerprints are linear scans] → a record store with 100 writers is never quiescent, so every catch-up session scans it per round; a cached fingerprint tree in pdn-store is the fix, outside this change, and the membership store's convergence does not wait for it (D3).
+- [An announcement gossip loses waits for the pass] → the entry reaches a member device at the first 5-minute run whose draw holds a device that took it, a handful of runs across a cell of 200 devices; accepted: the swarm carries live delivery, and the pass bounds how long a lost announcement delays it (D45).
 - [A member's own history is taken on its word] → a departed or demoted member's new entries under its old point count in both stores, whichever member device relays them, a member's device rewrites the entries its author wrote, and two events of one member at one point stand as D38 resolves them; accepted while cells serve load testing, untested, its fix deferred (D22, D23, D34).
 - [Dates in entries are self-asserted] → written and shown, never judged (D3, D22, D23); order is the sequence, and "provably before" is the anchored log D34 waits for.
 - [The membership store only grows] → events are never deleted; a member's sequence is a handful of events over a cell's life, and the store stays tiny beside the records (D3).
@@ -882,7 +906,7 @@ An identity's `PdnId` is the 32 bytes of BLAKE3 in its key-derivation mode, unde
 - [A later build reads a cell otherwise] → devices of one cell on two builds whose rules differ can reach two memberships and two sets of readable records from the same entries; accepted while cells run inside the company alone: a cell that splits is recreated and its content lost (D40).
 - [A record placed stays] → no member and no owner deletes or replaces a record: a mistake, a member's junk and a departed member's records stay for every member, and a corrected claim sits beside the old one; accepted while cells serve load testing (D14).
 - [Any member edits any mergeable-document] → accepted: every member is trusted with the whole cell already (D28), each operation carries its writer's signature (D15), and a spoiled mergeable-document is repaired by further operations.
-- [Payload bytes are served by hash to any caller] → the blob store is the node's and its egress is ungated (ADR-0013), so a party that learns a record's hash — a kicked member among them — fetches its payload from any member device; accepted while cells serve load testing; iroh-blobs offers a hook for a gate over payload bytes.
+- [Payload bytes are served by hash to any caller] → the blob store is the node's and its egress is ungated (ADR-0013), so a party that learns a record's hash fetches its payload from any member device; a kicked member's device that stays in the store's swarm learns the hash of every new payload as it spreads, since a member device that finishes a download announces the hash to its swarm neighbours (`Op::ContentReady` in the fork), and so fetches what is placed after the kick as well as before it; accepted while cells serve load testing; iroh-blobs offers a hook for a gate over payload bytes.
 - [A node hosting two members holds the cell twice] → each member identity holds replicas of its own, stored twice and walked twice on every reconcile pass; accepted as the price of separation, at the 1 to 10 identities a device is sized for (ADR-0013, D3, D32).
 - [Linkability] → a member carries one `PdnId` into every cell it joins, and two identities hosted on one node list the same node id in their device statements, so whoever shares cells with them sees one member in both, or two identities on one device; accepted, since the network links them regardless — one address, one relay, online together (ADR-0013) — and neither per-cell identities nor an endpoint per identity removes that link.
 

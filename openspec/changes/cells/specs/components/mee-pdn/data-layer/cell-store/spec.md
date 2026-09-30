@@ -208,6 +208,32 @@ Every device of every member SHALL hold both stores whole — every record reada
 - **WHEN** a device of member C, no owner, holding the record store's write ticket, produces an entry at the key of B's claim and reconciles with a device of B
 - **THEN** B's device holds it and reads nothing of it, and B's claim reads unchanged on every member device
 
+### Requirement: A cell store's periodic pass reaches at most 5 peers every 5 minutes
+
+The periodic reconcile pass SHALL reconcile each of a cell's stores at `SpawnOptions::cell_reconcile_interval`, 5 minutes by default, and each run SHALL open sessions for that store with at most 5 peers, drawn at random on every run from the store's contacts and the peers the engine recorded. Every other replica a node tracks SHALL keep `SpawnOptions::reconcile_interval` and every contact. Live delivery inside a cell rides the swarm's announcements and the pulls they trigger; the pass bounds how long an announcement gossip lost delays an entry.
+
+**Example:** Bob's phone b1 holds 50 cells of 100 members on 2 devices each, and Bob's data namespace, which his laptop b2 holds too.
+
+| replica on b1 | one run reaches | runs per hour |
+|---|---|---|
+| each store of the 50 cells, 199 contacts each | at most 5 of them | 12 |
+| Bob's data namespace | b2, its one contact | 360 |
+
+#### Scenario: A run over a cell store reaches at most 5 peers
+
+- **WHEN** a device holds a cell's stores, each with more than 5 contacts, and a periodic pass runs over them
+- **THEN** it opens sessions for each store with at most 5 peers
+
+#### Scenario: A write whose announcement was lost arrives at the next run
+
+- **WHEN** a device of member B misses the announcement of member A's write, and holds at most 5 contacts for the store
+- **THEN** the next run of the pass over that store brings the write
+
+#### Scenario: A cell store keeps its own interval
+
+- **WHEN** a device holds a data namespace and a cell's stores, and its reconcile interval is shorter than its cell reconcile interval
+- **THEN** the pass reconciles the data namespace once per reconcile interval and each cell store at most once per cell reconcile interval
+
 ### Requirement: Only member devices are served
 
 A session for either of a cell's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member kicked from the cell, or one that left it, SHALL be refused the record store from the first session set up after its departure event reaches the serving device, and served the membership store only as the requirement on a departed member's tombstone states; what it obtained while a member is retained.
