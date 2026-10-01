@@ -65,7 +65,7 @@ trait CellsService {
     /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member. Writes nothing to the cell:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
     async fn invite(&self, identity: PdnId, cell: CellId, lifetime: Option<Duration>) -> Result<CellInvite>;
-    /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
+    /// Joins through the invite's dialogue and returns once both stores have caught up and its replica folds the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
     /// `Kick` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the cell's tombstone.
