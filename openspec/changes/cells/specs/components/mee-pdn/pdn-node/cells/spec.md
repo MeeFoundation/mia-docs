@@ -1,6 +1,6 @@
 # pdn-node: cells
 
-The cells service of the runtime: creating a cell for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
+The cells service of the runtime: creating a [cell](../../../../architecture/language/cell.md) for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the cell, and recovering hosted cells across a restart. The two stores underneath — the membership store and the record store — are the data layer's [cell stores](../../data-layer/cell-store/spec.md); this spec covers the runtime surface and the ceremonies. A cell has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the cell itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
 
 **Cell**
 
@@ -65,7 +65,7 @@ trait CellsService {
     /// Mints a one-time invite: the inviting device's address, the secret, the cell id. Any member. Writes nothing to the cell:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
     async fn invite(&self, identity: PdnId, cell: CellId, lifetime: Option<Duration>) -> Result<CellInvite>;
-    /// Joins through the invite's dialogue and returns once caught up; the identity joins as a plain member.
+    /// Joins through the invite's dialogue and returns once both stores have caught up and its replica folds the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: CellInvite) -> Result<CellId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences (cells D23).
     /// `Kick` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the cell's tombstone.
@@ -102,8 +102,8 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 | call | result |
 |---|---|
-| `create(Alice)` | `eead8ef96aa1254969d63c12631b799c`; `members` answers Alice alone, an owner |
-| `create(Alice)` again | `684aad236ce530cd7b5dedb6ab6b755a`: another nonce, another id; `list` answers both cells |
+| `create(Alice)` | `9cbcbe4da7cc35a44360d64e45621957`; `members` answers Alice alone, an owner |
+| `create(Alice)` again | `b61cdcf20d79379e475d57d1c04db7a4`: another nonce, another id; `list` answers both cells |
 | `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
 #### Scenario: A created cell is listed with its creator as member
@@ -123,9 +123,9 @@ The cells service SHALL create a cell for a hosted identity: it draws a random n
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's signed join statement, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the cell id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes and the version and device list its device statement extends — the identity's own, when the cell has listed it before — write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's join statement, signed over that sequence by the joining steps of the [cell stores](../../data-layer/cell-store/spec.md) spec, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. The inviter SHALL write the invite act before it hands over the tickets, and the newcomer's device SHALL record both tickets and the cell's directory entry before it catches up, so the armer's sweep finishes a catch-up that a dropped connection, a dropped `join` future or a restart interrupts. A secret presented by an identity the cell already lists as a member SHALL write no joined event: the inviter hands over both tickets again, and writes the device statement the dialogue carries when the member's device list does not name that device. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
-**Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `eead8ef96aa1254969d63c12631b799c`, no ticket — and Bob hands it to Carol; three presentations follow.
+**Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `9cbcbe4da7cc35a44360d64e45621957`, no ticket — and Bob hands it to Carol; three presentations follow.
 
 | presented to b1 | b1 |
 |---|---|
@@ -153,6 +153,16 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 - **WHEN** C left the cell or was kicked from it, and a member invites C again and C joins
 - **THEN** C reads the cell, its earlier records among what it reads, and a new record C writes reaches every member
 
+#### Scenario: A catch-up the join lost is finished by the armer
+
+- **WHEN** a newcomer's device has received both tickets in the join dialogue, and its connection drops during the catch-up, or its caller drops the `join` future then, or its runtime restarts then
+- **THEN** the device holds both tickets and the cell's directory entry, and the armer's next sweep opens the cell and catches it up with no second invite
+
+#### Scenario: A member whose join lost the reply joins through a second invite
+
+- **WHEN** the connection drops after the inviter wrote newcomer C's joined event and before its reply reached C, and C then presents a second invite
+- **THEN** the second dialogue writes no joined event and hands C both tickets, C catches up, and every member device lists C by the one joined event
+
 #### Scenario: A wrong secret burns nothing
 
 - **WHEN** a dialer presents a secret that was never minted while an invite is pending
@@ -165,14 +175,14 @@ Any member's device SHALL mint a cell invite: a fresh one-time, short-lived secr
 
 ### Requirement: A cell reaches a member's other devices
 
-A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself: before it syncs the cell, and before every later sync, it SHALL check that the member's device list, as the [cell stores](../../data-layer/cell-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
+A cell created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's directory carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the cell from its directory registers itself: once its replica of the membership store folds the member, and at every later change to that store and every run of the cell stores' pass, it SHALL check that the member's device list, as the [cell stores](../../data-layer/cell-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the cell, a co-located one on a member's node included: it lists no such cell, and its calls on the cell fail with the unknown-cell error.
 
 **Example:** Alice-leisure's directory once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
 ```
-cells/eead8ef96aa1254969d63c12631b799c/1                      the cell's record at the founding, Alice-leisure's sequence 1
-tickets/cell/eead8ef96aa1254969d63c12631b799c/membership      the membership store's write ticket
-tickets/cell/eead8ef96aa1254969d63c12631b799c/records         the record store's write ticket
+cells/9cbcbe4da7cc35a44360d64e45621957/1                      the cell's record at the founding, Alice-leisure's sequence 1
+tickets/cell/9cbcbe4da7cc35a44360d64e45621957/membership      the membership store's write ticket
+tickets/cell/9cbcbe4da7cc35a44360d64e45621957/records         the record store's write ticket
 announcement-key                                              Alice-leisure's announcement key pair, minted with her
 
 a3 opens both stores from these tickets and writes member/<alice-leisure>/devices/2 — a1 and a3 — into the membership store
@@ -184,10 +194,10 @@ Alice-work's directory holds no cells/ entry and no tickets/cell/ kind for Famil
 - **WHEN** identity B joins a cell on its phone while B's laptop is linked into B
 - **THEN** the laptop eventually lists the cell, reads its entries, and its own device is served by the other members
 
-#### Scenario: A device a later version missed puts itself back
+#### Scenario: A device a later version missed stays listed
 
 - **WHEN** a device D of identity B has written a version of B's device statement listing itself, and another device of B that has not seen it writes the next version without D
-- **THEN** D's first sync after that version reaches it is preceded by a statement at the version after it, listing D beside every device the version that missed D lists, and the other members' devices admit D's entries again
+- **THEN** D's first sync after that version reaches it is preceded by no statement of D's, and the other members' devices keep admitting D's entries throughout
 
 #### Scenario: A co-located non-member identity does not reach the cell
 
@@ -241,7 +251,7 @@ A created cell SHALL record its creating identity as the cell's first owner. An 
 
 ### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a cell that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a cell leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the cell then has no owner. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' admission rule; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell.
+Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a cell that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a cell leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the cell then has no owner. A kicked event replicates like every cell entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the cell stores' rules; a device of the kicked member that learns of the kick SHALL tombstone the cell's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the cell's tombstone. A member that leaves SHALL tombstone the cell's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the cell's tombstone, so the cell is no longer listed there, while the remaining members, a co-located member of the same cell among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the cell. Before it writes its left event, the leaving device SHALL reconcile both stores with devices of the cell's other members and wait up to 10 seconds for a session with one of them, begun after the flush started, to go through on each store, since nothing outside the departure's past leaves the device once it departs; a leave that reaches no member's device in that time SHALL proceed all the same, and what no member's device held by then is lost.
 
 **Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its cell id.
 
@@ -287,6 +297,16 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 
 - **WHEN** C leaves the cell from one of its devices
 - **THEN** C's devices no longer list the cell, A and B still read each other's entries, and C's records and operations are still read by A and B
+
+#### Scenario: What a member wrote just before its leave reaches the cell
+
+- **WHEN** member C places a claim, appends an operation to A's mergeable-document and leaves at once, a device of A being reachable
+- **THEN** every remaining member reads C's claim and C's operation
+
+#### Scenario: A promotion just before the one owner's leave reaches the cell
+
+- **WHEN** A, the one owner, promotes B and leaves at once, B's and C's devices being reachable
+- **THEN** B's and C's devices list B as the one owner and A as no member
 
 ### Requirement: A claim and an immutable-document are placed once; a mergeable-document is edited by every member
 

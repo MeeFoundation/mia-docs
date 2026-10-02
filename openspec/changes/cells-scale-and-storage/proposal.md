@@ -2,11 +2,11 @@
 
 ## Why
 
-A cell is two stores, the membership store and the record store, each held whole as a replica of its own by every member identity on every device that hosts it, and every record replicates to every member device with its payload ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). The standing cost grows with the cells a device holds: every replica takes a reconcile pass once every `SpawnOptions::reconcile_interval`, 10 s by default, and the store's range fingerprint (`get_fingerprint` in `crates/pdn-store/src/store/fs.rs`) is a linear scan. The identity-scoped replicas measurement shows where the cost sits, on a store of 100,000 entries: a catch-up spends 93% of its time on the receiving store's actor thread and under 2% on the serving one's, while a pass over a converged pair is 97% fingerprint work, 39 milliseconds per pass. Storage grows the same way: every payload lands on every member device, and no quota bounds a cell. Load tests of cells produce the numbers these questions wait for; this change takes them and settles the questions.
+A cell is two stores, the membership store and the record store, each held whole as a replica of its own by every member identity on every device that hosts it, and every record replicates to every member device with its payload ([cell stores](../../specs/components/mee-pdn/data-layer/cell-store/spec.md)). The standing cost grows with the cells a device holds: every replica takes a reconcile pass — each store of a cell every 5 minutes, over at most 5 peers drawn at random, and every other replica every `SpawnOptions::reconcile_interval`, 10 s by default — and the store's range fingerprint (`get_fingerprint` in `crates/pdn-store/src/store/fs.rs`) is a linear scan. The identity-scoped replicas measurement shows where the cost sits, on a store of 100,000 entries: a catch-up spends 93% of its time on the receiving store's actor thread and under 2% on the serving one's, while a pass over a converged pair is 97% fingerprint work, 39 milliseconds per pass. Storage grows the same way: every payload lands on every member device, and no quota bounds a cell. Load tests of cells produce the numbers these questions wait for; this change takes them and settles the questions.
 
 **Example:** what a device holds as its identities join cells, each cell being two replicas per member identity the device hosts.
 
-| device | identities it hosts | cells each is a member of | replicas the reconcile pass walks every 10 s |
+| device | identities it hosts | cells each is a member of | replicas the reconcile pass walks every 5 minutes |
 |---|---|---|---|
 | Bob's phone b1 | Bob | 1 | 2 |
 | Bob's phone b1 | Bob | 50 | 100 |
@@ -29,7 +29,7 @@ Two devices on different networks without a relay and without DNS do not reliabl
 
 ### Swarm and cadence parameters for 200 nodes
 
-A cell of 100 members on 2 devices each is a swarm of 200 nodes, in which an announcement reaches everyone in 3 to 4 hops of HyParView's active view. The active and passive view sizes, the reconcile interval and the churn of mobile devices are set from the load tests.
+A cell of 100 members on 2 devices each is a swarm of 200 nodes, in which an announcement reaches everyone in 3 to 4 hops of HyParView's active view. The active and passive view sizes and the churn of mobile devices are set from the load tests, and so are the numbers of the cell stores' pass, 5 minutes and 5 peers a run.
 
 ### What a device downloads
 
