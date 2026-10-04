@@ -4,17 +4,19 @@
 
 ### Requirement: Typed tickets, kind in the key
 
-The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names. `data` is the kind under which the identity's own data-namespace ticket is published at creation — the durable record of the flat bootstrap model; the linking dialogue hands the bootstrap tickets over directly, so nothing in the linking critical path reads this entry (see [device-linking](../../pdn-node/device-linking/spec.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand. A [cell](../../../../architecture/language/cell.md)'s two stores are published under per-cell kinds keyed by the cell id (32 lowercase hex chars): the write ticket to its membership store at kind `cell/<cell-id-hex>/membership`, and the write ticket to its record store at kind `cell/<cell-id-hex>/records` — this is how a cell created or joined on one device reaches the identity's other devices, which open both stores from these tickets on demand. Each of the two tickets SHALL name the device that recorded it and, at a join, the inviting device as well, so that a device opening the cell from them — another device of the identity, or the recording device after a restart — has a member's device to dial without address lookup.
+The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names. `data` is the kind under which the identity's own data-namespace ticket is published at creation — the durable record of the flat bootstrap model; the linking dialogue hands the bootstrap tickets over directly, so nothing in the linking critical path reads this entry (see [device-linking](../../pdn-node/device-linking/spec.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand. A [cell](../../../../architecture/language/cell.md)'s two stores are published under per-cell kinds keyed by the cell id (32 lowercase hex chars): the write ticket to its membership store at kind `cell/<cell-id-hex>/membership`, and the write ticket to its record store at kind `cell/<cell-id-hex>/records` — this is how a cell created or joined on one device reaches the identity's other devices, which open both stores from these tickets on demand. Each of the two tickets SHALL name the device that recorded it, as the identity's own. At a join, the tickets the inviting device handed over SHALL be published beside them, unchanged, at kinds `cell/<cell-id-hex>/inviter/membership` and `cell/<cell-id-hex>/inviter/records`, naming the inviting device as the identity it holds the stores for: a ticket names all its nodes as the one identity that minted it, so a device named in another identity's ticket would be dialed as an identity it does not hold. A device opening the cell from them — another device of the identity, or the recording device after a restart — dials the nodes of both, each as its own ticket names it, so it has a member's device to dial without address lookup before its replica folds anyone.
 
-**Example:** the ticket entries in Bob's directory once he holds a connection to Alice and is a member of "Family"; `<alice-hex>`: 64 lowercase hex chars of Alice's `PdnId`.
+**Example:** the ticket entries in Bob's directory once he holds a connection to Alice and has joined "Family" from his phone b1 on the invitation of Alice's phone a1; `<alice-hex>`: 64 lowercase hex chars of Alice's `PdnId`.
 
 | path | payload |
 |---|---|
 | `tickets/data` | the ticket to Bob's own data namespace |
 | `tickets/connection-metadata/<alice-hex>/own` | the write ticket to Bob's store toward Alice |
 | `tickets/connection-metadata/<alice-hex>/peer` | the read ticket to Alice's store toward Bob |
-| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/membership` | the write ticket to the membership store of "Family" |
-| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/records` | the write ticket to its record store |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/membership` | the write ticket to the membership store of "Family", naming b1 as Bob |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/records` | the write ticket to its record store, naming b1 as Bob |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/inviter/membership` | the write ticket to the membership store a1 handed over, naming a1 as Alice |
+| `tickets/cell/9cbcbe4da7cc35a44360d64e45621957/inviter/records` | the write ticket to the record store a1 handed over, naming a1 as Alice |
 
 #### Scenario: A published ticket round-trips
 
@@ -34,7 +36,7 @@ The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with t
 #### Scenario: A cell's tickets are discoverable on a linked device
 
 - **WHEN** the identity creates or joins a cell on the phone, and a laptop is linked into the identity
-- **THEN** the laptop reads both write tickets from its directory replica after replication, under `cell/<cell-id-hex>/membership` and `cell/<cell-id-hex>/records` for that cell
+- **THEN** the laptop reads both write tickets from its directory replica after replication, under `cell/<cell-id-hex>/membership` and `cell/<cell-id-hex>/records` for that cell, and for a joined cell the two the inviting device handed over as well, under `cell/<cell-id-hex>/inviter/membership` and `cell/<cell-id-hex>/inviter/records`
 
 ### Requirement: The directory routes; grants live in connection metadata stores
 

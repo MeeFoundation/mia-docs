@@ -199,6 +199,11 @@ Alice-work's directory holds no cells/ entry and no tickets/cell/ kind for Famil
 - **WHEN** a device D of identity B has written a version of B's device statement listing itself, and another device of B that has not seen it writes the next version without D
 - **THEN** D's first sync after that version reaches it is preceded by no statement of D's, and the other members' devices keep admitting D's entries throughout
 
+#### Scenario: A device statement a restart cut off is written after the restart
+
+- **WHEN** a device linked into B holds two of B's cells, and its runtime restarts after its device statement landed in one of them and before it landed in the other
+- **THEN** after the restart the device writes its statement into the other cell, and the other members' devices read what it placed there
+
 #### Scenario: A co-located non-member identity does not reach the cell
 
 - **WHEN** a node hosts identity B, a member, and identity D, a non-member
@@ -268,6 +273,11 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 - **WHEN** owner A kicks member C from a cell with members A, B and C, and the kick reaches B's devices
 - **THEN** A and B still sync the cell, and C's next session is refused
 
+#### Scenario: A member's kicks follow its role through promotion, demotion and promotion again
+
+- **WHEN** owner A promotes B, B kicks C, A demotes B, B attempts to kick D, A promotes B again, and B kicks D
+- **THEN** B's first and last kicks are written, the attempt between them is refused with a typed error, and every remaining member lists A and B as owners and neither C nor D as a member
+
 #### Scenario: A plain member kicks nobody
 
 - **WHEN** member C, no owner, attempts to kick member B
@@ -297,6 +307,11 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 
 - **WHEN** C leaves the cell from one of its devices
 - **THEN** C's devices no longer list the cell, A and B still read each other's entries, and C's records and operations are still read by A and B
+
+#### Scenario: A device linked after the leave holds the tombstone alone
+
+- **WHEN** member C leaves the cell on its one device, and another device is linked into C afterwards
+- **THEN** the new device holds the cell's membership store, the left event taken from C's first device among its entries, holds no record store, and lists no such cell
 
 #### Scenario: What a member wrote just before its leave reaches the cell
 
