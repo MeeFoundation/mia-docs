@@ -89,7 +89,7 @@ The join statement:
 
 ```text
 Joining, in the join dialogue:
-1. the inviting device, once it has burned the secret, names subject_seq: the first sequence of the newcomer's chain it holds no entry at
+1. the inviting device, once it has burned the secret, names subject_seq: the first sequence past the newcomer's chain, as the inviting device holds it or as the newcomer reports its own, whichever runs further
 2. subject_signature = Ed25519 sign(announcement_secret, on the newcomer's device,
                                     "pdn/cell-join/v1" ‖ pdn_id ‖ announcement_pubkey ‖ cell_id[16] ‖ subject_seq[8])
 3. the inviting device writes the invite act at member/<pdn_id>/<subject_seq>/joined/<actor>/<actor_seq>:
@@ -197,7 +197,7 @@ both stores' namespace ids are 32-byte public keys of their own, and neither is 
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the cell is judged by the membership fold and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its directory, dialed as that identity, derived afresh whenever the membership store changes and at each run of the store's periodic pass, and replacing the previous list whole — save while the replica folds into no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the cell is judged by the membership fold and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its directory, dialed as that identity, derived afresh whenever the membership store changes and at each run of the store's periodic pass, and replacing the previous list whole — save while the replica folds into no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states. Both stores' sync SHALL start with their contacts as they stand before either starts, since the membership store's first session derives them again, from a fold that may list no device of the inviter yet while the statements' payloads are still on their way. A peer no derivation pairs with a member SHALL be dialed as the member whose ticket the store was imported from, whatever the device shares of the store since.
 
 **Example:** Alice places a claim in "Family" on her phone a1 while Bob's phone b1 is in the record store's swarm and Carol's phone c1 is offline; then a1 goes offline and c1 comes back.
 
@@ -221,6 +221,16 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 - **WHEN** a newcomer joins, is handed both stores' write tickets, and its device writes a claim
 - **THEN** every member's devices read the claim
+
+#### Scenario: A newcomer that shared its tickets pulls from its inviter
+
+- **WHEN** a newcomer shares its own tickets to both stores while the contacts its membership derives list no device of the inviter, and the inviter writes an entry
+- **THEN** the pull the inviter's announcement triggers addresses the inviter, and the newcomer receives the entry
+
+#### Scenario: A newcomer's record store reaches the inviter whatever the first membership session derives
+
+- **WHEN** a newcomer imports both stores, and the membership store's first session derives contacts listing no device of the inviter before the record store's sync starts
+- **THEN** the record store's sync starts with the inviter's device among its contacts, and the newcomer reads the inviter's claim
 
 #### Scenario: A member's write ticket widens nothing
 
