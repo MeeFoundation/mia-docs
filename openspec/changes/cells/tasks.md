@@ -49,7 +49,7 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 ## 5. pdn-node-http: cells on the debug surface and the stand
 
 - [x] 5.1 Debug routes for every operation of the cells service per D31, one call each: a cell the identity is no member of 409, a refusal by role 403, an absent record 404; no route writing a raw entry, handing over a store ticket or forcing reconciliation
-- [ ] 5.2 The stand's cell scenario per the container-stand delta: invitations by the creator and by an invited member with the consumed secret refused; a record and an edit reaching every member; a plain member's owner-only acts refused beside an owner's promotion; a kicked member no longer receiving once the remaining members read a later record; a restart that brings the cell back, and one that keeps a left cell left
+- [x] 5.2 The stand's cell scenario per the container-stand delta: invitations by the creator and by an invited member with the consumed secret refused; a record and an edit reaching every member; a plain member's owner-only acts refused beside an owner's promotion; a kicked member no longer receiving once the remaining members read a later record; a restart that brings the cell back, and one that keeps a left cell left
 
 ## 6. Docs and archive
 
