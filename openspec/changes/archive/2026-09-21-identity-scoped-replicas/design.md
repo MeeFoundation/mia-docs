@@ -27,7 +27,7 @@ The count this is sized for is 1 to 10 identities on a node, all of one person. 
 
 - Hiding that two identities share a node. One endpoint publishes one node id into every device set, and a counterparty of both reads the same node id in both places.
 - Scoping payload bytes. The blob store stays one, and its egress stays as it is.
-- Proving in a session that the caller acts as an identity. Identities hold no key material, and a device that hosts two of them holds the material of both either way.
+- Proving in a session that the caller acts as an identity. No session carries a proof by an identity's own key, and a device that hosts two identities holds the key material of both either way.
 - Changing what a swarm carries, when a peer reconciles, or how a grant is recorded.
 - Carrying over a directory written under the previous layout.
 - A node shared by different people. One process holds the namespace secrets of every identity it hosts, so a node for several people is a question of process boundaries rather than of how one node divides itself, and the counts a server carries would also multiply the sessions a namespace held by many co-located identities costs.

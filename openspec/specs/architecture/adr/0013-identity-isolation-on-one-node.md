@@ -14,7 +14,7 @@ A node hosts the store sets of several identities of one person — Alice-at-wor
 * An entry has to say which identity wrote it, because a cell binds an author key to a member and a counterparty judges a write by its author.
 * Isolation that rests on a check at every read fails wherever the check is forgotten; isolation that follows from where the bytes live does not.
 * A transport's costs — a socket, a relay connection, address discovery, a probing schedule — are paid per endpoint, and a phone pays them.
-* An identity holds no key material, so a session cannot prove which identity it acts as.
+* A session carries no proof by a key of the identity it names, so it cannot prove which identity it acts as.
 * The node's process holds the material of every identity it hosts, whatever arrangement sits above it.
 
 ## Considered Options

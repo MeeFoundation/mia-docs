@@ -2,7 +2,7 @@
 
 ## Overview
 
-A [User](user.md)'s software application responsible for data sharing between the user and a [Relying Party](relying-party.md), governed by [Capability](capability.md) validation.
+A [User](user.md)'s software application responsible for data sharing: between the user and a [Relying Party](relying-party.md), governed by [Capability](capability.md) validation, and among the members of each [cell](cell.md) the user's identity is a member of.
 
 ## Details
 

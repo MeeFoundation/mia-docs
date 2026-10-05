@@ -53,8 +53,8 @@ Scope: the cell as a platform primitive â€” a keyless id, two stores per cell â€
 
 ## 6. Docs and archive
 
-- [ ] 6.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
-- [ ] 6.2 On archive: place the two new specs and the eight deltas at their destinations; rewrite ADR-0003's Context for a `PdnId` derived from the announcement key (D44); `openspec validate --all --strict`
+- [x] 6.1 Sweep the spec tree for text that describes connections as the only sharing path, and the "later groups" of multi-identity's example, and point them at cells
+- [x] 6.2 On archive: place the two new specs and the eight deltas at their destinations; rewrite ADR-0003's Context for a `PdnId` derived from the announcement key (D44); `openspec validate --all --strict`
 
 ## 7. Stress
 

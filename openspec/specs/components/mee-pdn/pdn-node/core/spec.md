@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The embeddable runtime core: identity, connections, data, and sync services as thin glue over `data-layer`. Each embedded runtime is one running node — a host embeds one, and in-process tests embed several to stand up several nodes; one runtime hosts any number of identities (per data-layer [multi-identity](../../data-layer/multi-identity/spec.md)), each added by an explicit act. The core adds no sync or authorization mechanics of its own: every operation delegates to a `data-layer` primitive; read access is carried by session classification and the egress filter ([subset reconciliation](../../data-layer/subset-reconciliation/spec.md)), and the runtime registers everything it hosts, so its nodes are always armed.
+The embeddable runtime core: identity, connections, data, [cells](../cells/spec.md) and sync services as thin glue over `data-layer`. Each embedded runtime is one running node — a host embeds one, and in-process tests embed several to stand up several nodes; one runtime hosts any number of identities (per data-layer [multi-identity](../../data-layer/multi-identity/spec.md)), each added by an explicit act. The core adds no sync or authorization mechanics of its own: every operation delegates to a `data-layer` primitive; read access is carried by session classification and the egress filter ([subset reconciliation](../../data-layer/subset-reconciliation/spec.md)) — for a cell's stores by classification alone, every member being served them whole ([cell stores](../../data-layer/cell-store/spec.md)) — and the runtime registers everything it hosts, so its nodes are always armed.
 
 ## Requirements
 
@@ -14,7 +14,7 @@ The runtime core SHALL be usable as a library with no host attached: a process e
 - **THEN** every operation completes without any host process or HTTP surface involved
 
 ### Requirement: Identity service creates and links identities
-The identity service SHALL create an identity on its first device — minting a placeholder `PdnId` (a random identifier with no key material behind it) and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](../device-linking/spec.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
+The identity service SHALL create an identity on its first device — minting its announcement key pair ([private metadata store](../../data-layer/private-metadata-store/spec.md)) and deriving its `PdnId` from the pair's public key by the `PdnId` steps of the [cell stores](../../data-layer/cell-store/spec.md) spec, a placeholder for the autonomic identifier of ADR-0003, and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](../device-linking/spec.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
 
 **Example:** Alice-work and Alice-leisure are both hosted on Alice's phone a1, which mints a linking invite for each; her tablet a3 runs a runtime that hosts no identity yet.
 
@@ -31,6 +31,10 @@ The identity service SHALL create an identity on its first device — minting a 
 #### Scenario: Linking one identity imports nothing of another
 - **WHEN** runtime B is linked into identity X while identity Y exists elsewhere
 - **THEN** B hosts X only, and operations addressed to Y on B are refused as unknown
+
+#### Scenario: An identity's `PdnId` derives from its announcement key
+- **WHEN** an identity is created on runtime A and runtime B links into it
+- **THEN** the identity's `PdnId` equals the `PdnId` derived from the announcement public key in its directory, on A and on B alike
 
 ### Requirement: Connections service establishes, lists, and carries grants
 The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](../connection-establishment/spec.md)) — and SHALL list a hosted identity's current connections, delegating to the connections records of that identity's [directory](../../data-layer/private-metadata-store/spec.md). It SHALL carry data grants over the connection's [metadata pair](../../data-layer/connection-metadata-store/spec.md): publishing a grant of the identity's own namespace toward a connected peer — capability-scoped by an exact claim set, naming per claim whether write accompanies read — withdrawing a published grant, reading the grants a connected peer has published, and reading the grants the identity has published toward a connected peer, opening the pair from the directory's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a peer's grant yields the capability and the ticket it carries; the grantee runtime acts on that record by itself, so no import act is required of the caller. Reading the identity's own published grant yields the capability alone: the caller is the issuer of the namespace the record addresses, so a ticket to it answers nothing.
@@ -201,6 +205,7 @@ The sync service SHALL report the runtime's node id (its endpoint id) and the id
 #### Scenario: Hosted identities follow create and link
 - **WHEN** a fresh runtime reports its status, then creates one identity and links another
 - **THEN** the report lists no identities first and afterwards exactly those two, with the node id unchanged throughout
+
 ### Requirement: A granted namespace binds and unbinds for the identity its grant addresses
 
 The runtime SHALL keep the data namespaces behind a connection's live grants imported, without an explicit import act: for every open metadata pair of a hosted identity it SHALL watch the counterparty's replica and, as a grant record becomes readable there, import the namespace the record's ticket names for that identity. A grant whose ticket comes to name a different replica SHALL be re-imported onto it, and the replica it bound before SHALL be forgotten in that import, so a counterparty that keeps moving its grant leaves no replica behind. A grant that disappears from the counterparty's replica SHALL take its binding back out, and the replica it bound SHALL be forgotten with it, so the issuer resolves to nothing for that identity again.

@@ -16,6 +16,7 @@ The invariant governs **acquisition, not retention**, and its enforcement bounds
 
 - **Delivery is capability-filtered at egress.** During reconciliation an honest serving node reveals — fingerprints, offers, sends — only claims the receiving peer can present a read capability for: the read-side counterpart of the ADR-0008 ingest gate. A node can only serve what it holds, and holds only what this rule let it acquire, so no node — honest or not — can deliver claims it never received. An under-authorized node cannot *obtain* the data; a node authorized for a claim can of course still leak that claim.
 - **Revocation is not recall.** A revoked capability blocks further delivery, but deletion of already-delivered data cannot be guaranteed — nothing compels a modified node to forget claims it received while authorized. The invariant promises access is gated *before* delivery, not that delivered data can be retracted.
+- **Inside a [cell](../../architecture/language/cell.md), membership is the read authorization.** A cell has no audience narrower than its members, so a member's devices are served both of its stores whole and no filter runs within them. Acquisition is gated by membership instead: once a member's departure reaches a serving device, that device refuses the departed member's devices the record store from the next session ([cell stores](data-layer/cell-store/spec.md)), and what they obtained while a member stays with them.
 
 ## Invariant 3
 
