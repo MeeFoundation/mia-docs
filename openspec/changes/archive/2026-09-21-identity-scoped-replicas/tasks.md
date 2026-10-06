@@ -69,7 +69,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 
 - [x] 8.1 The crate `CLAUDE.md` files and the module and item docs that describe one author per node, one replica per namespace, or a node-wide classification restated — `data-layer/src/node.rs` on the node's one author, `pdn-node/src/data.rs` on operations addressing issuers rather than identities, and the `data-store` spec's line on author keys being node-local
 - [x] 8.2 `openspec validate --all --strict`, with every `#### Scenario:` heading of the deltas checked by eye
-- [x] 8.3 Sweep `openspec/specs/**` and the other active changes for the wording this change invalidates — one author per node, the union of co-hosted audiences, a replica served on its ticket alone, a link rollback restoring a displaced binding — and for what cells, reconcile-trigger and mobile-host-surface assume about a node hosting several identities
+- [x] 8.3 Sweep `openspec/specs/**` and the other active changes for the wording this change invalidates — one author per node, the union of co-hosted audiences, a replica served on its ticket alone, a link rollback restoring a displaced binding — and for what pods, reconcile-trigger and mobile-host-surface assume about a node hosting several identities
 
 ## 9. Stress pass
 

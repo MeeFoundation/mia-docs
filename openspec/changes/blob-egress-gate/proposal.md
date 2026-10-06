@@ -2,7 +2,7 @@
 
 ## Why
 
-A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever it was granted, a member kicked from a cell fetches every payload whose hash it saw before the kick, and, while its device stays in the cell's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
+A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever it was granted, a member kicked from a pod fetches every payload whose hash it saw before the kick, and, while its device stays in the pod's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
 
 **Example:** requests to Bob's phone b1 today; Bob granted Alice-leisure `contact/email` of his data namespace, the payload of his `notes/diary` entry has the hash `<diary>`, Alice's tablet a3 hosts Alice-leisure and Alice-work, Carol was kicked from "Family", of which Bob is a member, and Dave's phone d1 holds a connection with nobody.
 
@@ -24,9 +24,9 @@ Nothing is decided. The change settles what a request for a hash is checked agai
 
 ### What a request for a hash is checked against
 
-- The entries that reference the hash. A payload is served only to a caller that one of the node's hosted identities would serve, in a session, an entry referencing that hash: a device of that identity itself, a counterparty whose grant's egress filter covers the entry, a member of the cell whose store holds it. Through a hash the caller reaches exactly what it reaches through a session, and nothing more.
+- The entries that reference the hash. A payload is served only to a caller that one of the node's hosted identities would serve, in a session, an entry referencing that hash: a device of that identity itself, a counterparty whose grant's egress filter covers the entry, a member of the pod whose store holds it. Through a hash the caller reaches exactly what it reaches through a session, and nothing more.
 - The replicas that reference the hash. A payload is served to a caller that one of the node's hosted identities would serve a session on a replica holding an entry with that hash, whatever the entry. A grantee under a claim-scoped grant then fetches the payload of any claim of the namespace whose hash it learns.
-- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a counterparty, a cell member — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a grantee, a counterparty of a co-located identity, and a kicked member that is still a counterparty fetch every payload whose hash they hold.
+- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a counterparty, a pod member — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a grantee, a counterparty of a co-located identity, and a kicked member that is still a counterparty fetch every payload whose hash they hold.
 - Accepted, as the node does today, and recorded in the threat model.
 
 Whatever the answer, a kicked member reads no payload placed after its kick: the swarm hands a member's device that stays in it the hash of every new payload, so an answer that serves such a device leaves a kick without effect on payloads. Accepting does so for good, and known callers for as long as the kicked member is a counterparty of a hosted identity.
@@ -37,7 +37,7 @@ Whatever the answer, a kicked member reads no payload placed after its kick: the
 |---|---|---|---|---|
 | a3 asks for the `contact/email` payload | served | served | served | served |
 | a3 asks for `<diary>` | refused: no grant covers `notes/diary` | served: Alice-leisure holds a session on Bob's namespace | served | served |
-| c1 asks for the scan or the photo | refused: Carol is no member | refused: Carol is served no session on the cell's stores | served while Bob holds a connection with Carol, refused otherwise | served |
+| c1 asks for the scan or the photo | refused: Carol is no member | refused: Carol is served no session on the pod's stores | served while Bob holds a connection with Carol, refused otherwise | served |
 | d1 asks for the tax form | refused | refused | refused | served |
 
 ### How the node finds the entries that reference a hash

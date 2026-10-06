@@ -42,7 +42,7 @@ Both layouts put every issuer's claims in the node's single physical store — i
 
 ## More Information
 
-A [cell](../language/cell.md) is two stores, its membership store and its record store, each a replica held whole by every member's devices — namespaces that are not per issuer. The rejected alternative above does not argue against them: that argument is about one namespace holding every issuer's claims and serving each peer a filtered view of it, whereas a cell has bounded membership, runs no egress filter, and its members' devices form the swarm of each of its stores. An identity's own data keeps the per-issuer namespace either way.
+A [pod](../language/pod.md) is two stores, its membership store and its record store, each a replica held whole by every member's devices — namespaces that are not per issuer. The rejected alternative above does not argue against them: that argument is about one namespace holding every issuer's claims and serving each peer a filtered view of it, whereas a pod has bounded membership, runs no egress filter, and its members' devices form the swarm of each of its stores. An identity's own data keeps the per-issuer namespace either way.
 
 The realization is specified in `../../components/mee-pdn/pdn-node/namespace-addressing/spec.md` (the namespace-free addressing surface). The interim namespace-key/mapping path, confidentiality, device bootstrap, and pre-UWill relaxations live in the design of the archived `per-issuer-namespace` change, not in this ADR.
 

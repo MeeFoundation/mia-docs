@@ -15,7 +15,7 @@ An identity is named by a `PdnId`: 32 bytes, unique by construction, stable whil
 
 ## Decision Outcome
 
-Chosen option: **one identifier per identity**, because the pairwise alternative is substantial work this project has not taken up. Every place that names an identity — grants, the per-issuer namespace ([ADR-0009](0009-per-issuer-namespace.md)), both ceremonies, and the cell membership being designed — would need a per-counterparty identifier and a mapping between them, and the identity system would have to mint those identifiers and prove control of each. Nothing in the current design argues against pairwise identity; this record states what is built.
+Chosen option: **one identifier per identity**, because the pairwise alternative is substantial work this project has not taken up. Every place that names an identity — grants, the per-issuer namespace ([ADR-0009](0009-per-issuer-namespace.md)), both ceremonies, and the pod membership being designed — would need a per-counterparty identifier and a mapping between them, and the identity system would have to mint those identifiers and prove control of each. Nothing in the current design argues against pairwise identity; this record states what is built.
 
 ### Consequences
 

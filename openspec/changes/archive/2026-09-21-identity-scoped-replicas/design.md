@@ -36,7 +36,7 @@ The count this is sized for is 1 to 10 identities on a node, all of one person. 
 
 ### D1. A hosted identity owns an engine, a replica store and an author
 
-A hosted identity holds its own half of the node: its own docs engine with its own replica store, its own persisted author, its own registry of bound namespaces and its own access book. The node keeps one endpoint, one gossip instance and one blob store under all of them. Two identities granted by one issuer therefore hold two replicas of that issuer's namespace, each reconciled on its own and each serving what its own grant covers, and a cell that two identities of one person are members of is held twice on that node. Each hosted identity's store work runs on that identity's own actor thread and against its own database, so identities busy at the same time occupy several cores, and the two halves of a session between two co-located identities run on two threads.
+A hosted identity holds its own half of the node: its own docs engine with its own replica store, its own persisted author, its own registry of bound namespaces and its own access book. The node keeps one endpoint, one gossip instance and one blob store under all of them. Two identities granted by one issuer therefore hold two replicas of that issuer's namespace, each reconciled on its own and each serving what its own grant covers, and a pod that two identities of one person are members of is held twice on that node. Each hosted identity's store work runs on that identity's own actor thread and against its own database, so identities busy at the same time occupy several cores, and the two halves of a session between two co-located identities run on two threads.
 
 **Rejected alternatives:**
 
@@ -45,7 +45,7 @@ A hosted identity holds its own half of the node: its own docs engine with its o
   - **Cons:** one actor thread and one writer for every identity the node hosts, so signature checks, range fingerprints and commits queue behind one another however many cores the device has — the two halves of a session between two co-located identities included; the identity reaches the tables, the open-replica map, the live state and the range reconciler, which is where the fork tracks upstream — the one place this change keeps it out of; forgetting an identity becomes a range delete inside a live file whose pages a compaction returns, rather than the removal of a subtree.
 - One replica per namespace with the acting identity filtering every local read.
   - **Pros:** no protocol change, no second engine, no in-process path.
-  - **Cons:** the bytes of two identities stay together, so isolation holds only where a filter was remembered; a grant withdrawn toward one audience leaves its entries readable through the other; a removed member of a cell keeps receiving what the co-located member receives.
+  - **Cons:** the bytes of two identities stay together, so isolation holds only where a filter was remembered; a grant withdrawn toward one audience leaves its entries readable through the other; a removed member of a pod keeps receiving what the co-located member receives.
 - An endpoint per identity.
   - **Pros:** the node id, the swarm membership and the transport separate too, which is what unlinkability needs.
   - **Cons:** a socket, a relay connection, address discovery and a probing schedule per identity, on a phone as well; identity creation waits for an endpoint to bind; a device in a device set becomes one identity's endpoint, so one physical device leaving means as many withdrawals as it hosts identities.
@@ -63,7 +63,7 @@ A peer the engine recorded as useful carries a node id and nothing else, so a re
 **Rejected alternatives:**
 
 - Name only the caller's identity and let the serving side pick a replica.
-  - **Cons:** a node can hold the same namespace in several hosted identities with equal claim to it — an issuer and an audience it granted, or two members of one cell — so the pick is ambiguous exactly where hosted identities must not be confused.
+  - **Cons:** a node can hold the same namespace in several hosted identities with equal claim to it — an issuer and an audience it granted, or two members of one pod — so the pick is ambiguous exactly where hosted identities must not be confused.
 
 ### D4. A caller acts as an identity whose device set lists its node id
 
@@ -123,7 +123,7 @@ The engine hands that notification to its node, and a dial of D7 that resolves t
 
 ### D10. Each hosted identity writes with its own author
 
-Every hosted identity holds one author, persisted with its replicas and stable across restarts, and every write it performs is signed by that author. A write into a replica the identity holds under a grant therefore carries the author of the identity that was granted, and what a cell or a counterparty binds to a member is the author of that member on that device. The runtime's provisional-write tracker judges an entry by the author of the identity whose replica holds it, and a retraction verdict is recorded in that identity's directory, which the verdict's author names.
+Every hosted identity holds one author, persisted with its replicas and stable across restarts, and every write it performs is signed by that author. A write into a replica the identity holds under a grant therefore carries the author of the identity that was granted, and what a pod or a counterparty binds to a member is the author of that member on that device. The runtime's provisional-write tracker judges an entry by the author of the identity whose replica holds it, and a retraction verdict is recorded in that identity's directory, which the verdict's author names.
 
 ### D11. An import names the identity the replica is held for
 
@@ -145,7 +145,7 @@ The subdirectories with a record are also what a store's share of the cache budg
   - **Pros:** one file answers who is hosted without listing the subdirectories.
   - **Cons:** every change rewrote it from the hosted set in memory, so a record a start had skipped vanished at the next create or link, and with it the only pointer to the identity it named; its skip provisioned the identity first and left an empty store behind, which the subdirectory count took as an identity and so shrank every share of the budget; and one unreadable file stopped every identity's start at once.
 - The directory found by reading the identity's replicas.
-  - **Cons:** the store holds the directory beside the data replica, the connection metadata stores, the replicas received under grants and a cell's stores, and telling them apart by content breaks the first time a kind of replica is added.
+  - **Cons:** the store holds the directory beside the data replica, the connection metadata stores, the replicas received under grants and a pod's stores, and telling them apart by content breaks the first time a kind of replica is added.
 
 ### D13. Every create and every import names its identity
 
@@ -205,7 +205,7 @@ What a modified node can obtain is bounded by the identities it is genuinely a d
 | names one of the identities it is a device of | served that identity's rights alone, never a union (D5) |
 | opens a session per identity it hosts | obtains what each identity was granted, which its own stores already hold |
 | authors an entry as another member | the entry's signature fails; author keys are held by that member's devices |
-| places its own entry under another member's name in a cell | dropped by the gate, which resolves the author to a member through that member's statements |
+| places its own entry under another member's name in a pod | dropped by the gate, which resolves the author to a member through that member's statements |
 | writes outside the write set of its grant | refused at the issuer's gate and retracted at the writer |
 | imports a grant's ticket into another identity it hosts | its own state, not refused; that identity obtains nothing, since the issuer answers only the audience it granted (D11) |
 | asks for payload bytes by hash | served, as it is today |
@@ -253,7 +253,7 @@ What the decisions above leave to measurement, taken against a store of 100,000 
 - [A namespace held by two identities of one node is stored and synced twice] → accepted as the price of separation; the in-process path keeps the second copy cheap in bandwidth, not in disk, and the second pair costs a fingerprint walk on every pass whether anything changed or not (D1, D7, Measurement).
 - [A thread and a replica store per hosted identity] → the cost is linear in identities, paid at each one's creation, and affordable at the count this is sized for; what one thread buys and what one store's cache uses are measured above.
 - [Replica store caches multiply] → the cache cap is per database and one database per node made it invisible; with a store per identity the size becomes configuration with one stated default, and the value a phone passes is that application's own decision (D14).
-- [The protocol's first message changes shape] → nothing deployed speaks it, and the changes that build on it — the trigger transport of reconcile-trigger, the mobile facade, cells — are named in the proposal's Impact.
+- [The protocol's first message changes shape] → nothing deployed speaks it, and the changes that build on it — the trigger transport of reconcile-trigger, the mobile facade, pods — are named in the proposal's Impact.
 - [Four scenarios that rest on one replica shared by two audiences are rewritten or removed] → they defend a property the change removes on purpose; three are restated as the separated expectation and keep their paired denial, and the one that pins the count of bound grants goes with the count (D16).
 
 ## Migration Plan

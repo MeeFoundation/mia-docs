@@ -31,18 +31,18 @@ Until the clock passes the timestamp of its own tombstone, the device is not in 
 
 A write replacing the device's own entry at the key is exposed the same way, whether that entry holds a record or is a tombstone. A grant published again with `publish_grant` on the device that withdrew it, on a clock behind the withdrawal, is refused with `NewerEntryExists` until the clock passes the device's own tombstone. Published from a sibling, whose author has no entry at the key, the same grant is written and then loses to the tombstone on every replica, as any older entry does; that order is set by the clocks of two devices, not by a step back on one.
 
-A rejoin writes over the device's own entries as well. `join` in `crates/pdn-node/src/cells.rs` writes the cell's tickets into the directory, at `tickets/cell/<cell>/membership` and `tickets/cell/<cell>/records`, before its record at `cells/<cell>/<seq>`, and a device that joined a cell, left it and joins it again writes those ticket keys a second time under the same author. After a step back the first of those writes is refused once the inviter has already written the joined event: the identity is a member by every replica that folds that event, its directory still ends the cell at the tombstone of its leave, and the connection armer's next sweep forgets the record store the join has just imported.
+A rejoin writes over the device's own entries as well. `join` in `crates/pdn-node/src/pods.rs` writes the pod's tickets into the directory, at `tickets/pod/<pod>/membership` and `tickets/pod/<pod>/records`, before its record at `pods/<pod>/<seq>`, and a device that joined a pod, left it and joins it again writes those ticket keys a second time under the same author. After a step back the first of those writes is refused once the inviter has already written the joined event: the identity is a member by every replica that folds that event, its directory still ends the pod at the tombstone of its leave, and the connection armer's next sweep forgets the record store the join has just imported.
 
-**Example:** Bob's device b1 joins Alice's cell, leaves it, and joins it again after its clock stepped back thirty minutes.
+**Example:** Bob's device b1 joins Alice's pod, leaves it, and joins it again after its clock stepped back thirty minutes.
 
 ```
-10:00:00  join    tickets/cell/<cell>/membership, timestamp 10:00:00; cells/<cell>/1         Ok
-10:20:00  leave   tombstone at cells/<cell>/2                                                Ok
+10:00:00  join    tickets/pod/<pod>/membership, timestamp 10:00:00; pods/<pod>/1             Ok
+10:20:00  leave   tombstone at pods/<pod>/2                                                  Ok
           the clock steps back thirty minutes; Alice invites Bob again
 09:52:00  join    Alice's device writes Bob's joined event at 3
-                  tickets/cell/<cell>/membership, timestamp 09:52:00
+                  tickets/pod/<pod>/membership, timestamp 09:52:00
                   compared with 10:00:00 → not greater → refused                             Err(NewerEntryExists)
-09:52:30  sweep   the directory ends the cell at the tombstone at 2 → the record store is forgotten
+09:52:30  sweep   the directory ends the pod at the tombstone at 2 → the record store is forgotten
 ```
 
 The invite's secret is burned, so a repeat needs a new invite; Alice's device writes no second joined event for a member, and b1's ticket write is refused again until its clock passes 10:00:00.
