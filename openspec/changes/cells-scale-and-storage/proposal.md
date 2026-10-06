@@ -23,6 +23,23 @@ Nothing is decided. The change settles the questions below from the load tests' 
 
 With two stores per cell the tree serves each store over its own order. By the measurement above the tree pays off on the standing cost of passes over quiet stores — two per cell for every member identity a device hosts — and not on catch-up; a record store with 100 writers is never quiescent, so every catch-up session scans it per round. The load tests show at how many cells and entries per device the passes over quiet stores become the cost that matters.
 
+### When the membership fold is remembered
+
+A device folds a cell's whole membership store again on every classification of a session on either of the cell's stores, in both roles, on every derivation of the cell's contacts and on every read, and nothing remembers the result (`fold_cell_entries` in `crates/data-layer/src/access.rs`, `Membership::fold` in `crates/data-layer/src/cell/fold.rs`). A pull of one new record-store entry folds three times on each side — the classification of the membership store's session that `order_after` puts first, the derivation its end prompts, and the classification of the record store's session — and `append_op` and `act` fold twice each under the runtime's state lock.
+
+- A memo per cell, kept while the membership replica's entries and the payloads it holds stay as they are: a pull or a read on a quiet membership store folds nothing, at the cost of state that has to follow the replica. A memo keyed on the replica's write count alone goes stale when a payload arrives, since an arriving payload changes an entry's verdict.
+- One fold shared by the two sessions of a pull and the derivation after them: a pull folds once on each side, a read still folds every time, and the engine carries the fold from one session to the next.
+- Signature verdicts cached by key, author and content hash: the cost of the signature checks goes, and every fold still reads every entry and payload.
+
+**Example:** a cell of 100 members on 2 devices each, 300 entries in its membership store, each fold about 15 ms on a desktop in a release build; Alice's laptop a2 pulls one new operation from one neighbor and serves it to another.
+
+| option | folds on a2 for that operation | time on a2 |
+|---|---|---|
+| as today | 6 | about 90 ms |
+| a memo per cell | 0 | reading the memo |
+| one fold per pull | 2 | about 30 ms |
+| cached signature verdicts | 6, none checking a signature | 6 reads of 300 entries and their payloads |
+
 ### Reachability beyond relays
 
 Two devices on different networks without a relay and without DNS do not reliably reach each other, so a cell across networks rests on iroh relays, which the stack binds and the product is expected to run itself. Beyond them, always-on member devices can serve as the cell's hubs, and whether the platform prefers them as contacts is open.
@@ -62,5 +79,5 @@ None is settled. The fingerprint tree touches `components/mee-pdn/pdn-store/crat
 ## Impact
 
 - **`crates/pdn-store`**: the cached fingerprint tree; the download policy it already offers.
-- **`crates/data-layer`**: the download policy of a cell's record store, quotas.
+- **`crates/data-layer`**: the download policy of a cell's record store, quotas, a memo of the membership fold.
 - **`crates/pdn-node`**: what the cells service reads when a payload is not local.
