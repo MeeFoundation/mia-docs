@@ -35,6 +35,7 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
 /var/lib/pdn/                    mode 0700 when the node creates it
   node.key                       mode 0600: the endpoint's secret key in hex, written as node.key.tmp, then hard-linked into place
   lock                           held by the running node
+  peers                          the address book: the last addresses of the node's peers, JSON
   blobs/                         the payloads, one store for the node
   identities/<Alice-work>/
     docs.redb                    her replica store
@@ -80,6 +81,31 @@ A node spawned on a directory holding a key SHALL bind its endpoint with that ke
 #### Scenario: A fresh directory is a different node
 - **WHEN** a node is spawned on an empty directory
 - **THEN** it reports a node id of its own, holding none of another directory's state
+
+### Requirement: The node keeps its peers' last addresses across starts
+A node spawned on a directory SHALL keep there, in a file of its own, the last addresses its endpoint knew for every peer a hosted replica has synced with or names as a contact, and SHALL hand them to its endpoint before any store starts its sync at the next start. Without them a node with no address lookup comes back knowing only the addresses its tickets carry, and a device that minted every ticket it holds — a pod's creator, the device that invited a sibling to link — dials nobody: it waits until a peer dials it, which a peer does at its next pass, and only if the address the peer holds is still the device's. The book SHALL lag what the endpoint knows by at most 10 seconds while the node runs, SHALL be written once more at shutdown, and SHALL hold no peer that no hosted replica syncs with or names. It is a hint and not the node's identity: an address in it may be stale, and dialing it fails as any unreachable address does; a book that cannot be read SHALL start the node with an empty one, logged, and the next write SHALL replace it. A node on memory keeps no book.
+
+**Example:** Alice's phone a1 created "Family" and Bob's phone b1 joined it; then a1 restarts on `/var/lib/pdn` while b1 places a claim. `<b1>` is b1's node id.
+
+```
+before the shutdown    peers  [{"id":"<b1>","addrs":[{"Ip":"172.18.0.7:41641"}]}]
+                              b1 is a contact of both of the pod's stores on a1, and a session with it went through
+a1 starts again        the endpoint resolves <b1> to 172.18.0.7:41641 from the book
+                       the pod's sync dials b1 as Bob and reads the claim; the pod stores' pass, 5 minutes away, is not what delivers it
+without the book       a1's tickets name a1 alone, its contacts name <b1> without an address: no dial goes out
+```
+
+#### Scenario: A restarted creator reaches its member
+- **WHEN** a pod's creator's node on a directory is shut down, a member places a record, and the node is spawned again on the same directory with no address lookup
+- **THEN** the creator reads the record well before the pod stores' next pass
+
+#### Scenario: An unreadable book does not stop the start
+- **WHEN** a node is spawned on a directory whose address book cannot be parsed
+- **THEN** the node starts with an empty book, and the next write replaces the file with one that reads back
+
+#### Scenario: A peer no replica names leaves the book
+- **WHEN** the book is refreshed while it holds a peer that no hosted replica syncs with or names as a contact
+- **THEN** that peer is gone from the book, and every peer still named keeps its last known address, the endpoint's own when it knows one
 
 ### Requirement: One running node per directory
 A directory SHALL be used by one running node at a time. A node spawned on a directory another running node holds SHALL fail to start, naming the directory and the reason, rather than reporting a corrupt store or starting alongside.

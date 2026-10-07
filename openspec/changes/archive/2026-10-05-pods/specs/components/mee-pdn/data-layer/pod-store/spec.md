@@ -172,7 +172,7 @@ nonce                 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a
 pod_id                ad58a3faa04cdc5576c8dc5823a347c6
                       the first 16 bytes of BLAKE3 derive_key("pdn/pod-id/v1", pdn_id ‖ announcement_pubkey ‖ nonce)
 signature             6ad63c810f41d368…807d085d09, 64 bytes of Ed25519
-                      over "pdn/pod-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce, 100 bytes
+                      over "pdn/pod-founding/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce, 99 bytes
 a founding event in Alice's chain under another announcement key, d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48,
 with the same nonce, derives 0b1c51caa1cc711a3079f791899c43a7, its key deriving another pdn_id than Alice's, and every device holding ad58a3faa04cdc5576c8dc5823a347c6 counts it for nothing
 both stores' namespace ids are 32-byte public keys of their own, and neither is the pod id

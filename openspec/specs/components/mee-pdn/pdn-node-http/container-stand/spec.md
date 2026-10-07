@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The out-of-process stand the demo runs on: every node is the [HTTP host](../host/spec.md) binary in its own container, driven from the test host over HTTP alone while the nodes reach each other over the [runtime core](../../pdn-node/core/spec.md)'s own protocols. It exists to prove what an in-process suite cannot — that a node packaged as a binary comes up, that the address it publishes in a ceremony payload is one a peer on another container dials, and that a device which goes away takes its process with it.
+The out-of-process stand the demos run on: every node is the [HTTP host](../host/spec.md) binary in its own container, driven from the test host over HTTP alone while the nodes reach each other over the [runtime core](../../pdn-node/core/spec.md)'s own protocols. It exists to prove what an in-process suite cannot — that a node packaged as a binary comes up, that the address it publishes in a ceremony payload is one a peer on another container dials, and that a device which goes away takes its process with it.
 
 ## Requirements
 
@@ -231,35 +231,44 @@ The image SHALL be built from the workspace alone — its manifests, its lock fi
 - **WHEN** a `.cargo/config.toml` exists beside the workspace and the build context is listed
 - **THEN** the listing carries no `.cargo` entry
 
-### Requirement: The live demo runs on the stand's image
-The demo SHALL run the same image the suite runs, with every node on one container network and each node's HTTP port published on loopback of the demo host. Each node SHALL have a volume of its own for its state. The demo SHALL remove its nodes, its network and those volumes on every exit, the failing one included, and it SHALL drive the nodes over HTTP alone, so what passes between nodes is the runtimes' own traffic.
+### Requirement: The live demos run on the stand's image
+Each demo — the connections demo and the pods demo — SHALL run the same image the suite runs, with every node on one container network and each node's HTTP port published on loopback of the demo host. Each node SHALL have a volume of its own for its state. A demo SHALL remove its nodes, its network and those volumes on every exit, the failing one included, and it SHALL drive the nodes over HTTP alone, so what passes between nodes is the runtimes' own traffic.
 
-**Example:** `just demo`: `ops/compose.yml`, project `pdn-demo`, 7 nodes on network `demo`, each with `PDN_DEBUG=1`.
+**Example:** `just demo-connections` and `just demo-pods`, each with a compose file and a project of its own, every node on network `demo` with `PDN_DEBUG=1`.
 
 ```
-alice-phone      127.0.0.1:3011 → 3011    volume alice-phone-state over /var/lib/pdn
-…
-bob-laptop       127.0.0.1:3015 → 3011    volume bob-laptop-state; stopped and started mid-show, same node id
-…
-carol-laptop     127.0.0.1:3017 → 3011    volume carol-laptop-state
-on every exit    docker compose -f ops/compose.yml down --remove-orphans --volumes
+just demo-connections    ops/compose-connections.yml, project pdn-demo-connections, 7 nodes
+  alice-phone      127.0.0.1:3011 → 3011    volume alice-phone-state over /var/lib/pdn
+  …
+  bob-laptop       127.0.0.1:3015 → 3011    volume bob-laptop-state; stopped and started mid-show, same node id
+  …
+  carol-laptop     127.0.0.1:3017 → 3011    volume carol-laptop-state
+just demo-pods           ops/compose-pods.yml, project pdn-demo-pods, 6 nodes
+  alice-phone      127.0.0.1:3021 → 3011    volume alice-phone-state; stopped and started mid-show with alice-laptop, same node id
+  …
+  dave-phone       127.0.0.1:3026 → 3011    volume dave-phone-state
+on every exit            docker compose -f ops/compose-<demo>.yml down --remove-orphans --volumes
 ```
 
-#### Scenario: The demo brings up the nodes it names
-- **WHEN** the demo recipe runs
+#### Scenario: A demo brings up the nodes it names
+- **WHEN** a demo recipe runs
 - **THEN** it builds the image, brings up every node its compose file names, and waits for each of them to answer liveness before the first step
 
 #### Scenario: A run never meets the previous run's state
-- **WHEN** the demo exits, whether it finishes or fails
+- **WHEN** a demo exits, whether it finishes or fails
 - **THEN** its containers, its network and its volumes are removed
 
-#### Scenario: The demo publishes on loopback
-- **WHEN** a node of the demo publishes its HTTP port
+#### Scenario: A demo publishes on loopback
+- **WHEN** a node of a demo publishes its HTTP port
 - **THEN** the port is bound to loopback, because the debug surface is unauthenticated and mints live ceremony secrets
 
-#### Scenario: The show survives a node restarting
-- **WHEN** the demo stops one node mid-show and starts it again
+#### Scenario: The connections show survives a node restarting
+- **WHEN** the connections demo stops one node mid-show and starts it again
 - **THEN** that node comes back as the same node, its connection still stands, and nothing is established a second time
+
+#### Scenario: The pods show carries on without its creator's devices
+- **WHEN** the pods demo stops every device of the pod's creator mid-show and starts them again later
+- **THEN** while they are down a newcomer joins on another member's invite and reads what was placed before, and an edit reaches every online member device; started again, they come back as the same nodes and read what happened without them; and an owner's kick stops what reaches the kicked member
 
 ### Requirement: The stand restarts a node and asserts what came back
 The stand SHALL stop a node's container and start it again with its state directory intact, and SHALL assert that the node came back as itself: the same node id, the identity still hosted, the connection still listed, and an entry written before the stop still readable; a write made on it after the restart reaching its peer with no ceremony repeated; and the grant still readable on the peer's node. The stand SHALL also kill a node's container — no grace, no shutdown path — and start it again, asserting the same recovery, because a process that ends without warning is the ordinary end of a process, and recovery that differs by the manner of stopping depends on a goodbye a kill does not provide. One kill SHALL land in the middle of a stream of writes: every write acknowledged before the stores' settle window — the bounded delay after which an acknowledged write has committed, since the replica store and the blob store each commit after the acknowledgement, on a timer — SHALL be readable after the restart, and a write the kill cut inside that window, acknowledged or not, SHALL be absent or whole — never a torn value and never a read error. The assertion SHALL be paired, in the same scenario, with the tightest denial: a node started from the same image on an empty state directory holds none of it. Without that arm the scenario passes just as well against a node that quietly re-created everything.

@@ -40,7 +40,7 @@ None. The HTTP host already serves liveness unconditionally, gates its debug sub
 - **`justfile`**: `build-image`, `run-image`, `check-context`, `test-docker`, `stand-profile`, `demo`.
 - **`.config/nextest.toml`** (new): the test groups that bound the stand's parallelism, one rung per daemon size, with the suite's binaries filtered into them.
 - **`.github/workflows/ci.yml`**: a `stand` job beside the existing one — the image built through the builder's layer cache, then the suite run through the profile the daemon's own CPU count selects.
-- **`ops/compose.yml`** and **`ops/demo.sh`** (new): the demo's seven nodes on one network with loopback-published ports, and the narration that drives them over HTTP.
+- **`ops/compose-connections.yml`** and **`ops/demo-connections.sh`** (new): the demo's seven nodes on one network with loopback-published ports, and the narration that drives them over HTTP.
 - **`crates/pdn-node-http`**: the stand's test binaries (the scenarios, the refusal table, the surface's own bounds) and their harness module, plus dev-dependencies on a testcontainers client and an HTTP client. The existing `tests/common/mod.rs` becomes that harness, and the in-process scenario binaries go together with the router implementation behind them; the one property that cannot be reached from outside a node's process keeps a test of its own in this process.
 - **Nothing in `crates/pdn-node`, `crates/data-layer`, `crates/pdn-layer` or the `pdn-store` fork.** If a scenario cannot be expressed without changing one of them, that is a finding of this change, not a task in it.
 

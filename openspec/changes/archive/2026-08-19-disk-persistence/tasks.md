@@ -55,7 +55,7 @@
 
 ## 7. The demo
 
-- [x] 7.1 Give each node in `compose.yml` a volume of its own, mounted over the image's state directory; the image's `PDN_DATA_DIR` needs no per-node override.
+- [x] 7.1 Give each node in `compose-connections.yml` a volume of its own, mounted over the image's state directory; the image's `PDN_DATA_DIR` needs no per-node override.
 - [x] 7.2 Remove the volumes with the containers on every exit of the `demo` recipe, the failing one included, and check it by running a demo that fails part-way.
 - [x] 7.3 Add the restart step to the narration: one node stopped and started again mid-show, its connection still standing, nothing established a second time.
 
