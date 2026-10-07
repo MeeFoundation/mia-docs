@@ -2,7 +2,7 @@
 
 ## Purpose
 
-One node hosts several identities — for example Alice-at-work and Alice-at-leisure, later groups and organizations — each with its own store set (the private-metadata directory and the data store), added to a device explicitly and addressed independently. Read admission to a data store is classified per session — an identity's own devices see it whole, granted counterparties see what their grants cover, other callers are refused ([subset reconciliation](../subset-reconciliation/spec.md), Invariant 2); identity-bound authorization lands with UWill.
+One node hosts several identities — for example Alice-at-work and Alice-at-leisure — each with its own store set (the private-metadata directory and the data store), added to a device explicitly and addressed independently. A group of people is no identity a node hosts: its members share a [pod](../../../../architecture/language/pod.md), whose stores each member identity holds as replicas of its own. Read admission to a data store is classified per session — an identity's own devices see it whole, granted counterparties see what their grants cover, other callers are refused ([subset reconciliation](../subset-reconciliation/spec.md), Invariant 2); identity-bound authorization lands with UWill.
 
 ## Requirements
 

@@ -94,7 +94,7 @@ The linking scenario tests drive the ceremony end to end: create on one runtime,
 
 The dialogue carries no proof of control over the identity, on the same terms as pairing's: such a proof arrives with a root identifier that can carry one ([ADR-0003](0003-mee-identity-represents-keri-autonomic-namespace.md)), and the dialogue is the exchange that would carry it.
 
-The cells change leans on this shape twice. Joining a cell is this ceremony applied to a cell — a one-time secret on a dedicated ALPN, verified and burned before any state changes — so the shape outlives whatever becomes of connections. And the reply grows: alongside the store tickets, a linked device receives the identity's device-announcement secret, which is what lets it publish the identity's device list into every cell the identity belongs to.
+The pods change leans on this shape twice. Joining a pod is this ceremony applied to a pod — a one-time secret on a dedicated ALPN, verified and burned before any state changes — so the shape outlives whatever becomes of connections. And the reply grows: alongside the store tickets, a linked device receives the identity's device-announcement secret, which is what lets it publish the identity's device list into every pod the identity belongs to.
 
 Open questions, none blocking this decision: human-readable device labels in the registration (cheap to add behind the payload's format version); the QR encoding of the linking payload (a host concern); device removal and revocation (the device set only grows for now); whether linking should later present a per-relationship identifier instead of the long-lived `PdnId` — the same hoped-for KERI path as pairing's.
 

@@ -22,7 +22,7 @@ Three facts about the code shape the design more than anything else. The private
 - Encryption at rest, quotas, garbage collection of blobs, and any bound on how large the directory grows.
 - Hardening against other accounts on a shared machine. Trusted-parent validation, symlink refusal, and re-checking the directory's identity after opening answer a multi-user host, and no deployment here has one: the embedded runtime lives inside an app sandbox and the stand inside a container, where the boundary is the platform's rather than the file permissions'. A server host with untrusted neighbours is its own change.
 - Format versioning and migration. Nothing deployed holds data.
-- Identity key material. The `PdnId` stays a random placeholder; the key that becomes durable is the node's wire key.
+- Identity key material. The key this change adds to the storage directory is the node's wire key; an identity's own key pair lives in its directory replica.
 - Changing what the runtime services offer. Recovery uses the existing paths; it does not add an operation to any service.
 
 ## Decisions

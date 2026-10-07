@@ -60,7 +60,16 @@ Filtering SHALL run at reconciliation time inside `pdn-store`, per peer, distinc
 
 ### Requirement: Same-identity reconciliation is unfiltered
 
-Reconciliation between devices of the identity a replica belongs to SHALL deliver every claim of that replica — all are read-authorized by Invariant 1 — so the filter does not restrict an identity's own devices. On a multi-identity node this SHALL be judged per replica: a node is an own device for the replicas of the identities it is linked into, and a scoped peer elsewhere.
+Reconciliation between devices of the identity a replica belongs to SHALL deliver every claim of that replica — all are read-authorized by Invariant 1 — so the filter does not restrict an identity's own devices. A [pod](../../../../architecture/language/pod.md)'s two stores extend the same rule to every member: reconciliation between devices of the pod's members SHALL deliver every entry of either store, since a pod has no narrower audience than its members. On a multi-identity node this SHALL be judged per replica: a node is an own device for the replicas of the identities it is linked into, a member device for a pod's stores when the identity it names in the session is one of those identities and a member of the pod, and a scoped peer elsewhere.
+
+**Example:** callers reconcile with Bob's phone b1: his laptop b2, and Alice's tablet a3, linked into Alice-leisure and Alice-work; Alice-leisure is a member of "Family" and holds a grant from Bob on `contact/email`, and Alice-work is no member.
+
+| caller | names | replica on b1 | b1 delivers |
+|---|---|---|---|
+| b2 | Bob | Bob's data namespace | every claim, unfiltered |
+| a3 | Alice-leisure | Bob's data namespace | `contact/email` alone, filtered |
+| a3 | Alice-leisure | the record store of "Family" | every entry, unfiltered |
+| a3 | Alice-work | the record store of "Family" | nothing: the session is refused |
 
 #### Scenario: Own devices replicate in full
 
@@ -71,6 +80,11 @@ Reconciliation between devices of the identity a replica belongs to SHALL delive
 
 - **WHEN** a node linked into identity A but not identity B reconciles a replica of B under a capability covering one claim
 - **THEN** the filter applies — only that claim is delivered — even though the node is fully authorized for A's replicas
+
+#### Scenario: Member devices of a pod replicate in full
+
+- **WHEN** a device of member A and a device of member B reconcile either store of a pod both are members of
+- **THEN** every entry replicates, with no capability presented
 
 ### Requirement: Delivery is gated before transfer
 
@@ -220,11 +234,21 @@ received:    an Op::Put carrying an entry is dropped, never inserted
 
 ### Requirement: Grantees stay outside the gossip swarm
 
-A peer whose access arrived through a grant SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the issuer's own devices; a grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
+A peer whose access arrived through a grant SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the replica's device set: the issuer's own devices for a data store or a directory, the counterparty's devices too for a connection metadata store, and the devices of every member for each of a pod's stores — a pod has no grantees, its members are its whole audience, so member devices join the swarm as an identity's own devices do. A grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
 
-Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
+Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store, a pod's membership store or record store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
 A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a grant or imported it out of band. Minting restarts the replica's sync as a store of the minting identity's own: the replica rejoins the swarm, and every peer the engine recorded is dialed naming that identity instead of the issuer, which the issuer's devices refuse as not hosted.
+
+**Example:** the swarms around Alice, whose devices are a1 and a2; Bob, on b1 and b2, holds a connection to her and a grant on her data, and Alice, Bob and Carol, on c1, are the members of "Family".
+
+| replica | its swarm |
+|---|---|
+| Alice's data namespace | a1, a2; Bob, a grantee, reconciles and is never in it |
+| Alice's directory | a1, a2 |
+| the connection metadata store Alice writes toward Bob | a1, a2, b1, b2 |
+| both stores of "Family" | a1, a2, b1, b2, c1 |
+| A data import on b1 handed the ticket of the record store of "Family" is refused, and the store's swarm membership and live path are untouched. | |
 
 #### Scenario: A scoped peer receives nothing over gossip
 
@@ -243,8 +267,13 @@ A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a gr
 
 #### Scenario: A device-shared replica refuses a data import
 
-- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a directory or connection metadata store
+- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a directory, a connection metadata store or one of a pod's stores
 - **THEN** the import is refused, and the device-shared replica's tracking, swarm membership, and live path are untouched
+
+#### Scenario: Member devices of a pod form its swarm
+
+- **WHEN** a member writes into a pod's record store while devices of the other members are subscribed to its topic
+- **THEN** those devices converge on the entry through the content-free announcement and the pull it triggers, none of them holding a grant
 
 ### Requirement: A granted replica serves the audience identity's devices
 

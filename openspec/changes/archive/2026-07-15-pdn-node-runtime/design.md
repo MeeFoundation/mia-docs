@@ -33,7 +33,7 @@ The rule: a trait where a second non-degenerate implementation is plausible, con
 
 ### D3. The runtime owns the hosted-identity set
 
-`data-layer` deliberately keeps no list of hosted identities — store handles stay with the caller. The runtime is that caller: it holds each hosted identity's `IdentityStores` (private metadata + connections handles) and its data-namespace registration, keyed by `PdnId`, and the sync service reports exactly this set plus the node id. Identity creation mints a fresh placeholder `PdnId` (random identifier, no key material) — honest about KERI not being integrated; the identity service trait is where the real thing lands. Alternative — pushing the hosted-identity set into `SyncNode` — rejected: the multi-identity change already considered and rejected node-side identity state as a resource with no consumer; the consumer now exists and it is the runtime, so the state lives here.
+`data-layer` deliberately keeps no list of hosted identities — store handles stay with the caller. The runtime is that caller: it holds each hosted identity's `IdentityStores` (private metadata + connections handles) and its data-namespace registration, keyed by `PdnId`, and the sync service reports exactly this set plus the node id. Identity creation mints the identity's announcement key pair and derives the `PdnId` from its public key, a stand-in for the KERI identifier of ADR-0003; the identity service trait is the replacement point for it. Alternative — pushing the hosted-identity set into `SyncNode` — rejected: the multi-identity change already considered and rejected node-side identity state as a resource with no consumer; the consumer now exists and it is the runtime, so the state lives here.
 
 ### D4. Data namespace tickets are shared and imported through the data service
 
@@ -56,7 +56,7 @@ The data service includes listing — without enumeration a service cannot show 
 - **[Whole-store ticket sharing in the service surface]** Exposing share/import invites treating it as the sharing model. → It is the documented interim model (ADR-0008 posture); the spec requirement names it interim, and the subset-rbsr / connection-metadata changes replace the mechanism and the requirement together.
 - **[Runtime spec shadows data-layer specs]** Service-level scenarios re-tread store behavior. → The runtime spec pins delegation and isolation contracts (what the glue must preserve), not store semantics; store behavior stays specified in `components/mee-pdn/data-layer/`.
 - **[Traits with a single implementation]** Dead seams if the second implementation never comes. → The rule is applied per service with a named second implementation (KERI, test mock); hosts test against mocks immediately, so the seam is exercised from day one.
-- **[Placeholder identity minting leaks into products]** A random `PdnId` with no key material behind it. → Confined to the identity service implementation; the trait is the replacement seam, and proof-of-control is already marked deferred in ADR-0011's dialogue.
+- **[Stand-in identity minting leaks into products]** A `PdnId` derived from an announcement key that never rotates, standing in for the KERI identifier of ADR-0003. → Confined to the identity service implementation; the trait is the replacement point, and proof-of-control is already marked deferred in ADR-0011's dialogue.
 
 ## Migration Plan
 
