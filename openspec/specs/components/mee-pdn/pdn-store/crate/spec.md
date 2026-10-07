@@ -59,28 +59,28 @@ The workspace build compiles the store under its default features alone. Its oth
 
 #### Scenario: The store's tests are part of the default run
 - **WHEN** `just test` runs with no selection
-- **THEN** the store's unit tests and the tests of its `client`, `dispatch`, `gc`, and `sync` binaries run under default features — `util`, the module three of them share, builds as a fifth binary holding no test — its tests marked flaky are reported skipped, and the run ends with the doctests
+- **THEN** the store's unit tests and the tests of its `client`, `dispatch`, `gc`, and `sync` binaries run under default features — `util`, the module three of them share, builds as a fifth binary holding no test — and the run ends with the doctests
 
 #### Scenario: A README example that stops compiling fails the run
 - **WHEN** the README's example no longer compiles
 - **THEN** `just test` with no selection fails at the doctests, and `just test -p pdn-store` passes without running them
 
-### Requirement: The tests marked flaky run nightly
-The store's tests marked `#[ignore = "flaky"]` SHALL stay out of every ordinary run and SHALL be repeated by the nightly workflow, selected by package and by the ignore mark alone, a failing iteration not cancelling the remaining ones.
+### Requirement: Every test of the store runs, the nightly hunt included
+No test of the store SHALL carry an ignore mark: each SHALL run in every ordinary run whose feature set compiles it. The nightly hunt of the in-process scenarios SHALL repeat the store's integration tests with every other crate's, a failing iteration not cancelling the remaining ones, and SHALL fail when any iteration fails, whether it is the last one or an earlier one.
 
-**Example:** `sync_restart_node` and `sync_big`, in `tests/sync.rs`, are the store's tests marked `#[ignore = "flaky"]`; `sync_restart_node` needs `fs-store`.
+**Example:** where `sync_big` and `sync_restart_node`, in `tests/sync.rs`, run — the store's slowest test and the one that needs `fs-store`.
 
-| run | outcome |
-|---|---|
-| `just test` | both reported skipped |
-| `just test-store`, `--all-features` | both reported skipped |
-| `just test-store`, `--no-default-features` | `sync_big` reported skipped; `sync_restart_node` is not compiled |
-| nightly job `store-flaky` | `just stress -p pdn-store --run-ignored ignored-only --stress-count 10 --no-fail-fast`: 10 iterations of both; an iteration that fails leaves the rest running |
+| run | `sync_big` | `sync_restart_node` |
+|---|---|---|
+| `just test` | runs | runs |
+| `just test-store`, `--all-features` | runs | runs |
+| `just test-store`, `--no-default-features` | runs | not compiled |
+| nightly job `in-process-scenarios` | 15 iterations, selected by `-E 'kind(test)'` | 15 iterations |
 
-#### Scenario: An ordinary run skips them
+#### Scenario: An ordinary run skips none of the store's tests
 - **WHEN** `just test` or `just test-store` runs
-- **THEN** none of the tests marked flaky runs, and each one the pass's feature set compiles is reported skipped: both under the default features and under every feature, `sync_big` alone under no feature, since `sync_restart_node` needs `fs-store`
+- **THEN** no test of the store is reported skipped
 
-#### Scenario: The nightly hunt runs them to the end
-- **WHEN** the nightly workflow's store job runs
-- **THEN** the tests marked flaky run the requested number of times, and a failing iteration does not stop the ones after it
+#### Scenario: A failure before the last iteration fails the nightly hunt
+- **WHEN** an iteration of the nightly in-process hunt fails and every iteration after it passes
+- **THEN** the iterations after it still run, and the job fails
