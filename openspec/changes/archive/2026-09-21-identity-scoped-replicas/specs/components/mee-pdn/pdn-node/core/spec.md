@@ -42,9 +42,9 @@ Every data operation SHALL name the identity performing it, and SHALL act for th
 - **WHEN** a read, write, or list names an identity and an issuer that identity neither created nor imported
 - **THEN** the operation fails with an unknown-issuer error, and nothing is read, written, or listed
 
-### Requirement: A granted replica's sibling contacts follow the audience directory
+### Requirement: A granted replica's sibling contacts follow the audience private metadata store (PMS)
 
-The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's directory device records rather than kept beside them, and SHALL be re-derived as the directory changes, so a device linked after the namespace was imported is dialed too. The directory of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
+The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's PMS device records rather than kept beside them, and SHALL be re-derived as the PMS changes, so a device linked after the namespace was imported is dialed too. The PMS of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
 
 #### Scenario: A sibling contact is dialed with the issuer offline
 
@@ -83,7 +83,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 #### Scenario: A linked device binds a grant established elsewhere
 
 - **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
-- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
+- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its PMS carries
 
 #### Scenario: A withdrawn grant unbinds its namespace
 
@@ -109,7 +109,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 
 The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata store of the connection whose grant bound this replica, in addition to the addresses the grant's ticket carried and the holding identity's own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
 
-A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own directory is not a source here: it is device-internal and the audience cannot read it.
+A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own PMS is not a source here: it is device-internal and the audience cannot read it.
 
 Leaving the contact set is what this requirement governs. The sync engine keeps its own short record of peers that once served the replica and may redial such a peer until that record ages out, so a withdrawn device's reach is bounded by the re-derived set rather than cut at the very next dial; what any session delivers is governed by classification either way.
 
@@ -144,8 +144,8 @@ One node may host several identities granted by the same issuer, and each holds 
 
 #### Scenario: The publishing device is not special
 
-- **WHEN** the grant is published from a device the issuer linked later — the founder never touches the grant surface — and the publishing device then goes offline
-- **THEN** the audience converges on the granted claims from the founder
+- **WHEN** the grant is published from a device the issuer linked later — the first device never touches the grant surface — and the publishing device then goes offline
+- **THEN** the audience converges on the granted claims from the first device
 
 #### Scenario: Audiences hosted together keep separate replicas
 

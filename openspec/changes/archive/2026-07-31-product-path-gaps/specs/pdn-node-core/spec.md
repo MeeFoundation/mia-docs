@@ -1,12 +1,12 @@
 # pdn-node: runtime core
 
-A granted replica today knows two kinds of contact: whatever addresses rode in the grant's ticket, and the audience identity's own devices. The first is one device — whichever called publish — so the issuer's other devices are reachable to nobody, and a grant published from a phone goes dark with that phone. This delta gives the replica the issuer's device set, which the issuer already publishes to this very audience. The sibling-contacts requirement is modified in one clause: two hosted identities granted by the same issuer bind one replica, so its contact set consults every such audience's directory — consulting only one would have each identity's sweep strip the other's siblings. The issuer's device set is unioned across those audiences' connections for the same reason, and so is the device set the retraction tracker follows, which is keyed by the same shared replica.
+A granted replica today knows two kinds of contact: whatever addresses rode in the grant's ticket, and the audience identity's own devices. The first is one device — whichever called publish — so the issuer's other devices are reachable to nobody, and a grant published from a phone goes dark with that phone. This delta gives the replica the issuer's device set, which the issuer already publishes to this very audience. The sibling-contacts requirement is modified in one clause: two hosted identities granted by the same issuer bind one replica, so its contact set consults every such audience's private metadata store (PMS) — consulting only one would have each identity's sweep strip the other's siblings. The issuer's device set is unioned across those audiences' connections for the same reason, and so is the device set the retraction tracker follows, which is keyed by the same shared replica.
 
 ## MODIFIED Requirements
 
-### Requirement: A granted replica's sibling contacts follow the audience directory
+### Requirement: A granted replica's sibling contacts follow the audience PMS
 
-The runtime SHALL point a granted replica at the other devices of the identities the grants on it are addressed to, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from those identities' directory device records rather than kept beside them, and SHALL be re-derived as the directories change, so a device linked after the namespace was imported is dialed too. Only the directories of hosted identities holding a grant of this issuer SHALL be consulted: the devices of a hosted identity unrelated to the replica — no grant of this issuer names it — SHALL NOT become its contacts.
+The runtime SHALL point a granted replica at the other devices of the identities the grants on it are addressed to, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from those identities' PMS device records rather than kept beside them, and SHALL be re-derived as the PMSs change, so a device linked after the namespace was imported is dialed too. Only the PMSs of hosted identities holding a grant of this issuer SHALL be consulted: the devices of a hosted identity unrelated to the replica — no grant of this issuer names it — SHALL NOT become its contacts.
 
 #### Scenario: A sibling contact is dialed with the issuer offline
 
@@ -23,7 +23,7 @@ The runtime SHALL point a granted replica at the other devices of the identities
 ### Requirement: A granted replica reaches the issuer's other devices
 The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata stores of the connections whose grants bind this issuer here, in addition to the addresses the grant's ticket carried and the audience identities' own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
 
-A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own directory is not a source here: it is device-internal and the audience cannot read it.
+A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own PMS is not a source here: it is device-internal and the audience cannot read it.
 
 Leaving the contact set is what this requirement governs. The sync engine keeps its own short record of peers that once served the replica and may redial such a peer until that record ages out, so a withdrawn device's reach is bounded by the re-derived set rather than cut at the very next dial; what any session delivers is governed by classification either way.
 
@@ -60,8 +60,8 @@ The same union SHALL govern the device set the runtime consults to decide whose 
 
 #### Scenario: The publishing device is not special
 
-- **WHEN** the grant is published from a device the issuer linked later — the founder never touches the grant surface — and the publishing device then goes offline
-- **THEN** the audience converges on the granted claims from the founder
+- **WHEN** the grant is published from a device the issuer linked later — the first device never touches the grant surface — and the publishing device then goes offline
+- **THEN** the audience converges on the granted claims from the first device
 
 #### Scenario: Audiences hosted together keep both sibling sets
 

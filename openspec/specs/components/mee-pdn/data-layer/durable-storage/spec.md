@@ -27,7 +27,7 @@ A node's storage SHALL be chosen when it is spawned, by name: memory, or a direc
 - **THEN** each keeps its own state, and neither reads the other's directory
 
 ### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
-A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its private metadata directory, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
+A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its PMS, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
 
 **Example:** `/var/lib/pdn` after Alice-work and Alice-leisure are hosted; `<x>` is identity x's `PdnId` in 64 hex digits.
 
@@ -40,7 +40,7 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
   identities/<Alice-work>/
     docs.redb                    her replica store
     default-author               the one author her writes carry
-    directory                    her hosting record: her directory's namespace, written at the commit point
+    pms                          her hosting record: her PMS's namespace, written at the commit point
   identities/<Alice-leisure>/    the same three files
 ```
 
@@ -70,7 +70,7 @@ A node spawned on a directory holding a key SHALL bind its endpoint with that ke
 
 | record | held by | a1 restarted on `/var/lib/pdn` | a1 back under a fresh key |
 |---|---|---|---|
-| `devices/<a1>` in Alice's directory | her other devices | names a1 | names an id that never answers |
+| `devices/<a1>` in Alice's PMS | her other devices | names a1 | names an id that never answers |
 | a ticket a1 minted, `<a1>` in `DocTicket.nodes` | whoever imported it | dials a1 | dials nobody |
 | `devices/<a1>` in the device set she publishes | Bob's node b1 | admits a1's sessions | refuses the new id as not hosted |
 

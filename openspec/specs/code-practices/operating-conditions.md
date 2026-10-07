@@ -6,9 +6,9 @@ This is not an instruction to multiply every test by every condition. The full p
 
 ## The conditions
 
-**Several identities on one node.** A node hosts the store sets of any number of identities, and co-location is not a trust boundary. The mistakes have a shape: a check that asks "is this our node" where it must ask "is this device one of *this identity's*", a set derived from the wrong identity's directory, a cache keyed by node where it must be keyed by identity. Two identities of the same person are as separate here as two strangers.
+**Several identities on one node.** A node hosts the store sets of any number of identities, and co-location is not a trust boundary. The mistakes have a shape: a check that asks "is this our node" where it must ask "is this device one of *this identity's*", a set derived from the wrong identity's private metadata store (PMS), a cache keyed by node where it must be keyed by identity. Two identities of the same person are as separate here as two strangers.
 
-**One device, or several.** An identity may live on one device forever or on four, and nothing may assume a founder. Anything phrased as "the device that did X is the device that will do Y" is a defect waiting for the second device. Watch addressing in particular: a ticket names the device that minted it, so a set of contacts built from tickets alone quietly encodes "one device" inside what looks like a routing detail.
+**One device, or several.** An identity may live on one device forever or on four, and nothing may treat its first device as special. Anything phrased as "the device that did X is the device that will do Y" is a defect waiting for the second device. Watch addressing in particular: a ticket names the device that minted it, so a set of contacts built from tickets alone quietly encodes "one device" inside what looks like a routing detail.
 
 **A device links before, during, or after.** Linking is not a setup step that precedes the interesting part. A device can join before any connection exists, between the halves of a ceremony running on a sibling, or long after a grant was published, consumed, and forgotten about. Each arrival has to converge on the same state, and a device that arrives late must reach it by replication rather than by having been present.
 

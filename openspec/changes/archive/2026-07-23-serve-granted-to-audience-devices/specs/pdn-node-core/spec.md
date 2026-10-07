@@ -18,7 +18,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 #### Scenario: A linked device binds a grant established elsewhere
 
 - **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
-- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
+- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its private metadata store (PMS) carries
 
 #### Scenario: A withdrawn grant unbinds its namespace
 
@@ -30,9 +30,9 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 - **WHEN** a runtime imports a namespace from a ticket obtained outside any grant, and no grant record for that issuer exists in any of its pairs
 - **THEN** the imported namespace stays bound — the binding mechanism forgets only namespaces it imported itself
 
-### Requirement: A granted replica's sibling contacts follow the audience directory
+### Requirement: A granted replica's sibling contacts follow the audience PMS
 
-The runtime SHALL point a granted replica at the other devices of the identity the grant is addressed to, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's directory device records rather than kept beside them, and SHALL be re-derived as the directory changes, so a device linked after the namespace was imported is dialed too. Only the audience identity's directory SHALL be consulted: on a runtime hosting several identities, the devices of an unrelated hosted identity SHALL NOT become contacts of the replica.
+The runtime SHALL point a granted replica at the other devices of the identity the grant is addressed to, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's PMS device records rather than kept beside them, and SHALL be re-derived as the PMS changes, so a device linked after the namespace was imported is dialed too. Only the audience identity's PMS SHALL be consulted: on a runtime hosting several identities, the devices of an unrelated hosted identity SHALL NOT become contacts of the replica.
 
 #### Scenario: A sibling contact is dialed with the issuer offline
 
@@ -47,7 +47,7 @@ The runtime SHALL point a granted replica at the other devices of the identity t
 ## MODIFIED Requirements
 
 ### Requirement: Connections service establishes, lists, and carries grants
-The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](connection-establishment.md)) — and SHALL list a hosted identity's current connections, delegating to the connections records of that identity's [directory](../data-layer/private-metadata-store.md). It SHALL carry data grants over the connection's [metadata pair](../data-layer/connection-metadata-store.md): publishing a grant of the identity's own namespace toward a connected peer — capability-scoped by an exact claim set, with optional write — withdrawing a published grant, and reading the grants a connected peer has published, opening the pair from the directory's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a grant yields the capability and the ticket it carries; the grantee runtime acts on that record by itself, so no import act is required of the caller.
+The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](connection-establishment.md)) — and SHALL list a hosted identity's current connections, delegating to the connections records of that identity's [PMS](../data-layer/private-metadata-store.md). It SHALL carry data grants over the connection's [metadata pair](../data-layer/connection-metadata-store.md): publishing a grant of the identity's own namespace toward a connected peer — capability-scoped by an exact claim set, with optional write — withdrawing a published grant, and reading the grants a connected peer has published, opening the pair from the PMS's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a grant yields the capability and the ticket it carries; the grantee runtime acts on that record by itself, so no import act is required of the caller.
 
 A grant SHALL name the granting identity itself as the data issuer; publishing or withdrawing a grant of any other issuer's data SHALL be refused loudly, with nothing minted or written. Granting foreign data is delegation: the serving side evaluates grants from the records of the *data issuer's* own connections, so a grant recorded under a different granting identity could never be honored — without the refusal it would publish successfully, replicate, and enforce as nothing, a silent no-op on both sides. The grant keying by data issuer is untouched — it is the groundwork delegation chains use; the boundary lifts when `UWill` chains make a foreign issuer's grant provable.
 

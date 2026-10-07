@@ -54,10 +54,10 @@ Start after `mobile-host-surface` has landed and its portability spike has passe
 ## 6. Docs and spec tree (manual, not deltas)
 
 - [ ] 6.1 `pdn-app`'s README and CLAUDE.md kept true to what was built: the layout as it ended up, the build steps as recipes that exist, and the environment facts unchanged
-- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the directory layout beside `mia-docs`
+- [ ] 6.2 CLAUDE.md of `mee-pdn`: `pdn-app` in the private metadata store (PMS) layout beside `mia-docs`
 - [ ] 6.3 Sweep the spec tree and the active changes for statements this change invalidates
 
 ## 7. Gates
 
 - [ ] 7.1 The run-through of 5.9 passed twice, and every refusal in it observed rather than assumed
-- [ ] 7.2 `openspec validate --all --strict` before archiving. The deltas' relative links are written for the archive destination, not for the delta's own directory
+- [ ] 7.2 `openspec validate --all --strict` before archiving. The deltas' relative links are written for the archive destination, not for the delta's own PMS

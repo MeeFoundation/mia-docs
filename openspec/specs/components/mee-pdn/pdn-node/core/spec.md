@@ -14,7 +14,7 @@ The runtime core SHALL be usable as a library with no host attached: a process e
 - **THEN** every operation completes without any host process or HTTP surface involved
 
 ### Requirement: Identity service creates and links identities
-The identity service SHALL create an identity on its first device — minting its announcement key pair ([private metadata store](../../data-layer/private-metadata-store/spec.md)) and deriving its `PdnId` from the pair's public key by the `PdnId` steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, a placeholder for the autonomic identifier of ADR-0003, and provisioning its store set: the private-metadata directory and the data namespace, with the data-namespace ticket published in the directory ([device-linking](../device-linking/spec.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
+The identity service SHALL create an identity on its first device — minting its announcement key pair ([private metadata store](../../data-layer/private-metadata-store/spec.md)) and deriving its `PdnId` from the pair's public key by the `PdnId` steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, a placeholder for the autonomic identifier of ADR-0003, and provisioning its store set: the private metadata store (PMS) and the data namespace, with the data-namespace ticket published in the PMS ([device-linking](../device-linking/spec.md)). It SHALL mint a linking invite for a hosted identity — the one-time secret and the bearer-free linking payload — and SHALL link this runtime into an existing identity from a scanned linking payload, one explicit linking act per identity; the payload names the identity, and a runtime already hosting it refuses before dialing.
 
 **Example:** Alice-work and Alice-leisure are both hosted on Alice's phone a1, which mints a linking invite for each; her tablet a3 runs a runtime that hosts no identity yet.
 
@@ -26,7 +26,7 @@ The identity service SHALL create an identity on its first device — minting it
 
 #### Scenario: Create on one runtime, link on another
 - **WHEN** an identity is created on runtime A and runtime B links from a linking invite minted on A
-- **THEN** B hosts the identity: it appears among B's hosted identities, and the identity's directory and data namespace converge on B
+- **THEN** B hosts the identity: it appears among B's hosted identities, and the identity's PMS and data namespace converge on B
 
 #### Scenario: Linking one identity imports nothing of another
 - **WHEN** runtime B is linked into identity X while identity Y exists elsewhere
@@ -34,18 +34,18 @@ The identity service SHALL create an identity on its first device — minting it
 
 #### Scenario: An identity's `PdnId` derives from its announcement key
 - **WHEN** an identity is created on runtime A and runtime B links into it
-- **THEN** the identity's `PdnId` equals the `PdnId` derived from the announcement public key in its directory, on A and on B alike
+- **THEN** the identity's `PdnId` equals the `PdnId` derived from the announcement public key in its PMS, on A and on B alike
 
 ### Requirement: Connections service establishes, lists, and carries grants
-The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](../connection-establishment/spec.md)) — and SHALL list a hosted identity's current connections, delegating to the connections records of that identity's [directory](../../data-layer/private-metadata-store/spec.md). It SHALL carry data grants over the connection's [metadata pair](../../data-layer/connection-metadata-store/spec.md): publishing a grant of the identity's own namespace toward a connected peer — capability-scoped by an exact claim set, naming per claim whether write accompanies read — withdrawing a published grant, reading the grants a connected peer has published, and reading the grants the identity has published toward a connected peer, opening the pair from the directory's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a peer's grant yields the capability and the ticket it carries; the grantee runtime acts on that record by itself, so no import act is required of the caller. Reading the identity's own published grant yields the capability alone: the caller is the issuer of the namespace the record addresses, so a ticket to it answers nothing.
+The connections service SHALL produce connections through the establishment dialogue — minting invites for a hosted identity and establishing from an invite payload ([connection-establishment](../connection-establishment/spec.md)) — and SHALL list a hosted identity's current connections, delegating to the connections records of that identity's [PMS](../../data-layer/private-metadata-store/spec.md). It SHALL carry data grants over the connection's [metadata pair](../../data-layer/connection-metadata-store/spec.md): publishing a grant of the identity's own namespace toward a connected peer — capability-scoped by an exact claim set, naming per claim whether write accompanies read — withdrawing a published grant, reading the grants a connected peer has published, and reading the grants the identity has published toward a connected peer, opening the pair from the PMS's tickets on demand, so linked devices reach it too. Manual one-sided recording is not offered: establishment is the producer of connections. Reading a peer's grant yields the capability and the ticket it carries; the grantee runtime acts on that record by itself, so no import act is required of the caller. Reading the identity's own published grant yields the capability alone: the caller is the issuer of the namespace the record addresses, so a ticket to it answers nothing.
 
 Both reads SHALL report what is readable at the moment of the call and SHALL NOT wait for a record to arrive. A grant published on one device of an identity reaches that identity's other devices by replication of the pair, so a device that did not publish a grant reads it once the record and its payload have arrived, and reads nothing before then — the same waiting a peer does, for the same reason. Neither read is free of writes: opening a pair publishes the opening device's record into it and registers the connection, so "reports what is readable now" means the call does not wait and changes no grant, not that it writes nothing.
 
 Both reads answer for the device they run on, and SHALL be described that way wherever a caller reads about them. The read reports what this device holds in the pair's replicas: on the device that published a grant it is evidence the record is here, never that it reached a sibling or the peer, and no read reports what the counterparty has received. Nothing on this surface carries that answer, which would need a per-peer synchronization progress out of the engine or an acknowledgement a sibling writes into the pair.
 
-An empty answer therefore covers four states and SHALL NOT be presented as the fact that nothing is granted: this identity holds no connection to that peer, the pair's tickets have not replicated to this device yet, a grant record is here whose payload cannot be read yet, and nothing is granted toward that peer. The peer-side read answers the same way for the same reason, and refusing wherever no pair opens would turn a linked device's catching-up into failures rather than into an answer that changes when the directory arrives.
+An empty answer therefore covers four states and SHALL NOT be presented as the fact that nothing is granted: this identity holds no connection to that peer, the pair's tickets have not replicated to this device yet, a grant record is here whose payload cannot be read yet, and nothing is granted toward that peer. The peer-side read answers the same way for the same reason, and refusing wherever no pair opens would turn a linked device's catching-up into failures rather than into an answer that changes when the PMS arrives.
 
-Both reads SHALL resolve the pair through the acting identity's own directory. An identity hosted beside another therefore reaches only its own pairs, and a third party on another node reaches none of them at all: the pair's stores are addressed by the tickets the two sides exchanged, and only those two sides hold them.
+Both reads SHALL resolve the pair through the acting identity's own PMS. An identity hosted beside another therefore reaches only its own pairs, and a third party on another node reaches none of them at all: the pair's stores are addressed by the tickets the two sides exchanged, and only those two sides hold them.
 
 A grant SHALL name the granting identity itself as the data issuer; publishing or withdrawing a grant of any other issuer's data SHALL be refused loudly, with nothing minted or written. Granting foreign data is delegation: the serving side evaluates grants from the records of the *data issuer's* own connections, so a grant recorded under a different granting identity could never be honored — without the refusal it would publish successfully, replicate, and enforce as nothing, a silent no-op on both sides. The grant keying by data issuer is untouched — it is the groundwork delegation chains use; the boundary lifts when `UWill` chains make a foreign issuer's grant provable.
 
@@ -87,11 +87,11 @@ A grant SHALL name the granting identity itself as the data issuer; publishing o
 
 #### Scenario: A co-hosted identity reads none of another identity's published grants
 - **WHEN** identity Y, hosted on the same runtime as X and holding no connection to P, reads its own published grants toward P
-- **THEN** it obtains nothing, because the read resolves the pair through the acting identity's own directory, which holds no pair toward P — and X's grants toward P stay readable to X on the same runtime
+- **THEN** it obtains nothing, because the read resolves the pair through the acting identity's own PMS, which holds no pair toward P — and X's grants toward P stay readable to X on the same runtime
 
 #### Scenario: Two identities connected to one peer read their own grants and no other's
 - **WHEN** X and Y are hosted on the same runtime, both hold a connection to P, both have published a grant toward P, and each reads its own published grants toward P
-- **THEN** each reads the claim set it published itself and never the other's, because each read resolves its own pair through its own directory
+- **THEN** each reads the claim set it published itself and never the other's, because each read resolves its own pair through its own PMS
 
 #### Scenario: Granting a foreign issuer's data is refused
 - **WHEN** identity X publishes or withdraws a grant naming a data issuer other than X, even one hosted on the same runtime
@@ -170,17 +170,17 @@ The runtime SHALL expose a subscription to write-retraction events of its hosted
 - **WHEN** a hosted identity's write into a granted namespace is retracted
 - **THEN** a subscriber on that runtime observes one event naming the retracted entry's issuer, path, author, timestamp, and content hash
 
-### Requirement: A granted replica's sibling contacts follow the audience directory
+### Requirement: A granted replica's sibling contacts follow the audience PMS
 
-The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's directory device records rather than kept beside them, and SHALL be re-derived at every grant sweep of the connection whose grant bound the replica: once when the grant binder of that connection starts, and again at every entry or payload that arrives on this device in the counterparty's store of that connection. A sweep that reads no device the issuer published in that store leaves the contact set as it was. A change of the directory alone does not re-derive it: a device the identity links after the namespace was imported enters the contacts of the replica on an existing device at that device's next grant sweep, while the linked device counts every sibling its directory lists from its own first import. The directory of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
+The runtime SHALL point a granted replica at the other devices of the identity it is held for, so the replica converges from a sibling while the issuer is unreachable. The contact set SHALL be derived from that identity's PMS device records rather than kept beside them, and SHALL be re-derived at every grant sweep of the connection whose grant bound the replica: once when the grant binder of that connection starts, and again at every entry or payload that arrives on this device in the counterparty's store of that connection. A sweep that reads no device the issuer published in that store leaves the contact set as it was. A change of the PMS alone does not re-derive it: a device the identity links after the namespace was imported enters the contacts of the replica on an existing device at that device's next grant sweep, while the linked device counts every sibling its PMS lists from its own first import. The PMS of any other hosted identity SHALL NOT be consulted for this replica, whether that identity holds a grant of the same issuer or none at all.
 
 **Example:** Alice-leisure holds Bob's namespace under his grant on her phone a1 and her tablet a3; Alice-work, also hosted on a3, has her laptop a2 as a second device; the grant sweep runs on a3.
 
 | read by the sweep | lists | enters the contacts of Alice-leisure's replica on a3 |
 |---|---|---|
-| Alice-leisure's directory, `devices/` keys | a1, a3 | a1, dialed as Alice-leisure; a3 is this device |
+| Alice-leisure's PMS, `devices/` keys | a1, a3 | a1, dialed as Alice-leisure; a3 is this device |
 | Bob's store toward Alice-leisure, `devices/` keys | b1 | b1, dialed as Bob |
-| Alice-work's directory, `devices/` keys | a2, a3 | nothing: it is never read for Alice-leisure's replica |
+| Alice-work's PMS, `devices/` keys | a2, a3 | nothing: it is never read for Alice-leisure's replica |
 | contacts | | a1, b1 |
 | later, Alice-leisure links a4: the contacts on a3 stay a1, b1 until an entry or payload next arrives in Bob's store toward Alice-leisure on a3 | | |
 
@@ -237,7 +237,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 #### Scenario: A linked device binds a grant established elsewhere
 
 - **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
-- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
+- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its PMS carries
 
 #### Scenario: A withdrawn grant unbinds its namespace
 
@@ -283,7 +283,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 
 The runtime SHALL point a granted replica at the devices the issuing identity has published in the connection metadata store of the connection whose grant bound this replica, in addition to the addresses the grant's ticket carried and the holding identity's own siblings. The whole contact set SHALL be re-derived from those records as they change, so a device the issuer links later is dialed and one the issuer withdraws leaves the contact set — the publishing device included, since the ticket's addressing is kept only for devices the issuer still publishes.
 
-A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own directory is not a source here: it is device-internal and the audience cannot read it.
+A grant's ticket names whichever device published the grant, so without this a granted replica has exactly one reachable device of its issuer. The published device set is the issuer's own statement of who acts for it toward this counterparty — the same set the runtime already consults to decide whose writes it may retract — so reaching a sibling asks nothing new of the issuer and reveals nothing the counterparty was not already told. The issuer's own PMS is not a source here: it is device-internal and the audience cannot read it.
 
 Leaving the contact set is what this requirement governs. The sync engine keeps its own short record of peers that once served the replica and may redial such a peer until that record ages out, so a withdrawn device's reach is bounded by the re-derived set rather than cut at the very next dial; what any session delivers is governed by classification either way.
 
@@ -326,8 +326,8 @@ One node may host several identities granted by the same issuer, and each holds 
 
 #### Scenario: The publishing device is not special
 
-- **WHEN** the grant is published from a device the issuer linked later — the founder never touches the grant surface — and the publishing device then goes offline
-- **THEN** the audience converges on the granted claims from the founder
+- **WHEN** the grant is published from a device the issuer linked later — the first device never touches the grant surface — and the publishing device then goes offline
+- **THEN** the audience converges on the granted claims from the first device
 
 #### Scenario: Audiences hosted together keep separate replicas
 

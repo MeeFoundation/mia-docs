@@ -72,7 +72,7 @@ A replica's gossip topic SHALL carry only content-free announcements, never entr
 
 A peer whose access arrived through a grant — capability-scoped or whole-store — SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the issuer's own devices; a grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
 
-Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
+Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a private metadata store (PMS), a connection metadata store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
 #### Scenario: A scoped peer receives nothing over gossip
 
@@ -91,7 +91,7 @@ Membership SHALL follow the recorded sync strategy in both directions: a grantee
 
 #### Scenario: A device-shared replica refuses a data import
 
-- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a directory or connection metadata store
+- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a PMS or connection metadata store
 - **THEN** the import is refused, and the device-shared replica's tracking, swarm membership, and live path are untouched
 
 ### Requirement: Unauthorized callers are refused uniformly

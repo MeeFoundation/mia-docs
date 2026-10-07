@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How two identities become [connected](../../../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [directories](../../data-layer/private-metadata-store/spec.md) and the exchanged [connection metadata pair](../../data-layer/connection-metadata-store/spec.md). The exchange is bearer-level: a presented `PdnId` is asserted, not proven, since the dialogue carries no proof of control over it (ADR-0008, ADR-0011). Both peers must be online at once: an invite is answered only by a running inviter, and nothing holds an invitation for a peer that is offline.
+How two identities become [connected](../../../../architecture/language/connection.md), realizing ADR-0011 on the runtime: a pairing dialogue — one raw bidirectional exchange on the dedicated pairing ALPN, not a document-sync session — whose handler the runtime registers at spawn through the data-layer assembly slot and whose dial side rides the node's dial handle. The dialogue creates the shared state everything later travels through: mutual connections records in the two identities' [private metadata stores (PMSs)](../../data-layer/private-metadata-store/spec.md) and the exchanged [connection metadata pair](../../data-layer/connection-metadata-store/spec.md). The exchange is bearer-level: a presented `PdnId` is asserted, not proven, since the dialogue carries no proof of control over it (ADR-0008, ADR-0011). Both peers must be online at once: an invite is answered only by a running inviter, and nothing holds an invitation for a peer that is offline.
 
 ## Requirements
 
@@ -67,7 +67,7 @@ ceiling   no PairingResponse within 15 s (ESTABLISHMENT_DIALOGUE_TIMEOUT): estab
 - **THEN** the operation fails with an unknown-identity error and no dialogue runs
 
 ### Requirement: The secret is verified and burned atomically, before any state
-On a presented secret the inviter SHALL atomically check-and-burn against its pending set: present and unexpired → burned and the dialogue proceeds; expired, already burned, or unknown → refused. The check SHALL precede every state change, so a refused attempt leaves no observable state on the inviter: no replica created, no ticket issued, no connections entry, no directory entry. An unpresented secret SHALL expire at the end of its lifetime and thereafter be refused. A refused presentation SHALL NOT burn a live pending invite (a guess cannot extinguish a ceremony in progress), and refusals SHALL be uniform — the dialer cannot distinguish wrong from expired from already burned.
+On a presented secret the inviter SHALL atomically check-and-burn against its pending set: present and unexpired → burned and the dialogue proceeds; expired, already burned, or unknown → refused. The check SHALL precede every state change, so a refused attempt leaves no observable state on the inviter: no replica created, no ticket issued, no connections entry, no PMS entry. An unpresented secret SHALL expire at the end of its lifetime and thereafter be refused. A refused presentation SHALL NOT burn a live pending invite (a guess cannot extinguish a ceremony in progress), and refusals SHALL be uniform — the dialer cannot distinguish wrong from expired from already burned.
 
 **Example:** a1 minted Alice's secrets S and S2 at t = 0, each with the default 120 s lifetime; W was never minted.
 
@@ -84,26 +84,26 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 
 #### Scenario: An expired secret is refused
 - **WHEN** a secret is presented after its lifetime has elapsed
-- **THEN** the attempt is refused and no observable state exists on the inviter — no replica, no ticket, no connections entry, no directory entry
+- **THEN** the attempt is refused and no observable state exists on the inviter — no replica, no ticket, no connections entry, no PMS entry
 
 #### Scenario: A wrong secret is refused and burns nothing
 - **WHEN** a dialer presents a secret that was never minted while an invite is pending
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: Establishment records the connection for both identities, on all their devices
-On a completed dialogue each side SHALL record the counterparty among the connections records of its private-metadata directory, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory replicates, and a linked device opens the pair from the directory's tickets by itself, at the connection armer's next sweep of its directory.
+On a completed dialogue each side SHALL record the counterparty among the connections records of its PMS, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same PMS. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the PMS replicates, and a linked device opens the pair from the PMS's tickets by itself, at the connection armer's next sweep of its PMS.
 
 **Example:** Bob (b1) establishes from Alice's invite on a1, and Alice has a second device a2; `<alice>`, `<bob>`: `PdnId`s in hex; `<a1>`, `<a2>`: endpoint ids in hex.
 
 ```
-Alice's directory, written by a1, replicated to a2
+Alice's PMS, written by a1, replicated to a2
   connections/<bob>                          one byte 01, the connection marker
   tickets/connection-metadata/<bob>/own      write ticket to Alice's store toward Bob
   tickets/connection-metadata/<bob>/peer     read ticket to Bob's store toward Alice, b1's address added
 Alice's store toward Bob
   devices/<a1>                               one byte 01, written by a1 as it assembles the pair
   devices/<a2>                               one byte 01, written by a2 once it opens the pair from the two tickets
-Bob's directory                              the same three keys, naming <alice>
+Bob's PMS                              the same three keys, naming <alice>
 ```
 
 #### Scenario: Both sides list each other
@@ -112,18 +112,18 @@ Bob's directory                              the same three keys, naming <alice>
 
 #### Scenario: The connection is visible from linked devices
 - **WHEN** establishment ran between A's phone and B's phone, and each identity has a laptop linked
-- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its directory
+- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its PMS
 
 ### Requirement: Re-establishment converges, whichever side invites
-A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's directory holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
+A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's PMS holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the PMS yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
 
 **Example:** Alice (a1) and Bob (b1) connected from Alice's invite; later Alice establishes from a fresh invite Bob mints; both sides act alike.
 
 | state | outcome |
 |---|---|
-| own store toward the other | the cached pair's replica; on a device with no cache, the one the directory's own-kind ticket names |
+| own store toward the other | the cached pair's replica; on a device with no cache, the one the PMS's own-kind ticket names |
 | peer store | the received ticket names the cached peer replica, so it is reused |
-| directory | the connection record and both tickets rewritten under the same keys |
+| PMS | the connection record and both tickets rewritten under the same keys |
 | `connections().list` | Alice's lists Bob once, Bob's lists Alice once |
 | metadata replicas | 2 per side before, 2 per side after |
 
@@ -158,7 +158,7 @@ Establishment SHALL report to its own caller three failed outcomes of the dialog
 
 ### Requirement: Two identities of one node establish through the same dialogue
 
-Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and each of the metadata pair's two stores SHALL be held twice on the node — created for the identity that writes it and imported for the identity that reads it — four replicas in all, each store's two replicas converging inside the node without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
+Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own PMSs, and each of the metadata pair's two stores SHALL be held twice on the node — created for the identity that writes it and imported for the identity that reads it — four replicas in all, each store's two replicas converging inside the node without any peer being reachable. The runtime's shutdown SHALL let the serving half of such a dialogue finish before it stops the node, as it does for a serving half answering another node.
 
 **Example:** Alice-work and Alice-leisure are both hosted on Alice's phone a1, and Alice-leisure establishes from Alice-work's invite with no other node reachable.
 

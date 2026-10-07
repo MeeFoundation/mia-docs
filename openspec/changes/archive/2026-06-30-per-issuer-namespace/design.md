@@ -39,18 +39,18 @@ So while write = secret-possession, the namespace key MUST be random, and `data-
 
 Not solved here, and one-per-issuer doesn't make it worse: the replica boundary was never the confidentiality tool — the gate (ADR-0008) is admission-only, so anyone who can sync a replica already reads all of it. Real content confidentiality (encryption, access control) is UWill-era, not replica partitioning.
 
-### D4. Device bootstrap: one directory rail, two planes
+### D4. Device bootstrap: one private metadata store (PMS) rail, two planes
 
-A linked device comes up from a single seed — the `PrivateMetadataStore` ticket — and discovers every other store through that directory (`tickets/<kind>`); there is no second bootstrap path. Two planes:
+A linked device comes up from a single seed — the `PrivateMetadataStore` ticket — and discovers every other store through that PMS (`tickets/<kind>`); there is no second bootstrap path. Two planes:
 
-- **Control plane** (directory + connections store): small, imported eagerly, blocking `link_device` under a liveness timeout.
+- **Control plane** (PMS + connections store): small, imported eagerly, blocking `link_device` under a liveness timeout.
 - **Data plane** (per-issuer data namespaces, potentially large): discovered the same way but imported lazily, after linking — staged, not unimplemented.
 
-The directory is complete by construction: every store an identity owns publishes its ticket into it (enforced in pdn-node; until then upheld by the caller). A device self-registers into the device set only after the directory has caught up, so the write does not race initial sync. Mechanics live in `components/mee-pdn/pdn-node/device-linking.md`.
+The PMS is complete by construction: every store an identity owns publishes its ticket into it (enforced in pdn-node; until then upheld by the caller). A device self-registers into the device set only after the PMS has caught up, so the write does not race initial sync. Mechanics live in `components/mee-pdn/pdn-node/device-linking.md`.
 
 ### D5. Pre-UWill access is relaxed by design
 
-The seed is a bearer write-ticket — write because the device self-registers, bearer because identity-bound, revocable, least-privilege access (a read-only directory seed plus a scoped join capability, per-store/per-claim grants) is UWill's job. These relaxations — bearer tickets (D5), random keys + mapping (D2) — are accepted until UWill lands. No enforced trust-ramp is built on bearer tokens, since any holder that syncs the directory already reads every ticket in it.
+The seed is a bearer write-ticket — write because the device self-registers, bearer because identity-bound, revocable, least-privilege access (a read-only PMS seed plus a scoped join capability, per-store/per-claim grants) is UWill's job. These relaxations — bearer tickets (D5), random keys + mapping (D2) — are accepted until UWill lands. No enforced trust-ramp is built on bearer tokens, since any holder that syncs the PMS already reads every ticket in it.
 
 ## Risks / Trade-offs
 

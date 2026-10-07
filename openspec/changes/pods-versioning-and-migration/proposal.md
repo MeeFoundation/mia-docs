@@ -20,7 +20,7 @@ Nothing is decided. The change settles how a pod's entries and the fold over the
 ### What carries a version
 
 - Each entry, in its key: the version of the rules it was written under. A build reads each entry by its own version's rules, and a later version adds kinds and rules for them while never changing what an entry of an earlier version means, so one set of entries stays the only source of truth: an older build's answers are the newer one's with some of them unknown, never different ones. A build carries the fold of every version it has shipped.
-- Each pod, in its founding event, as a Matrix room fixes its room version in the event that creates it. Every entry of the pod reads by that version's rules, and a new version is a new pod — in Matrix, a new room, with a tombstone event in the old one naming its successor; a build that lacks a pod's version takes no part in it.
+- Each pod, in its created event, as a Matrix room fixes its room version in the event that creates it. Every entry of the pod reads by that version's rules, and a new version is a new pod — in Matrix, a new room, with a tombstone event in the old one naming its successor; a build that lacks a pod's version takes no part in it.
 - The folded membership alone, compared between devices: a split is detected, and prevented nowhere.
 
 **Example:** the suspension of Why under each option.
@@ -28,7 +28,7 @@ Nothing is decided. The change settles how a pod's entries and the fold over the
 | option | where the version sits | a1, on the later build, and c1, on the earlier |
 |---|---|---|
 | each entry | `member/<bob>/3/suspended.2/<alice>/1`: version 2 | a1 counts none of Bob's operations naming his sequence 3; c1 answers unknown for them |
-| each pod | the founding event of "Family", naming version 1 | a1 writes no suspension into "Family": a suspension takes a new pod of version 2 |
+| each pod | the created event of "Family", naming version 1 | a1 writes no suspension into "Family": a suspension takes a new pod of version 2 |
 | the folded membership | the digest two devices compare | the digests differ, and each device goes on reading its own |
 
 ### What an older build does with what it cannot read
@@ -64,7 +64,7 @@ Some rules read more than one chain, and an entry a build cannot read reaches ev
 - Refused, as a member the device does not list: the older device stops serving that member's devices, which sync with updated members only.
 - Served by its last known state: nothing stops, and a member that a newer rule has since cut off reaches the record store through an older device.
 
-**Example:** a later version adds an act that cuts a member off the record store sooner than a kick; Alice uses it on Bob, and c1, on the earlier build, holds it unread; Bob's phone b1 asks c1 for a session on the record store.
+**Example:** a later version adds an act that cuts a member off the record store sooner than a removal; Alice uses it on Bob, and c1, on the earlier build, holds it unread; Bob's phone b1 asks c1 for a session on the record store.
 
 | option | c1 |
 |---|---|
@@ -82,7 +82,7 @@ The fold of each shipped version stays in the code as it shipped, and the next i
 
 | option | the refactoring, every answer unchanged | the change to the precedence |
 |---|---|---|
-| a golden corpus | passes | fails on the sets where a kick and a promotion share a point |
+| a golden corpus | passes | fails on the sets where a removal and a promotion share a point |
 | a digest of the source | fails | fails |
 
 ### When a build starts writing a newer version's entries
@@ -106,14 +106,14 @@ Reading by a newer fold is safe at once, since it answers whatever the older one
 Some changes cannot keep what an earlier entry means: a shipped fold that answers wrong, and a rule that from some point on every act anchors in its author's key event log.
 
 - A switch inside the pod: an owner's act names, for every member's chain, the point after which the new rules apply. Within one chain "after" is exact, so the entries stay one source of truth. The switch touches every chain, so a build has to know its kind from the first build that reads versions on, and to take it as the point where its own answers end.
-- A new generation of the pod, as Matrix upgrades a room: the members join a new pod founded under the new rules, and the old one ends with an entry naming its successor. Records are copied across or read from the old pod, and a link to an old record resolves through it.
+- A new generation of the pod, as Matrix upgrades a room: the members join a new pod created under the new rules, and the old one ends with an entry naming its successor. Records are copied across or read from the old pod, and a link to an old record resolves through it.
 
 **Example:** "Family" adopts the anchoring rule; Bob's last act is at his sequence 4, and Carol's at her sequence 2.
 
 | option | what happens |
 |---|---|
 | a switch inside the pod | Alice's act names Bob's sequence 4 and Carol's sequence 2: their later acts count only when anchored, and the earlier ones stand as they are |
-| a new generation of the pod | a new pod is founded and every member joins it; "Family" holds an entry naming the new pod's id |
+| a new generation of the pod | a new pod is created and every member joins it; "Family" holds an entry naming the new pod's id |
 
 ### What happens to the pods created before this change
 

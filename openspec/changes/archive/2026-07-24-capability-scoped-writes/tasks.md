@@ -25,7 +25,7 @@
 ## 3. Ingest gate (D2, D3, D4)
 
 - [x] 3.1 The session classifier computes the write set beside the read set and deposits a per-session snapshot keyed by replica and peer, for both session roles, before any entry flows
-- [x] 3.2 The validator installed at spawn beside the access provider: hosted-issuer data replicas judge by snapshot (issuer device → all; write set → per claim; else refuse); directories, connection metadata stores, grantee-held and unregistered replicas admit as before
+- [x] 3.2 The validator installed at spawn beside the access provider: hosted-issuer data replicas judge by snapshot (issuer device → all; write set → per claim; else refuse); private metadata stores (PMSs), connection metadata stores, grantee-held and unregistered replicas admit as before
 - [x] 3.3 Grantee-side second duty: entries named by a local retraction marker are refused at ingest (the branch exists from the start, empty marker set = no-op)
 - [x] 3.4 The gate's verdict is three-valued: only a live capability decision against the session's write set signals the sender; a marker match, an unresolved session, and records the gate cannot read refuse silently, and markers are consulted on data replicas only
 - [x] 3.5 Courtesy refusal in the data service: a write at a granted namespace outside the local record's write set fails at the call site before touching the replica (D8)
@@ -39,7 +39,7 @@
 
 - [x] 5.1 Writer-side consumption of the rejection (A): the runtime installs the `rejection_observer`; a rejection is acted on only when the peer resolves as a device of the issuer (the read side's device-set resolution) and names an own author's entry — then a verdict fires at once, one session. **Remove** the re-offer counting (`RetractionTracker` pending/threshold, the sent-observer wiring, the `retraction_threshold` `SpawnOptions` knob, and the per-device stopgap that stood in for the peer check)
 - [x] 5.2 The act: physical removal through the fork operation; verify re-offering stops and the issuer's entry reads back (the set difference is gone)
-- [ ] 5.3 Markers in the directory: `retractions/<issuer-hex>/<author-hex>/<path>`, payload carrying bound, node id, content hash, timestamp; written at verdict — plus the drop rule: pruned when the entry can no longer win (superseded by a newer own write, or aged out by a retention window) and in bulk on forget, never on a bare re-grant; the retention window a constant injected like the reconcile interval
+- [ ] 5.3 Markers in the PMS: `retractions/<issuer-hex>/<author-hex>/<path>`, payload carrying bound, node id, content hash, timestamp; written at verdict — plus the drop rule: pruned when the entry can no longer win (superseded by a newer own write, or aged out by a retention window) and in bulk on forget, never on a bare re-grant; the retention window a constant injected like the reconcile interval
 - [x] 5.4 Marker consumption on every device of the identity: remove matching local entries, refuse their re-ingest (the 3.3 branch); verified against sibling flap — a sibling still holding the entry does not re-establish it
 - [x] 5.5 Surfacing: `tracing` dependency added, warn on verdict; runtime event stream in the existing changes-stream style; pdn-node subscription surface per the core delta
 - [x] 5.6 A verdict acts only on a name the local record confirms: before the marker is written, the named author, path, timestamp and content hash are matched against the replica's own record, so a fabricated bound arms nothing and a superseded version is not retracted

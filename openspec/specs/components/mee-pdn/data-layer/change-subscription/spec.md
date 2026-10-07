@@ -2,7 +2,7 @@
 
 ## Purpose
 
-What a subscription to a replica's events promises its consumer and costs the store — the runtime's connection armer and grant binder reading the directory's and the connection metadata store's change streams, a directory's catch-up wait, and any consumer of the store's event interface. Events are a hint to read the replica again, never a record of it: nothing a subscriber does, reading or not, holds up the store, and a subscriber that falls behind learns that it did.
+What a subscription to a replica's events promises its consumer and costs the store — the runtime's connection armer and grant binder reading the private metadata store (PMS) and the connection metadata store's change streams, a PMS's catch-up wait, and any consumer of the store's event interface. Events are a hint to read the replica again, never a record of it: nothing a subscriber does, reading or not, holds up the store, and a subscriber that falls behind learns that it did.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ What a subscription to a replica's events promises its consumer and costs the st
 
 A subscription to a replica's events SHALL NOT make the store wait for its subscriber. A subscription merges two buffers of 256 events each: one for the replica's inserts — an entry written on this device or arrived by sync — and one for the live events — a payload become readable, a session finished, a neighbor up or down. When either buffer is full, the store SHALL drop the event and SHALL follow the last event that buffer still delivers with a lag notice of that buffer's own; the subscriber reads a notice only after every event it stands for was emitted, so a subscriber that reads the replica again on the notice finds every entry those events reported. The guarantee holds per buffer: one burst can yield two lag notices, one from each buffer, and events of one buffer can arrive after the other buffer's notice. The sessions and the downloads a dropped event reported are not recorded anywhere and are lost. Only the store's own live engine subscribes with a delivery that waits for room, since what it does on an event — announcing a local write, queueing a download — has no other trigger; no interface outside the store offers that delivery. Without this, a subscriber that stops reading stops the store behind it: every replica of the identity stops answering, sessions to its siblings and its counterparties stall, and a caller holding a lock the subscriber waits on never gets its answer.
 
-**Example:** a1 holds a subscription to Alice's directory that it never reads; a2 connects 600 peers, one `connections/<peer-hex>` record each.
+**Example:** a1 holds a subscription to Alice's PMS that it never reads; a2 connects 600 peers, one `connections/<peer-hex>` record each.
 
 | step | a1's store | a1's subscription |
 |---|---|---|
@@ -21,7 +21,7 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 #### Scenario: A subscriber that stops reading holds up no sync
 
-- **WHEN** a device holds a subscription to its directory that it never reads, and a sibling writes more records than the subscription buffers
+- **WHEN** a device holds a subscription to its PMS that it never reads, and a sibling writes more records than the subscription buffers
 - **THEN** the device takes in every record, its own writes and reads go on answering, and the subscription, read at last, yields a change
 
 #### Scenario: An unread subscription holds up neither entries nor their content
@@ -36,9 +36,9 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 ### Requirement: A change stream reports every change, dropped ones by a lag notice
 
-The change streams of the directory and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield each lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read for each of the two buffers the burst overflowed.
+The change streams of the PMS and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield each lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read for each of the two buffers the burst overflowed.
 
-**Example:** a2, Alice's second device, reads the `changes()` stream of her directory while a1 opens a connection to Bob.
+**Example:** a2, Alice's second device, reads the `changes()` stream of her PMS while a1 opens a connection to Bob.
 
 | `LiveEvent` on a2's replica | item | `get_ticket("connection-metadata/<bob-hex>/own")`, read again |
 |---|---|---|
@@ -50,5 +50,5 @@ The change streams of the directory and of the connection metadata store SHALL y
 
 #### Scenario: A lag notice reads as a change
 
-- **WHEN** a directory's change stream was left unread while more changes arrived than it buffers
-- **THEN** the directory lists every record the dropped changes reported, and the stream yields an item when read
+- **WHEN** a PMS's change stream was left unread while more changes arrived than it buffers
+- **THEN** the PMS lists every record the dropped changes reported, and the stream yields an item when read

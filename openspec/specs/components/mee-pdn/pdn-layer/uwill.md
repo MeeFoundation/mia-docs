@@ -46,7 +46,7 @@ A UWill capability grants access to **exactly one claim**. The resource field is
 
 Prefix-based scoping and other geometric regions are intentionally not supported at the UWill level. If a use case requires granting access to a set of claims, the issuer SHALL produce one UWill delegation per `ClaimId`.
 
-> **Why claim-id only.** Top-level UWill capabilities trade expressiveness for auditability and domain alignment: a capability names exactly the claim it grants, with no implicit reach. Bulk-sharing patterns (a directory, a thread, a calendar's entries) are constructed at the layer above UWill by issuing capabilities per claim; storage-level scoping primitives (path prefixes, key ranges) are not exposed here.
+> **Why claim-id only.** Top-level UWill capabilities trade expressiveness for auditability and domain alignment: a capability names exactly the claim it grants, with no implicit reach. Bulk-sharing patterns (a private metadata store (PMS), a thread, a calendar's entries) are constructed at the layer above UWill by issuing capabilities per claim; storage-level scoping primitives (path prefixes, key ranges) are not exposed here.
 
 ## Chain validation
 
@@ -72,7 +72,7 @@ Eventually-consistent, CID-based:
 
 UWill capabilities reference identities; the sync layer authenticates a session by the peer's node id. The design bridges the two:
 
-- A `PdnId` is resolved to the identity's device set — the device records of its directory, and the device set it publishes into each connection metadata store.
+- A `PdnId` is resolved to the identity's device set — the device records of its PMS, and the device set it publishes into each connection metadata store.
 - Capability chains do not break on key rotation because they reference the identity, not raw keys.
 - Adding or removing a device under an existing `PdnId` does not require re-issuing delegations — the device set widens or narrows on its own.
 

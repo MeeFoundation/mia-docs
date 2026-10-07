@@ -72,7 +72,7 @@ This is the act the product's privacy claim rests on: 2 lives on one device that
 - **THEN** nothing it can read or list names the other identity or anything inside it
 
 ### Requirement: A connection is made by 2 people, and the code burns
-The demonstration SHALL show an invite payload rendered as a code on one device's screen and read by the other device's camera, ending in a connection that both sides list. No account, no directory, and no third party SHALL take part.
+The demonstration SHALL show an invite payload rendered as a code on one device's screen and read by the other device's camera, ending in a connection that both sides list. No account, no private metadata store (PMS), and no third party SHALL take part.
 
 The same code SHALL then be presented a second time and be refused, with no second connection recorded on the inviting side. The refusal SHALL be shown as a refusal on the screen, not as a silent absence of effect.
 

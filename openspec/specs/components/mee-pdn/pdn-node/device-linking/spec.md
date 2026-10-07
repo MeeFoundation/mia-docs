@@ -2,23 +2,23 @@
 
 ## Purpose
 
-How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from the pairing ALPN because the stakes differ (a whole-directory write ticket versus per-connection read tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its store set, which is what every later device is brought up onto. The dialogue hands the newcomer that store set directly — write tickets to the identity's [directory](../../data-layer/private-metadata-store/spec.md) and its [data store](../../data-layer/data-store/spec.md), minted from the inviter's local replicas and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter registers the newcomer as pending before replying, the newcomer confirming itself once the tickets are in hand. The exchange is bearer-level for now: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both devices must be online — pending linking invites, device removal, and revocation are future work.
+How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from the pairing ALPN because the stakes differ (a whole-private metadata store (PMS) write ticket versus per-connection read tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its store set, which is what every later device is brought up onto. The dialogue hands the newcomer that store set directly — write tickets to the identity's [PMS](../../data-layer/private-metadata-store/spec.md) and its [data store](../../data-layer/data-store/spec.md), minted from the inviter's local replicas and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter registers the newcomer as pending before replying, the newcomer confirming itself once the tickets are in hand. The exchange is bearer-level for now: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue, deferred (ADR-0008's interim posture), and both devices must be online — pending linking invites, device removal, and revocation are future work.
 
 ## Requirements
 
 ### Requirement: An identity is provisioned with its full store set on its first device
-Creating an identity SHALL provision its store set on the creating device: the private-metadata directory and the identity's data namespace are created, the creating device's node id is recorded in the directory's device set, and the data namespace's ticket is published in the directory under the `data` kind. The directory copy of the data ticket is the durable record; the linking dialogue below hands the bootstrap tickets over directly.
+Creating an identity SHALL provision its store set on the creating device: the PMS and the identity's data namespace are created, the creating device's node id is recorded in the PMS's device set, and the data namespace's ticket is published in the PMS under the `data` kind. The PMS copy of the data ticket is the durable record; the linking dialogue below hands the bootstrap tickets over directly.
 
-**Example:** Alice's directory right after `create()` on a1 (Alice's first device); `<a1-node-id>` is a1's `NodeId` in 64 lowercase hex.
+**Example:** Alice's PMS right after `create()` on a1 (Alice's first device); `<a1-node-id>` is a1's `NodeId` in 64 lowercase hex.
 
 | key | value | what it records |
 |---|---|---|
 | `devices/<a1-node-id>` | `01` | a1, the only confirmed device |
-| `tickets/data` | `doc…` (the `DocTicket`'s text, `ShareMode::Write`) | Alice's data namespace, hosted on a1 beside the directory |
+| `tickets/data` | `doc…` (the `DocTicket`'s text, `ShareMode::Write`) | Alice's data namespace, hosted on a1 beside the PMS |
 
-#### Scenario: Creation provisions directory and data namespace
+#### Scenario: Creation provisions PMS and data namespace
 - **WHEN** an identity is created on a runtime
-- **THEN** the runtime hosts the identity's directory with the creating device in its device set, hosts the identity's data namespace, and the directory carries the data namespace's ticket under the `data` kind
+- **THEN** the runtime hosts the identity's PMS with the creating device in its device set, hosts the identity's data namespace, and the PMS carries the data namespace's ticket under the `data` kind
 
 ### Requirement: A linking invite is one-time, short-lived, and bearer-free
 The identity service SHALL mint a linking invite for a hosted identity: a fresh random one-time secret (32 bytes from the operating-system generator) with a short lifetime (a default with an invite-time override), held pending on the inviting runtime, and a self-contained linking payload carrying a format version, the inviting device's node address, the secret, and the identity's `PdnId`. The payload SHALL carry no ticket and no identity proof — nothing in it grants durable access, so a photographed payload expires with its secret. Minting a linking invite for an identity the runtime does not host SHALL be refused with no pending state created.
@@ -60,7 +60,7 @@ not in it:    a2's node id; a1 takes it from connection.remote_id(), the connect
 
 #### Scenario: Linking completes between two runtimes
 - **WHEN** runtime B links with a live linking invite minted on runtime A
-- **THEN** the dialogue completes over the linking ALPN and B holds the directory and data-namespace tickets from the reply
+- **THEN** the dialogue completes over the linking ALPN and B holds the PMS and data-namespace tickets from the reply
 
 #### Scenario: An unknown payload version is refused before dialing
 - **WHEN** link is given a payload with an unsupported format version
@@ -97,7 +97,7 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: The inviter registers the newcomer as pending before replying
-After the burn, the inviter SHALL write the newcomer's device record into its own directory replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the directory, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary directory replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. A pending record whose device never confirms SHALL be tombstoned by the first cleanup that runs 24 hours or more after the creation time its payload carries, whatever restarts or re-imports happen meanwhile, so an abandoned attempt leaves nothing that outlives it; the registration writes that payload as `01` followed by the time in 8 bytes of big-endian seconds since the Unix epoch. Cleanup SHALL treat every other payload by its shape: `01` alone is rewritten with the cleanup's own time, so that record expires 24 hours after the cleanup that first observed it; a version-1 payload of any other shape — `01` not followed by exactly 8 bytes, or followed by a time the clock cannot represent — is tombstoned by the first cleanup that observes it, without waiting 24 hours; a payload whose first byte names another version is left alone, and never expires on this build. The [private metadata store](../../data-layer/private-metadata-store/spec.md) holds when cleanup runs. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
+After the burn, the inviter SHALL write the newcomer's device record into its own PMS replica as pending — using the node id of the connection's authenticated peer, never a claimed field — and only then reply. The registration is a local write on a device that already holds the PMS, so no cross-node delivery sits in the linking critical path, and the identity's existing devices learn of the newcomer through ordinary PMS replication. A pending record SHALL confer nothing: session classification consults the confirmed device set alone, so a reply lost after the registration leaves a device that is visible to the identity's other devices and admitted nowhere, and a fresh invite converges. A pending record whose device never confirms SHALL be tombstoned by the first cleanup that runs 24 hours or more after the creation time its payload carries, whatever restarts or re-imports happen meanwhile, so an abandoned attempt leaves nothing that outlives it; the registration writes that payload as `01` followed by the time in 8 bytes of big-endian seconds since the Unix epoch. Cleanup SHALL treat every other payload by its shape: `01` alone is rewritten with the cleanup's own time, so that record expires 24 hours after the cleanup that first observed it; a version-1 payload of any other shape — `01` not followed by exactly 8 bytes, or followed by a time the clock cannot represent — is tombstoned by the first cleanup that observes it, without waiting 24 hours; a payload whose first byte names another version is left alone, and never expires on this build. The [private metadata store](../../data-layer/private-metadata-store/spec.md) holds when cleanup runs. The runtime's shutdown SHALL let this serving half — the burn, the registration and the reply — finish within the fixed budget it gives the serving half of a pairing dialogue, before it stops the stores the registration writes to; a linking dialogue that would begin after that wait SHALL be refused before its secret is verified, so nothing burns.
 
 **Example:** a1 (Alice's first device) serves the link of a2 (her second); `<a2-node-id>` comes from `connection.remote_id()`, not the request.
 
@@ -105,21 +105,21 @@ After the burn, the inviter SHALL write the newcomer's device record into its ow
 |---|---|---|
 | 1 | `serving_halves.enter()` | takes a permit; once a shutdown has drained them, the dialogue is refused here, nothing burned |
 | 2 | `verify_and_burn` | the secret leaves `pending_linking_invites` |
-| 3 | `add_pending_device` | `pending-devices/<a2-node-id>` in Alice's directory on a1: a local write, no sync awaited |
+| 3 | `add_pending_device` | `pending-devices/<a2-node-id>` in Alice's PMS on a1: a local write, no sync awaited |
 | 4 | both tickets minted | |
 | 5 | the reply is sent | a reply that never reaches a2 leaves it pending: visible to Alice's devices, admitted by none |
 | `Runtime::shutdown` waits up to 10 s (`SHUTDOWN_SERVING_BUDGET`) for a permit held in steps 1 to 5 before it stops the stores | | |
 
 #### Scenario: The newcomer is registered on the inviting device
 - **WHEN** runtime B completes the linking dialogue against runtime A
-- **THEN** A's directory replica already contains B's node id, with no wait on any sync exchange
+- **THEN** A's PMS replica already contains B's node id, with no wait on any sync exchange
 
 #### Scenario: The registered id is the connection's, not a claimed one
 - **WHEN** the inviter registers a newcomer
 - **THEN** the recorded node id equals the authenticated endpoint id of the dialing connection
 
 #### Scenario: A pending registration is served nothing
-- **WHEN** a device is registered as pending in an identity's directory and holds a grant on one claim of that identity's data namespace
+- **WHEN** a device is registered as pending in an identity's PMS and holds a grant on one claim of that identity's data namespace
 - **THEN** it receives exactly what the grant names, and the identity's remaining entries never reach it
 
 #### Scenario: A dialogue lost after commit converges on a fresh invite
@@ -142,7 +142,7 @@ The inviter SHALL preserve uniform remote refusal after a linking secret is veri
 | failing step | a2's link gets | a1's `subscribe_linking_failures()` receives |
 |---|---|---|
 | `add_pending_device` | `LinkingRefused` | `LinkingLocalFailure::PendingDeviceWrite { identity, newcomer }` |
-| directory write-ticket mint | `LinkingRefused` | `LinkingLocalFailure::DirectoryTicketMint { identity, newcomer }` |
+| PMS write-ticket mint | `LinkingRefused` | `LinkingLocalFailure::PmsTicketMint { identity, newcomer }` |
 | data write-ticket mint | `LinkingRefused` | `LinkingLocalFailure::DataTicketMint { identity, newcomer }` |
 
 #### Scenario: Pending registration fails after burn
@@ -150,15 +150,15 @@ The inviter SHALL preserve uniform remote refusal after a linking secret is veri
 - **THEN** the peer receives the uniform refusal and the inviter records the storage failure locally
 
 ### Requirement: The newcomer confirms itself once the tickets are in hand
-A device that has imported the directory and its identity's data namespace SHALL promote its own pending record to confirmed. Writing that record requires the directory's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
+A device that has imported the PMS and its identity's data namespace SHALL promote its own pending record to confirmed. Writing that record requires the PMS's write ticket, so the record is evidence the reply arrived — which the inviter, having sent it into a connection that may drop, cannot establish. Until the confirmation replicates, the identity's other devices refuse the newcomer's data sessions and re-serve it on a later reconcile pass.
 
-The confirmation SHALL be written only after the newcomer's own hosting record is written, and never before it. What a device writes into the directory replicates to every other device of the identity, and no rollback reaches it there — so a link that published before it committed could fail locally and still leave the identity naming a device that hosts nothing, with no operation anywhere able to take that name back. A written record survives a process kill, but its rename is not synced to disk ([restart recovery](../restart-recovery/spec.md)): an operating-system crash or a power loss just after the link can take the record back after the confirmation has replicated, and the identity then names a device that hosts nothing. A confirmation that fails after the commit SHALL NOT fail the link and SHALL NOT be rolled back: the device is hosted and recorded, and it SHALL write the record itself whenever it finds its identity's directory without it — which is also how a device that was interrupted between the two comes back whole.
+The confirmation SHALL be written only after the newcomer's own hosting record is written, and never before it. What a device writes into the PMS replicates to every other device of the identity, and no rollback reaches it there — so a link that published before it committed could fail locally and still leave the identity naming a device that hosts nothing, with no operation anywhere able to take that name back. A written record survives a process kill, but its rename is not synced to disk ([restart recovery](../restart-recovery/spec.md)): an operating-system crash or a power loss just after the link can take the record back after the confirmation has replicated, and the identity then names a device that hosts nothing. A confirmation that fails after the commit SHALL NOT fail the link and SHALL NOT be rolled back: the device is hosted and recorded, and it SHALL write the record itself whenever it finds its identity's PMS without it — which is also how a device that was interrupted between the two comes back whole.
 
-The confirmed set is written by the devices themselves, each holding the directory's write ticket, and the newest write at a key is the one that reads back. Removal therefore cannot be expressed as the absence of a device's record: any device may write its own record again — and a device recovering its own hosting has reason to — after which the removal is simply gone, with nothing left to say it ever happened. Device revocation, when it is designed, SHALL be a record of its own, which a device consults before writing its own record and obeys, rather than the deletion of the record it revokes.
+The confirmed set is written by the devices themselves, each holding the PMS's write ticket, and the newest write at a key is the one that reads back. Removal therefore cannot be expressed as the absence of a device's record: any device may write its own record again — and a device recovering its own hosting has reason to — after which the removal is simply gone, with nothing left to say it ever happened. Device revocation, when it is designed, SHALL be a record of its own, which a device consults before writing its own record and obeys, rather than the deletion of the record it revokes.
 
-**Example:** a2 (Alice's second device) links from an invite of a1 (her first) and is killed at one of three moments; a2's hosting record is `identities/<alice-hex>/directory` on a2's disk.
+**Example:** a2 (Alice's second device) links from an invite of a1 (her first) and is killed at one of three moments; a2's hosting record is `identities/<alice-hex>/pms` on a2's disk.
 
-| killed after | a2's hosting record | Alice's directory for a2 | a2's next start |
+| killed after | a2's hosting record | Alice's PMS for a2 | a2's next start |
 |---|---|---|---|
 | the catch-up | absent | `pending-devices/<a2-node-id>` | hosts nothing; the key expires 24 h after a1 wrote it |
 | the commit | written | `pending-devices/<a2-node-id>` | hosts Alice; the armer's first sweep confirms a2 |
@@ -173,12 +173,12 @@ The confirmed set is written by the devices themselves, each holding the directo
 - **THEN** the dialing device is not in the identity's confirmed device set
 
 #### Scenario: A link publishes nothing before it commits
-- **WHEN** a link is held at its commit point and the identity's directory is read from another of its devices
+- **WHEN** a link is held at its commit point and the identity's PMS is read from another of its devices
 - **THEN** the dialing device is not in the confirmed set, and it appears there only after the commit is released
 
 #### Scenario: A link that cannot be recorded leaves nothing on the identity
 - **WHEN** a link fails because the dialing device cannot write the identity's hosting record
-- **THEN** it hosts nothing, the identity's directory never names it, and a later link from the same device succeeds and is named
+- **THEN** it hosts nothing, the identity's PMS never names it, and a later link from the same device succeeds and is named
 
 ### Requirement: Cancellation cleanup precedes retry
 After importing replicas, a cancelled linking attempt SHALL retain its reservation until rollback completes. Runtime shutdown SHALL wait up to 10 seconds for tracked linking and establishment cleanup, and cleanup owned by an older attempt SHALL NOT remove state committed by a later retry.
@@ -202,58 +202,58 @@ After importing replicas, a cancelled linking attempt SHALL retain its reservati
 - **THEN** shutdown waits within its cleanup budget and leaves no reservation or imported replica from the cancelled attempt
 
 ### Requirement: The reply hands over the bootstrap tickets
-The linking reply SHALL carry write tickets to the identity's directory and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through directory ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the directory as the identity's directory replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, founder or not.
+The linking reply SHALL carry write tickets to the identity's PMS and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through PMS ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the PMS as the identity's PMS replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, first device or not.
 
 **Example:** the `LinkingResponse` a1 sends a2 (Alice's first and second devices): postcard, one frame of at most 65,536 bytes.
 
 | field | what a1 puts in it | what a2 does with it |
 |---|---|---|
-| `directory` | write ticket minted from a1's directory replica | appends a1's address from the payload, imports it as Alice's directory |
+| `pms` | write ticket minted from a1's PMS replica | appends a1's address from the payload, imports it as Alice's PMS |
 | `data` | write ticket minted from a1's replica of Alice's data namespace | imports it under issuer Alice, held for identity Alice |
 | a1 reads nothing under `tickets/` to build it; a3 linking from a2 gets tickets minted from the replicas a2's own reply brought up | | |
 
 #### Scenario: The newcomer comes up with the full store set
-- **WHEN** runtime B links into an identity and the directory's first sync completes
-- **THEN** B hosts the identity's directory and its data namespace, and an entry written under the identity on either runtime becomes readable on the other
+- **WHEN** runtime B links into an identity and the PMS's first sync completes
+- **THEN** B hosts the identity's PMS and its data namespace, and an entry written under the identity on either runtime becomes readable on the other
 
-#### Scenario: Linking through a non-founder device
+#### Scenario: Linking through a linked device
 - **WHEN** device 2 was itself linked into an identity, and device 3 links from an invite minted on device 2
-- **THEN** device 3 comes up with the directory and the data namespace, and all three devices' device sets converge to three
+- **THEN** device 3 comes up with the PMS and the data namespace, and all three devices' device sets converge to three
 
 ### Requirement: Link returns caught up, and failure leaves no local residue
-`link` SHALL NOT report success until the imported directory has completed one successful sync exchange that started after the import — one bounded wait, not a retry loop, which a successful session with any peer ends; in practice that peer is the inviter, the only address the directory ticket carries; a directory that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the directory's contents does not discharge this requirement. The first exchange counts however quickly it finishes: the wait SHALL be listening before the arming starts the directory's sync, because an exchange that finished before the wait began would leave it waiting for the next one, which the node's periodic reconcile pass may bring only after the caller's budget is spent.
+`link` SHALL NOT report success until the imported PMS has completed one successful sync exchange that started after the import — one bounded wait, not a retry loop, which a successful session with any peer ends; in practice that peer is the inviter, the only address the PMS ticket carries; a PMS that cannot catch up within the caller's timeout SHALL surface as an error, not a hang. The property waited on is a completed session, not arrived content: a runtime that never synced and one that synced and found nothing new must not be confused, so polling the PMS's contents does not discharge this requirement. The first exchange counts however quickly it finishes: the wait SHALL be listening before the arming starts the PMS's sync, because an exchange that finished before the wait began would leave it waiting for the next one, which the node's periodic reconcile pass may bring only after the caller's budget is spent.
 
 The caller's timeout SHALL bound the whole act, the dialogue included: the dialogue spends from the budget first and the catch-up gets what remains, so a dialed inviter that never answers costs the caller its budget — surfaced as its own typed outcome — and never the transport's idle timeout. Without this bound the budget would govern only the last third of the act, and a hung inviter would hold the caller for as long as the transport tolerates a silent connection, however small a budget the caller named.
 
-The dialing runtime SHALL arm the identity for session classification the moment its directory is imported, before the data namespace is imported — so at no instant does the data binding exist ahead of the book that judges its sessions. A data replica no records can judge refuses every session ([multi-identity](../../data-layer/multi-identity/spec.md)), so the other order opens no serving window either; what it costs is the data namespace's first sessions, refused while nothing judges them and retried by nothing before the node's next reconcile pass. The cost of arming early is bounded and fail-closed: while the directory is still converging, callers it cannot yet resolve are refused, and a refused device is served once its record replicates in — the node's periodic reconcile pass is the retry cadence.
+The dialing runtime SHALL arm the identity for session classification the moment its PMS is imported, before the data namespace is imported — so at no instant does the data binding exist ahead of the book that judges its sessions. A data replica no records can judge refuses every session ([multi-identity](../../data-layer/multi-identity/spec.md)), so the other order opens no serving window either; what it costs is the data namespace's first sessions, refused while nothing judges them and retried by nothing before the node's next reconcile pass. The cost of arming early is bounded and fail-closed: while the PMS is still converging, callers it cannot yet resolve are refused, and a refused device is served once its record replicates in — the node's periodic reconcile pass is the retry cadence.
 
-On any failure after import, the dialing runtime SHALL undo what this linking did in this order — the data-namespace import, then the directory replica, then the identity's half of the node, whose removal disarms the identity for session classification — so a failed link leaves no local residue and the identity is unknown to the runtime again. The link brings up stores of its own for the identity it joins, so the undo drops what it brought up and reaches nothing else: a namespace of that same issuer which another identity of this node holds under a grant is held for that identity and is untouched by this rollback. The emptied store the undo leaves, and the subdirectory holding it, MAY remain; a start SHALL host nothing from a subdirectory the runtime's record of hosted identities does not name. A device record already committed on the inviter side may remain, per the lost-reply posture above.
+On any failure after import, the dialing runtime SHALL undo what this linking did in this order — the data-namespace import, then the PMS replica, then the identity's half of the node, whose removal disarms the identity for session classification — so a failed link leaves no local residue and the identity is unknown to the runtime again. The link brings up stores of its own for the identity it joins, so the undo drops what it brought up and reaches nothing else: a namespace of that same issuer which another identity of this node holds under a grant is held for that identity and is untouched by this rollback. The emptied store the undo leaves, and the subdirectory holding it, MAY remain; a start SHALL host nothing from a subdirectory the runtime's record of hosted identities does not name. A device record already committed on the inviter side may remain, per the lost-reply posture above.
 
 **Example:** a2 (Alice's second device) runs `link(payload, 30 s)`; its steps in order, and what running out of budget at each leaves.
 
 | # | step | what it does |
 |---|---|---|
 | 1 | dialogue with a1 | spends from the 30 s first; still in flight at the deadline: fails, nothing to undo |
-| 2 | `provision_identity`, then import the directory | |
-| 3 | `watch_catch_up` | listening before anything can sync the directory |
-| 4 | `host_identity` | armed, and the directory's sync starts; a caller it cannot resolve yet is refused |
+| 2 | `provision_identity`, then import the PMS | |
+| 3 | `watch_catch_up` | listening before anything can sync the PMS |
+| 4 | `host_identity` | armed, and the PMS's sync starts; a caller it cannot resolve yet is refused |
 | 5 | import the data namespace | under issuer Alice |
-| 6 | wait with what is left | for the first successful session started after step 3, with any peer; none by the deadline: fails; `undo_link` undoes the data import, drops the directory, then `unhost_identity` drops Alice's half of the node, which disarms her |
+| 6 | wait with what is left | for the first successful session started after step 3, with any peer; none by the deadline: fails; `undo_link` undoes the data import, drops the PMS, then `unhost_identity` drops Alice's half of the node, which disarms her |
 
-#### Scenario: Success implies the directory is caught up
+#### Scenario: Success implies the PMS is caught up
 - **WHEN** `link` returns success
-- **THEN** the newcomer's directory replica has completed a successful sync exchange started after the import, and the device set it reads locally includes the identity's existing devices
+- **THEN** the newcomer's PMS replica has completed a successful sync exchange started after the import, and the device set it reads locally includes the identity's existing devices
 
 #### Scenario: The first exchange counts however quickly it finishes
-- **WHEN** the directory's first sync exchanges finish before the link begins its wait, and the caller's budget ends before the next periodic reconcile pass
+- **WHEN** the PMS's first sync exchanges finish before the link begins its wait, and the caller's budget ends before the next periodic reconcile pass
 - **THEN** `link` succeeds on the first exchange rather than failing with the catch-up timeout
 
 #### Scenario: No serving window opens while the link catches up
-- **WHEN** the data namespace of a linking identity receives a session from a caller the still-converging directory cannot resolve, before `link` has returned
+- **WHEN** the data namespace of a linking identity receives a session from a caller the still-converging PMS cannot resolve, before `link` has returned
 - **THEN** the session is refused — the identity was armed before the data namespace was imported, so no session reaches the namespace ahead of the book that judges it
 
 #### Scenario: A timed-out link leaves nothing behind on the dialing node
-- **WHEN** the directory cannot complete a first sync within the timeout
+- **WHEN** the PMS cannot complete a first sync within the timeout
 - **THEN** `link` fails, the identity is absent from the runtime's hosted identities and disarmed for classification, and operations addressed to it are refused as unknown — as they were before the attempt, not as storage errors against a dropped replica
 
 #### Scenario: A failed link leaves a granted namespace of the same issuer intact
@@ -280,7 +280,7 @@ Linking SHALL report a refusal by the inviting device to its own caller as a ref
 - **THEN** the first reports a refusal and the second reports the unreachable outcome — each recognizable as its own, distinguishable without matching on error text
 
 #### Scenario: A refusal is not a catch-up timeout
-- **WHEN** linking is refused by the inviting device, and separately when the dialogue succeeds but the imported directory does not catch up within the timeout
+- **WHEN** linking is refused by the inviting device, and separately when the dialogue succeeds but the imported PMS does not catch up within the timeout
 - **THEN** the two are distinguishable without matching on error text, and both leave the newcomer with no local residue of the attempt
 
 #### Scenario: A hung inviter costs the caller its budget and nothing more

@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: A node hosts several identities side by side
-A `SyncNode` SHALL host the store sets of any number of identities concurrently: each identity's private metadata store (the directory, carrying its device set, tickets, and connections records) and data store are separate replicas, created or imported on the same node. Data stores are addressed by their issuer's `PdnId`; the directory is reached through its store handle. The stores of different identities SHALL NOT share a replica.
+A `SyncNode` SHALL host the store sets of any number of identities concurrently: each identity's private metadata store (the private metadata store (PMS), carrying its device set, tickets, and connections records) and data store are separate replicas, created or imported on the same node. Data stores are addressed by their issuer's `PdnId`; the PMS is reached through its store handle. The stores of different identities SHALL NOT share a replica.
 
 #### Scenario: Two identities' private stores on one node
 - **WHEN** private metadata stores are created on one node for identity A and identity B

@@ -18,7 +18,7 @@ ADR-0009 decides the collapse: drop the pair, one namespace per issuer, granular
 
 - **Computed namespace key / dropping the mapping** — safe only once write-authority is UWill, not namespace-secret possession (design D2). Until then: random key + interim mapping.
 - **UWill itself** (ADR-0007) — this change consumes the per-claim model, it does not implement the token.
-- **Lazy data-namespace import at device linking** — the directory rail and staging are recorded in design D4; the import is a follow-up. Device-internal stores are unaffected (`components/mee-pdn/pdn-node/device-linking.md`).
+- **Lazy data-namespace import at device linking** — the private metadata store (PMS) rail and staging are recorded in design D4; the import is a follow-up. Device-internal stores are unaffected (`components/mee-pdn/pdn-node/device-linking.md`).
 - **Confidentiality** — deferred to UWill; the replica boundary is not a confidentiality tool, so one-per-issuer regresses nothing (design D3).
 
 ## Capabilities

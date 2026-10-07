@@ -2,45 +2,45 @@
 
 ## Purpose
 
-What a [runtime](../core/spec.md) holds after it starts again on a directory it used before. Each identity this node hosts carries one durable record in its own subdirectory, beside its replica store — the namespace of its private metadata directory — and nothing else: that directory already carries the identity's own state — its device set, its tickets, its connections records (Invariant 1) — so a second record of the same facts could only disagree with it. Recovery re-hosts each recorded identity through the steps a newly created identity goes through once its stores exist, and lets the rest re-derive along the product path: the data namespace from its published `data` ticket, the connections from the identity's connection records, each connection's metadata pair from that pair's two published tickets, the granted namespaces from the counterparty's grant records through the sweep that imports them anyway. It needs no peer, no network, and no ceremony repeated. The bytes and the key underneath are [durable storage](../../data-layer/durable-storage/spec.md)'s; what a restart deliberately does not bring back — invites minted and not consumed, ceremonies in flight — is named here.
+What a [runtime](../core/spec.md) holds after it starts again on a directory it used before. Each identity this node hosts carries one durable record in its own subdirectory, beside its replica store — the namespace of its private metadata store (PMS) — and nothing else: that PMS already carries the identity's own state — its device set, its tickets, its connections records (Invariant 1) — so a second record of the same facts could only disagree with it. Recovery re-hosts each recorded identity through the steps a newly created identity goes through once its stores exist, and lets the rest re-derive along the product path: the data namespace from its published `data` ticket, the connections from the identity's connection records, each connection's metadata pair from that pair's two published tickets, the granted namespaces from the counterparty's grant records through the sweep that imports them anyway. It needs no peer, no network, and no ceremony repeated. The bytes and the key underneath are [durable storage](../../data-layer/durable-storage/spec.md)'s; what a restart deliberately does not bring back — invites minted and not consumed, ceremonies in flight — is named here.
 
 ## Requirements
 
 ### Requirement: The runtime records which identities it hosts
-A runtime with durable storage SHALL keep, for each identity it hosts, a hosting record in that identity's own subdirectory of its storage directory, beside the identity's replica store: the namespace of the identity's private metadata directory, the identity being the name of the subdirectory. It SHALL record nothing else about it — no data namespace, no connections, no metadata pairs, no bound grants — because the directory is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. A record SHALL be written beside, synced to disk, and renamed over, so no start ever reads a half-written record: a process killed before the rename leaves no record, from a create or link that never reported success, and a process killed after it leaves the whole record. Nothing syncs the directory holding the record after the rename, so an operating-system crash or a power loss can take a record back after its create or link reported success, and the next start then finds that subdirectory without a record and hosts nothing from it. A record belongs to its own identity alone: recording one identity never rewrites another's.
+A runtime with durable storage SHALL keep, for each identity it hosts, a hosting record in that identity's own subdirectory of its storage directory, beside the identity's replica store: the namespace of the identity's PMS, the identity being the name of the subdirectory. It SHALL record nothing else about it — no data namespace, no connections, no metadata pairs, no bound grants — because the PMS is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. A record SHALL be written beside, synced to disk, and renamed over, so no start ever reads a half-written record: a process killed before the rename leaves no record, from a create or link that never reported success, and a process killed after it leaves the whole record. Nothing syncs the directory holding the record after the rename, so an operating-system crash or a power loss can take a record back after its create or link reported success, and the next start then finds that subdirectory without a record and hosts nothing from it. A record belongs to its own identity alone: recording one identity never rewrites another's.
 
 **Example:** Alice-work and Alice-leisure, two identities on one node; recording Alice-leisure touches her own subdirectory alone.
 
 ```
-identities/<alice-work-hex>/directory          Alice-work's record, untouched: her directory's NamespaceId, 64 hex characters
-identities/<alice-leisure-hex>/directory.tmp   written and synced to disk first; a kill here leaves Alice-leisure no record
-identities/<alice-leisure-hex>/directory       renamed over from directory.tmp: her directory's NamespaceId and nothing else
-identities/<alice-leisure-hex>/                not synced after the rename: a power loss after create() returned can leave no record
-in neither record: a data namespace, a connection, a metadata pair, a bound grant; her private metadata directory holds those
+identities/<alice-work-hex>/pms          Alice-work's record, untouched: her PMS's NamespaceId, 64 hex characters
+identities/<alice-leisure-hex>/pms.tmp   written and synced to disk first; a kill here leaves Alice-leisure no record
+identities/<alice-leisure-hex>/pms       renamed over from pms.tmp: her PMS's NamespaceId and nothing else
+identities/<alice-leisure-hex>/          not synced after the rename: a power loss after create() returned can leave no record
+in neither record: a data namespace, a connection, a metadata pair, a bound grant; her PMS holds those
 ```
 
 #### Scenario: Hosting is recorded when an identity is created
 - **WHEN** an identity is created on a runtime with durable storage
-- **THEN** that identity's subdirectory holds a record naming its directory namespace, and nothing else about it
+- **THEN** that identity's subdirectory holds a record naming its PMS namespace, and nothing else about it
 
 #### Scenario: Hosting is recorded when a device links
 - **WHEN** a device links to an identity and its catch-up completes
-- **THEN** that identity's subdirectory holds a record naming the directory namespace it imported
+- **THEN** that identity's subdirectory holds a record naming the PMS namespace it imported
 
 #### Scenario: A failed record change loses no identity
 - **WHEN** recording a second identity fails — the process killed, the disk full — and the runtime restarts
 - **THEN** the first identity is hosted from its own record, untouched by the attempt, and the second is either fully hosted or absent, never half-recorded
 
 ### Requirement: A restarted runtime recovers each hosted identity along the product path
-At spawn, a runtime SHALL host every identity whose subdirectory holds a hosting record and whose store holds the directory replica that record names, each with stores of its own, by opening that identity's private metadata directory from the replica that identity already holds and performing the same registration a newly created identity performs: the directory arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the directory rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records, all imported for that identity. A contact re-derived this way that names this node's own address SHALL be reached inside the process. Recovery SHALL require no peer, no ceremony, and no network.
+At spawn, a runtime SHALL host every identity whose subdirectory holds a hosting record and whose store holds the PMS replica that record names, each with stores of its own, by opening that identity's PMS from the replica that identity already holds and performing the same registration a newly created identity performs: the PMS arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the PMS rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records, all imported for that identity. A contact re-derived this way that names this node's own address SHALL be reached inside the process. Recovery SHALL require no peer, no ceremony, and no network.
 
 **Example:** Alice's runtime restarts on its storage directory; she holds a connection to Bob, who granted her read on his `contact/email`.
 
 | comes back | read from | when |
 |---|---|---|
-| Alice, hosted | `identities/<alice-hex>/directory`, naming her directory | before spawn returns |
-| the connection to Bob | `connections/<bob-hex>` in her directory | before spawn returns |
-| her data namespace | `tickets/data` in her directory | the armer's first sweep |
+| Alice, hosted | `identities/<alice-hex>/pms`, naming her PMS | before spawn returns |
+| the connection to Bob | `connections/<bob-hex>` in her PMS | before spawn returns |
+| her data namespace | `tickets/data` in her PMS | the armer's first sweep |
 | the metadata pair | `tickets/connection-metadata/<bob-hex>/own` and `…/peer` there | the armer's first sweep |
 | Bob's namespace | `grants/<bob-hex>` in Bob's half of the pair | the grant binder's first sweep |
 | every record above is on Alice's own disk, so no peer has to answer | | |
@@ -78,8 +78,8 @@ A record SHALL become durable only after its identity's replicas are durable, so
 | killed after | on disk | the next start |
 |---|---|---|
 | `provision_identity` | `docs.redb`, `default-author` | hosts nothing from it |
-| any step up to `host_identity`: the directory with `devices/<a1-node-id>`, the data namespace, `tickets/data` | the same, holding the replicas as far as the store committed them | hosts nothing from it, serves neither |
-| `commit_hosting`: replicas flushed, record renamed in | + `directory`, the replicas committed | hosts Alice |
+| any step up to `host_identity`: the PMS with `devices/<a1-node-id>`, the data namespace, `tickets/data` | the same, holding the replicas as far as the store committed them | hosts nothing from it, serves neither |
+| `commit_hosting`: replicas flushed, record renamed in | + `pms`, the replicas committed | hosts Alice |
 | a failure rather than a kill before the commit: `CreateRollback` drops Alice's half of the running node; the files stay | | |
 | a failure of `default_author` after the commit: `create()` fails, `CreateRollback` drops Alice's half of the running node, the record stays, and the next start hosts Alice | | |
 
@@ -100,7 +100,7 @@ A record SHALL become durable only after its identity's replicas are durable, so
 - **THEN** it starts hosting nothing, and creating an identity writes that identity's record
 
 ### Requirement: A record whose replica is missing is skipped, not fatal
-A hosting record naming a directory replica its identity's store does not hold — the store gone from the subdirectory, or holding no such replica — SHALL be skipped: that identity is not hosted, the skip is reported, the record is left as it is, and every other identity recovers as usual. Where the store is gone, the skip SHALL open none in its place. A record whose store is present but does not open, or whose store holds the named replica but cannot open it, SHALL stop the start — a runtime that silently hosted less than its records name would look healthy while refusing everything. A replica that does not open SHALL fail the start with an error naming the identity; a store that does not open fails it first, with the error every failed store open gives, which names the node's storage directory and not the identity. A skip and a stop SHALL be told apart by whether the store is on disk and what it holds, never by the wording of a failure.
+A hosting record naming a PMS replica its identity's store does not hold — the store gone from the subdirectory, or holding no such replica — SHALL be skipped: that identity is not hosted, the skip is reported, the record is left as it is, and every other identity recovers as usual. Where the store is gone, the skip SHALL open none in its place. A record whose store is present but does not open, or whose store holds the named replica but cannot open it, SHALL stop the start — a runtime that silently hosted less than its records name would look healthy while refusing everything. A replica that does not open SHALL fail the start with an error naming the identity; a store that does not open fails it first, with the error every failed store open gives, which names the node's storage directory and not the identity. A skip and a stop SHALL be told apart by whether the store is on disk and what it holds, never by the wording of a failure.
 
 The asymmetry is the reason: skipping loses one identity's hosting on this device, and the record stays readable by whoever ends the hosting, while stopping the start loses every identity on that disk at once — and a runtime that cannot start cannot be asked to repair itself, leaving erasure of the storage directory as the only way back.
 
@@ -112,11 +112,11 @@ The asymmetry is the reason: skipping loses one identity's hosting on this devic
 | `docs.redb` absent | `RecordedHosting { store_present: false }` | skips x with a warning, opens no store |
 | `docs.redb` present, does not open | `provision_identity → Err(_)` | fails: `"cannot open the node's stores in <storage-dir>"`, naming no identity |
 | holds no such replica | `PrivateMetadataStore::open → Ok(None)` | skips x with a warning |
-| holds the named replica, which does not open | `PrivateMetadataStore::open → Err(_)` | fails: `"cannot recover hosted identity <x-hex>: its directory replica did not open"` |
+| holds the named replica, which does not open | `PrivateMetadataStore::open → Err(_)` | fails: `"cannot recover hosted identity <x-hex>: its PMS replica did not open"` |
 | both skips leave the record as it is, so the skip repeats on every start | | |
 
 #### Scenario: A record whose replica is absent is skipped and the rest comes back
-- **WHEN** a runtime starts on a directory recording three identities — one whose store holds its directory replica, one whose store is gone, and one whose store holds no such replica — and creates a fourth identity afterwards
+- **WHEN** a runtime starts on a directory recording three identities — one whose store holds its PMS replica, one whose store is gone, and one whose store holds no such replica — and creates a fourth identity afterwards
 - **THEN** the first is hosted and its entries read back, the other two are not hosted and reads addressed to them are refused, no store is opened where one was gone, the start succeeds, and both skipped records are left as they were
 
 ### Requirement: A runtime dropped without a shutdown releases its directory
@@ -158,7 +158,7 @@ Invites minted and not yet consumed, ceremonies in flight, and the in-memory boo
 | held before the stop | kept in | after the restart |
 |---|---|---|
 | the invite's secret | `pending_linking_invites`, in memory | gone: a2 presenting it gets `LinkingRefused` |
-| the pending record of an earlier link whose reply was lost | `pending-devices/<a2-node-id>` in Alice's directory | still there, conferring nothing, and expiring 24 h after it was written |
+| the pending record of an earlier link whose reply was lost | `pending-devices/<a2-node-id>` in Alice's PMS | still there, conferring nothing, and expiring 24 h after it was written |
 | the metadata pairs and the grants bound | `metadata_pairs`, `bound_grants`, in memory | rebuilt by the armer's sweeps |
 
 #### Scenario: A pending invite does not outlive the process

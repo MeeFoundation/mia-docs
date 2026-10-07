@@ -121,7 +121,7 @@ Given a claim and a caller's effective grants, the mechanism SHALL decide read-a
 
 An identity's own device SHALL be read-authorized for all of that identity's data without any grant, composing with Invariant 1.
 
-**Example:** sessions on Alice's data replica at her laptop a2; a1 is listed at `devices/<a1-hex>` in Alice's directory and holds no grant.
+**Example:** sessions on Alice's data replica at her laptop a2; a1 is listed at `devices/<a1-hex>` in Alice's private metadata store (PMS) and holds no grant.
 
 | entry | a1 (Alice's device) | b1 (Bob's, read grant on `contact/email`) | a3 (acts for Alice, not listed) | c1 (Carol's, outsider) |
 |---|---|---|---|---|
