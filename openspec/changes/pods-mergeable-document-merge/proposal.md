@@ -9,7 +9,7 @@ A pod stores a mergeable-document as its operations: every edit is an entry of i
 | | on every member device once they sync |
 |---|---|
 | Bob replaces "milk" with "oat milk" | an entry naming Bob, b1's author, Bob's sequence 1 and b1's operation 4 |
-| Carol removes the line "milk" | an entry naming Carol, c1's author, Carol's sequence 1 and c1's operation 2 |
+| Carol deletes the line "milk" | an entry naming Carol, c1's author, Carol's sequence 1 and c1's operation 2 |
 | `read_ops` | both entries, each with its writer, as opaque bytes |
 | what the list reads as | computed by nothing: "oat milk", an empty list and both lines are each a merge some rule could choose |
 
@@ -30,7 +30,7 @@ A mergeable-document is a markdown note or a rich text held as a JSON tree of te
 
 | option | the list reads as | where the rule comes from |
 |---|---|---|
-| an existing library | "oat milk" on every device: Bob's edit removes "milk" and inserts "oat milk", both removals take the same letters, and a text type keeps a concurrent insertion | the library's documented semantics |
+| an existing library | "oat milk" on every device: Bob's edit deletes "milk" and inserts "oat milk", both deletions take the same letters, and a text type keeps a concurrent insertion | the library's documented semantics |
 | a CRDT of our own | "oat milk", or both lines, or nothing, the same on every device | a rule this change writes and tests |
 
 ### Where the merge runs
@@ -52,12 +52,12 @@ A key orders one writer's operations; a merge across writers needs the operation
 - The dependencies in the payload, as a CRDT's change format carries them. The key layout stays, and a device merges once it holds a change's dependencies, which whole-store reconciliation brings.
 - The dependencies read by the record view, which reads an operation only once the operations it depends on are held, as the membership fold counts an event only once what it rests on is held. A document is never merged over a gap, at the cost of a second reading of the payload below pdn-layer.
 
-**Example:** Carol's removal of the line saw Bob's operation 3 and not his operation 4, and reaches Alice's laptop a2 before operation 3 does.
+**Example:** Carol's deletion of the line saw Bob's operation 3 and not his operation 4, and reaches Alice's laptop a2 before operation 3 does.
 
 | option | a2 |
 |---|---|
-| dependencies in the payload | holds the removal; the merge waits for operation 3, or merges over the gap if it allows one |
-| dependencies read by the record store | reads the removal only once operation 3 is held |
+| dependencies in the payload | holds the deletion; the merge waits for operation 3, or merges over the gap if it allows one |
+| dependencies read by the record store | reads the deletion only once operation 3 is held |
 
 ### What keeps a document's history bounded
 
@@ -81,7 +81,7 @@ The rights table grants every member the edit of another member's mergeable-docu
 
 ## Operating conditions
 
-Several devices of one member edit one document while disconnected from each other: each writes under its own author, so their operations never share a key, and the merge has to take them as two writers. A member that left or was kicked keeps its operations from while it was a member in the document, and the merge takes them as any other. Clocks decide nothing: an entry's timestamp is set by its author, and the merge orders operations by what each saw. A restart loses nothing: operations are entries, and the merged state is derived from them.
+Several devices of one member edit one document while disconnected from each other: each writes under its own author, so their operations never share a key, and the merge has to take them as two writers. A member that left or was removed keeps its operations from while it was a member in the document, and the merge takes them as any other. Clocks decide nothing: an entry's timestamp is set by its author, and the merge orders operations by what each saw. A restart loses nothing: operations are entries, and the merged state is derived from them.
 
 ## Out of Scope
 

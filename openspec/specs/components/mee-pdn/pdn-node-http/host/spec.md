@@ -159,7 +159,7 @@ The host SHALL report a runtime refusal with its allow-listed client-error statu
 
 | request | answer |
 |---|---|
-| `POST /debug/identities/<alice-work>/pods/f942dfc21acd0218d48f61f714ddfff3/acts`, `Kick(<bob>)` | 403; Bob stays a member |
+| `POST /debug/identities/<alice-work>/pods/f942dfc21acd0218d48f61f714ddfff3/acts`, `Remove(<bob>)` | 403; Bob stays a member |
 | `GET /debug/identities/<alice-work>/pods/ad58a3faa04cdc5576c8dc5823a347c6/members` | 409 |
 | `GET /debug/identities/<alice-leisure>/pods/ad58a3faa04cdc5576c8dc5823a347c6/records/<bob>/claim/<absent>` | 404 |
 
@@ -184,7 +184,7 @@ The host SHALL report a runtime refusal with its allow-listed client-error statu
 - **THEN** the response is a client error other than 404
 
 #### Scenario: A refusal by role is reported as a refusal
-- **WHEN** a plain member kicks another member of the pod
+- **WHEN** a plain member removes another member of the pod
 - **THEN** the response is a client error and every member still lists the other member
 
 #### Scenario: An absent record is reported as absent

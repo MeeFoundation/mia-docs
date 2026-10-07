@@ -268,7 +268,7 @@ on every exit            docker compose -f ops/compose-<demo>.yml down --remove-
 
 #### Scenario: The pods show carries on without its creator's devices
 - **WHEN** the pods demo stops every device of the pod's creator mid-show and starts them again later
-- **THEN** while they are down a newcomer joins on another member's invite and reads what was placed before, and an edit reaches every online member device; started again, they come back as the same nodes and read what happened without them; and an owner's kick stops what reaches the kicked member
+- **THEN** while they are down a newcomer joins on another member's invite and reads what was placed before, and an edit reaches every online member device; started again, they come back as the same nodes and read what happened without them; and an owner's removal stops what reaches the removed member
 
 ### Requirement: The stand restarts a node and asserts what came back
 The stand SHALL stop a node's container and start it again with its state directory intact, and SHALL assert that the node came back as itself: the same node id, the identity still hosted, the connection still listed, and an entry written before the stop still readable; a write made on it after the restart reaching its peer with no ceremony repeated; and the grant still readable on the peer's node. The stand SHALL also kill a node's container — no grace, no shutdown path — and start it again, asserting the same recovery, because a process that ends without warning is the ordinary end of a process, and recovery that differs by the manner of stopping depends on a goodbye a kill does not provide. One kill SHALL land in the middle of a stream of writes: every write acknowledged before the stores' settle window — the bounded delay after which an acknowledged write has committed, since the replica store and the blob store each commit after the acknowledgement, on a timer — SHALL be readable after the restart, and a write the kill cut inside that window, acknowledged or not, SHALL be absent or whole — never a torn value and never a read error. The assertion SHALL be paired, in the same scenario, with the tightest denial: a node started from the same image on an empty state directory holds none of it. Without that arm the scenario passes just as well against a node that quietly re-created everything.
@@ -355,7 +355,7 @@ The stand SHALL run two identities on one container as issuers, each connected t
 
 ### Requirement: The stand runs a pod across three containers with its paired denials
 
-The stand SHALL run, across three containers, a [pod](../../../../architecture/language/pod.md)'s creation, an invitation by its creator and one by an invited member, a claim and a mergeable-document placed by the creator, and an operation on that document appended by another member; it SHALL promote a member to owner, kick a member through that owner, and restart a member's node. In the same scenario it SHALL assert the tightest denials: a plain member's promotion of itself and its kick of a member are refused while an owner's promotion and kick go through; a consumed invite secret is refused; a kicked member stops receiving records after the remaining members are shown to receive a later one; and a pod left before a restart stays left. What a modified node does — a forged entry, an entry outside the key layout — is not reachable over HTTP, and the data layer's own tests hold it.
+The stand SHALL run, across three containers, a [pod](../../../../architecture/language/pod.md)'s creation, an invitation by its creator and one by an invited member, a claim and a mergeable-document placed by the creator, and an operation on that document appended by another member; it SHALL promote a member to owner, remove a member through that owner, and restart a member's node. In the same scenario it SHALL assert the tightest denials: a plain member's promotion of itself and its removal of a member are refused while an owner's promotion and removal go through; a consumed invite secret is refused; a removed member stops receiving records after the remaining members are shown to receive a later one; and a pod left before a restart stays left. What a modified node does — a forged entry, an entry outside the key layout — is not reachable over HTTP, and the data layer's own tests hold it.
 
 **Example:** the scenario across containers A, B and C, hosting Alice, Bob and Carol, every step a request over HTTP.
 
@@ -363,8 +363,8 @@ The stand SHALL run, across three containers, a [pod](../../../../architecture/l
 |---|---|---|---|
 | 1 | creates "Family" and invites B | joins and invites C | joins; B's invite presented again is a client error |
 | 2 | places a claim and a note | | appends an operation to A's note |
-| 3 | | reads the claim and both operations | promotes itself and kicks B: two 403s |
-| 4 | promotes B: B is an owner on every container | kicks C | |
+| 3 | | reads the claim and both operations | promotes itself and removes B: two 403s |
+| 4 | promotes B: B is an owner on every container | removes C | |
 | 5 | places two records, one after the other | reads both | reads neither within the budget |
 | 6 | places a record while B's container is stopped | starts again on its state directory, lists the pod and reads the record | |
 | 7 | creates a second pod and invites B | joins it, leaves it and restarts: lists no such pod, and requests addressing it are 409 | |
@@ -381,12 +381,12 @@ The stand SHALL run, across three containers, a [pod](../../../../architecture/l
 
 #### Scenario: A plain member's owner-only acts are refused
 
-- **WHEN** C, no owner, promotes itself and kicks B, and A then promotes B
+- **WHEN** C, no owner, promotes itself and removes B, and A then promotes B
 - **THEN** C's two requests are client errors, C stays a plain member and B's membership is unchanged, while B reads as an owner on every container
 
-#### Scenario: A kicked member stops receiving
+#### Scenario: A removed member stops receiving
 
-- **WHEN** A promotes B, B kicks C, and A places two records one after the other
+- **WHEN** A promotes B, B removes C, and A places two records one after the other
 - **THEN** B reads both, and C reads neither within the budget once B has read the second
 
 #### Scenario: A member's node comes back with its pod

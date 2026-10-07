@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The pods service of the runtime: creating a [pod](../../../../architecture/language/pod.md) for a hosted identity, inviting and joining, ownership, reaching a member's other devices, kicking and leaving, writing records — claims, mergeable-documents and immutable-documents — into the pod, and recovering hosted pods across a restart. The two stores underneath — the membership store and the record store — are the data layer's [pod stores](../../data-layer/pod-store/spec.md); this spec covers the runtime surface and the ceremonies. A pod has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the pod itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
+The pods service of the runtime: creating a [pod](../../../../architecture/language/pod.md) for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the pod, and recovering hosted pods across a restart. The two stores underneath — the membership store and the record store — are the data layer's [pod stores](../../data-layer/pod-store/spec.md); this spec covers the runtime surface and the ceremonies. A pod has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the pod itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
 
 **Pod**
 
@@ -14,9 +14,9 @@ The pods service of the runtime: creating a [pod](../../../../architecture/langu
 | Promote member to owner        | yes        | no          |
 | Demote another owner to member | yes        | no          |
 | Demote oneself to member       | no         | no          |
-| Kick member from pod           | yes        | no          |
-| Kick another owner from pod    | yes        | no          |
-| Kick oneself from pod          | no         | no          |
+| Remove member from pod         | yes        | no          |
+| Remove another owner from pod  | yes        | no          |
+| Remove oneself from pod        | no         | no          |
 
 **Immutable-document** — attachments, for example a PDF file.
 
@@ -70,7 +70,7 @@ trait PodsService {
     /// Joins through the invite's dialogue and returns once both stores have caught up and its replica folds the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: PodInvite) -> Result<PodId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences.
-    /// `Kick` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the pod's tombstone.
+    /// `Remove` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the pod's tombstone.
     async fn act(&self, identity: PdnId, pod: PodId, act: PodAct) -> Result<()>;
 
     /// Places a record under the identity's own name at a fresh id: a claim's or an immutable-document's one entry,
@@ -89,7 +89,7 @@ trait PodsService {
 }
 
 /// The founding act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by the device sweep — never through `act`.
-enum PodAct { Promote(PdnId), Demote(PdnId), Kick(PdnId), Leave }
+enum PodAct { Promote(PdnId), Demote(PdnId), Remove(PdnId), Leave }
 struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
 enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 ```
@@ -152,7 +152,7 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 
 #### Scenario: A former member joins again
 
-- **WHEN** C left the pod or was kicked from it, and a member invites C again and C joins
+- **WHEN** C left the pod or was removed from it, and a member invites C again and C joins
 - **THEN** C reads the pod, its earlier records among what it reads, and a new record C writes reaches every member
 
 #### Scenario: A former member invited by a device that has not seen its departure joins
@@ -229,7 +229,7 @@ A created pod SHALL record its creating identity as the pod's first owner. An ow
 | `act(Alice, Family, Demote(Alice))` | a typed error, nothing written |
 | `act(Bob, Family, Demote(Alice))` | written: Alice a plain member, still a member |
 | `act(Bob, Family, Promote(Carol))` | written: Carol an owner |
-| Carol kicks Bob and Alice invites him again, then `act(Bob, Family, Promote(Alice))` | a typed error: Bob is a plain member until an owner promotes him anew |
+| Carol removes Bob and Alice invites him again, then `act(Bob, Family, Promote(Alice))` | a typed error: Bob is a plain member until an owner promotes him anew |
 
 #### Scenario: The creator is listed as owner
 
@@ -258,46 +258,46 @@ A created pod SHALL record its creating identity as the pod's first owner. An ow
 
 #### Scenario: A former owner joins again as a plain member
 
-- **WHEN** owner B is kicked, a member invites B again and B joins, and B then attempts to promote a member
+- **WHEN** owner B is removed, a member invites B again and B joins, and B then attempts to promote a member
 - **THEN** every member lists B as a plain member, and B's attempt is refused with a typed error
 
-### Requirement: Only an owner kicks a member, and only another member; leaving is forgetting
+### Requirement: Only an owner removes a member, and only another member; leaving is forgetting
 
-Kicking a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a kick by a member that is no owner, and a kick of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a pod that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a pod leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the pod then has no owner. A kicked event replicates like every pod entry; the remaining members' devices refuse the kicked member's devices the record store from the next session and serve them the membership store up to the kick, per the pod stores' rules; a device of the kicked member that learns of the kick SHALL tombstone the pod's record in its directory at the kicked event's sequence, forget the record store and keep the membership store as the pod's tombstone. A member that leaves SHALL tombstone the pod's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the pod's tombstone, so the pod is no longer listed there, while the remaining members, a co-located member of the same pod among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the pod. Before it writes its left event, the leaving device SHALL reconcile both stores with devices of the pod's other members and wait up to 10 seconds for a session with one of them, begun after the flush started, to go through on each store, since nothing outside the departure's past leaves the device once it departs; a leave that reaches no member's device in that time SHALL proceed all the same, and what no member's device held by then is lost.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a removal by a member that is no owner, and a removal of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a pod that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a pod leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the pod then has no owner. A removed event replicates like every pod entry; the remaining members' devices refuse the removed member's devices the record store from the next session and serve them the membership store up to the removal, per the pod stores' rules; a device of the removed member that learns of the removal SHALL tombstone the pod's record in its directory at the removed event's sequence, forget the record store and keep the membership store as the pod's tombstone. A member that leaves SHALL tombstone the pod's record in its directory at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the pod's tombstone, so the pod is no longer listed there, while the remaining members, a co-located member of the same pod among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the pod. Before it writes its left event, the leaving device SHALL reconcile both stores with devices of the pod's other members and wait up to 10 seconds for a session with one of them, begun after the flush started, to go through on each store, since nothing outside the departure's past leaves the device once it departs; a leave that reaches no member's device in that time SHALL proceed all the same, and what no member's device held by then is lost.
 
-**Example:** kicks and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its pod id.
+**Example:** removals and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its pod id.
 
 | call | result |
 |---|---|
-| `act(Bob, Wedding, Kick(Alice-work))` | a typed error, nothing written |
-| `act(Erin, Wedding, Kick(Erin))` | a typed error, nothing written |
-| `act(Erin, Wedding, Kick(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the kicked event has reached, and learn of the kick from the membership store |
+| `act(Bob, Wedding, Remove(Alice-work))` | a typed error, nothing written |
+| `act(Erin, Wedding, Remove(Erin))` | a typed error, nothing written |
+| `act(Erin, Wedding, Remove(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the removed event has reached, and learn of the removal from the membership store |
 | `act(Erin, Wedding, Leave)` | a typed error, nothing written: Erin is the one owner, and the pod has other members |
 | `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `pods/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her directory; the record store forgotten for Alice-work on a3, and on each of her other devices once her directory syncs there, the membership store kept as the pod's tombstone, while Alice-leisure's replicas on a3 go on; her records and operations stay in the pod |
 
-#### Scenario: An owner kicks a member
+#### Scenario: An owner removes a member
 
-- **WHEN** owner A kicks member C from a pod with members A, B and C, and the kick reaches B's devices
+- **WHEN** owner A removes member C from a pod with members A, B and C, and the removal reaches B's devices
 - **THEN** A and B still sync the pod, and C's next session is refused
 
-#### Scenario: A member's kicks follow its role through promotion, demotion and promotion again
+#### Scenario: A member's removals follow its role through promotion, demotion and promotion again
 
-- **WHEN** owner A promotes B, B kicks C, A demotes B, B attempts to kick D, A promotes B again, and B kicks D
-- **THEN** B's first and last kicks are written, the attempt between them is refused with a typed error, and every remaining member lists A and B as owners and neither C nor D as a member
+- **WHEN** owner A promotes B, B removes C, A demotes B, B attempts to remove D, A promotes B again, and B removes D
+- **THEN** B's first and last removals are written, the attempt between them is refused with a typed error, and every remaining member lists A and B as owners and neither C nor D as a member
 
-#### Scenario: A plain member kicks nobody
+#### Scenario: A plain member removes nobody
 
-- **WHEN** member C, no owner, attempts to kick member B
+- **WHEN** member C, no owner, attempts to remove member B
 - **THEN** the attempt is refused with a typed error, B is still listed by every member, and B's devices are still served
 
-#### Scenario: An owner kicks another owner
+#### Scenario: An owner removes another owner
 
-- **WHEN** owners A and B both own the pod and A kicks B
+- **WHEN** owners A and B both own the pod and A removes B
 - **THEN** B's next session is refused, and B is listed by no remaining member
 
-#### Scenario: An owner does not kick itself
+#### Scenario: An owner does not remove itself
 
-- **WHEN** owner A attempts to kick itself
+- **WHEN** owner A attempts to remove itself
 - **THEN** the attempt is refused with a typed error, and every member still lists A as a member and an owner
 
 #### Scenario: The last owner does not leave a pod with other members
@@ -308,7 +308,7 @@ Kicking a member — an owner or a plain member alike — SHALL be available onl
 #### Scenario: The last two owners leaving at once leave the pod without an owner
 
 - **WHEN** A and C, a pod's only owners, leave while disconnected from each other, and plain member B's device then reconciles with both
-- **THEN** B's device lists no owner, B reads and appends to the pod's mergeable-documents, and B's kick of a member and promotion of itself are refused with a typed error
+- **THEN** B's device lists no owner, B reads and appends to the pod's mergeable-documents, and B's removal of a member and promotion of itself are refused with a typed error
 
 #### Scenario: A member leaves
 

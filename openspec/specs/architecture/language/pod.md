@@ -18,7 +18,7 @@ A record is what a member places into a pod, under its own name, as one of three
 
 ## Roles
 
-A pod has two roles, owner and member, and every owner is a member. The creator is the pod's first owner. A plain member reads every record, edits every mergeable-document and invites newcomers; an owner also acts on membership: it promotes a member to owner, demotes another owner, and kicks another member. A newcomer, and a member that joins again, is a plain member until an owner promotes it.
+A pod has two roles, owner and member, and every owner is a member. The creator is the pod's first owner. A plain member reads every record, edits every mergeable-document and invites newcomers; an owner also acts on membership: it promotes a member to owner, demotes another owner, and removes another member. A newcomer, and a member that joins again, is a plain member until an owner promotes it.
 
 ## Membership acts and their events
 
@@ -29,11 +29,11 @@ A membership act is what a member's device writes into the membership store; the
 | found | the creator, when it creates the pod | founded | a member and an owner |
 | invite | any member, once the newcomer presents the invite's one-time secret | joined | a plain member |
 | leave | the member itself | left | no member |
-| kick | an owner, on another member | kicked | no member |
+| remove | an owner, on another member | removed | no member |
 | promote | an owner | promoted | an owner |
 | demote | an owner, on another owner | demoted | a plain member |
 
-A member that leaves, or learns it was kicked, forgets the record store and keeps the membership store as the pod's tombstone.
+A member that leaves, or learns it was removed, forgets the record store and keeps the membership store as the pod's tombstone.
 
 **Example:** Bob's chain in the pod "Family", which Alice created.
 

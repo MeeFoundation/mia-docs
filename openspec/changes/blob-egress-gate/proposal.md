@@ -2,16 +2,16 @@
 
 ## Why
 
-A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever it was granted, a member kicked from a pod fetches every payload whose hash it saw before the kick, and, while its device stays in the pod's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
+A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever it was granted, a member removed from a pod fetches every payload whose hash it saw before the removal, and, while its device stays in the pod's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
 
-**Example:** requests to Bob's phone b1 today; Bob granted Alice-leisure `contact/email` of his data namespace, the payload of his `notes/diary` entry has the hash `<diary>`, Alice's tablet a3 hosts Alice-leisure and Alice-work, Carol was kicked from "Family", of which Bob is a member, and Dave's phone d1 holds a connection with nobody.
+**Example:** requests to Bob's phone b1 today; Bob granted Alice-leisure `contact/email` of his data namespace, the payload of his `notes/diary` entry has the hash `<diary>`, Alice's tablet a3 hosts Alice-leisure and Alice-work, Carol was removed from "Family", of which Bob is a member, and Dave's phone d1 holds a connection with nobody.
 
 | caller | asks b1 for | b1 answers |
 |---|---|---|
 | a3 | the payload of Bob's `contact/email` entry | the payload, which Alice-leisure's grant covers |
 | a3 | `<diary>`, learned outside the platform | the diary, which neither identity on a3 was granted |
-| Carol's phone c1 | the hash of a scan in "Family" she saw before the kick | the scan |
-| c1, still in the swarm of Family's record store | the hash of a photo Alice placed after the kick, which a member device announced there | the photo |
+| Carol's phone c1 | the hash of a scan in "Family" she saw before the removal | the scan |
+| c1, still in the swarm of Family's record store | the hash of a photo Alice placed after the removal, which a member device announced there | the photo |
 | d1 | the hash of a public tax form Bob keeps in his data namespace | the form, and with it the fact that Bob keeps it |
 
 Closing the gap needs no proof of which identity asks. A session admits its caller by the authenticated node id against the device sets the serving identity's records hold, and a request for a hash can be judged by the same records. The request names no identity, and it needs none: a node acts as every identity it hosts (threat model), so what all of them may read is what the node reaches anyway, one session per identity. A request judged before the store is read gets one answer for a hash the node keeps and a hash it lacks alike, whenever the caller is not entitled to it.
@@ -26,10 +26,10 @@ Nothing is decided. The change settles what a request for a hash is checked agai
 
 - The entries that reference the hash. A payload is served only to a caller that one of the node's hosted identities would serve, in a session, an entry referencing that hash: a device of that identity itself, a counterparty whose grant's egress filter covers the entry, a member of the pod whose store holds it. Through a hash the caller reaches exactly what it reaches through a session, and nothing more.
 - The replicas that reference the hash. A payload is served to a caller that one of the node's hosted identities would serve a session on a replica holding an entry with that hash, whatever the entry. A grantee under a claim-scoped grant then fetches the payload of any claim of the namespace whose hash it learns.
-- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a counterparty, a pod member — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a grantee, a counterparty of a co-located identity, and a kicked member that is still a counterparty fetch every payload whose hash they hold.
+- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a counterparty, a pod member — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a grantee, a counterparty of a co-located identity, and a removed member that is still a counterparty fetch every payload whose hash they hold.
 - Accepted, as the node does today, and recorded in the threat model.
 
-Whatever the answer, a kicked member reads no payload placed after its kick: the swarm hands a member's device that stays in it the hash of every new payload, so an answer that serves such a device leaves a kick without effect on payloads. Accepting does so for good, and known callers for as long as the kicked member is a counterparty of a hosted identity.
+Whatever the answer, a removed member reads no payload placed after its removal: the swarm hands a member's device that stays in it the hash of every new payload, so an answer that serves such a device leaves a removal without effect on payloads. Accepting does so for good, and known callers for as long as the removed member is a counterparty of a hosted identity.
 
 **Example:** the requests of Why under each option.
 

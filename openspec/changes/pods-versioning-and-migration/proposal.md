@@ -64,7 +64,7 @@ Some rules read more than one chain, and an entry a build cannot read reaches ev
 - Refused, as a member the device does not list: the older device stops serving that member's devices, which sync with updated members only.
 - Served by its last known state: nothing stops, and a member that a newer rule has since cut off reaches the record store through an older device.
 
-**Example:** a later version adds an act that cuts a member off the record store sooner than a kick; Alice uses it on Bob, and c1, on the earlier build, holds it unread; Bob's phone b1 asks c1 for a session on the record store.
+**Example:** a later version adds an act that cuts a member off the record store sooner than a removal; Alice uses it on Bob, and c1, on the earlier build, holds it unread; Bob's phone b1 asks c1 for a session on the record store.
 
 | option | c1 |
 |---|---|
@@ -82,7 +82,7 @@ The fold of each shipped version stays in the code as it shipped, and the next i
 
 | option | the refactoring, every answer unchanged | the change to the precedence |
 |---|---|---|
-| a golden corpus | passes | fails on the sets where a kick and a promotion share a point |
+| a golden corpus | passes | fails on the sets where a removal and a promotion share a point |
 | a digest of the source | fails | fails |
 
 ### When a build starts writing a newer version's entries
