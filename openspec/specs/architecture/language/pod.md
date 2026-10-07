@@ -26,7 +26,7 @@ A membership act is what a member's device writes into the membership store; the
 
 | act | written by | event in the subject's chain | the subject afterwards |
 |---|---|---|---|
-| found | the creator, when it creates the pod | founded | a member and an owner |
+| create | the creator, when it creates the pod | created | a member and an owner |
 | invite | any member, once the newcomer presents the invite's one-time secret | joined | a plain member |
 | leave | the member itself | left | no member |
 | remove | an owner, on another member | removed | no member |

@@ -55,7 +55,7 @@ The service's surface — the operations the requirements below constrain:
 /// The pods service of a runtime. `identity` is the hosted identity acting; a call on a pod the identity is no member of
 /// fails with the unknown-pod error, and a refusal by role is a typed error that writes nothing.
 trait PodsService {
-    /// Derives the pod id, creates both stores, writes the signed founding event; the identity is the first owner.
+    /// Derives the pod id, creates both stores, writes the signed created event; the identity is the first owner.
     async fn create(&self, identity: PdnId) -> Result<PodId>;
     /// The pods the identity is a member of.
     async fn list(&self, identity: PdnId) -> Result<Vec<PodInfo>>;
@@ -86,7 +86,7 @@ trait PodsService {
     async fn list_unknown(&self, identity: PdnId, pod: PodId) -> Result<Vec<UnknownEntry>>;
 }
 
-/// The founding act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by the device sweep — never through `act`.
+/// The create act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by the device sweep — never through `act`.
 enum PodAct { Promote(PdnId), Demote(PdnId), Remove(PdnId), Leave }
 struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
 enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
@@ -96,7 +96,7 @@ enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 
 ### Requirement: The pods service creates a pod for a hosted identity
 
-The pods service SHALL create a pod for a hosted identity: it draws a random nonce, derives the pod id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the founding event signed by the announcement key — the creating identity the first member — and answers the pod id, the one address of the pod. Creating a pod for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The pods service SHALL create a pod for a hosted identity: it draws a random nonce, derives the pod id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the created event signed by the announcement key — the creating identity the first member — and answers the pod id, the one address of the pod. Creating a pod for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 **Example:** `create` calls on Alice's phone a1, which hosts Alice and not Erin; the nonces a1 draws are 16 bytes of `5a`, then 16 bytes of `a5`.
 
@@ -180,7 +180,7 @@ A pod created or joined on one device of an identity SHALL become reachable from
 **Example:** Alice-leisure's directory once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
 ```
-pods/ad58a3faa04cdc5576c8dc5823a347c6/1                       the pod's record at the founding, Alice-leisure's sequence 1
+pods/ad58a3faa04cdc5576c8dc5823a347c6/1                       the pod's record at the created event, Alice-leisure's sequence 1
 tickets/pod/ad58a3faa04cdc5576c8dc5823a347c6/membership       the membership store's write ticket
 tickets/pod/ad58a3faa04cdc5576c8dc5823a347c6/records          the record store's write ticket
 announcement-key                                              Alice-leisure's announcement key pair, minted with her
