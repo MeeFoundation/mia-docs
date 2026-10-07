@@ -23,7 +23,7 @@ Nothing is decided. The change settles how a pod sheds a member entirely, and th
 ### How a pod sheds a member entirely
 
 - Identity-bound authorization: write authority leaves the ticket, and a store serves and admits by the identity a capability names, so a removed member's tickets open nothing. It rests on UWill, and the topic ids stay known to the removed member unless the stores move as well.
-- Moving the pod to a new pair of stores: the owners mint new stores for the same pod, the remaining members' devices import them from the directory records that carry a pod's tickets, and the old stores are forgotten, so the removed member holds tickets and topic ids of stores nobody serves. It costs a full copy of the pod per shedding, and every member device has to take the move.
+- Moving the pod to a new pair of stores: the owners mint new stores for the same pod, the remaining members' devices import them from the private metadata store (PMS) records that carry a pod's tickets, and the old stores are forgotten, so the removed member holds tickets and topic ids of stores nobody serves. It costs a full copy of the pod per shedding, and every member device has to take the move.
 - A new pod, as today: nothing to build; the members lose the pod id, every link into the pod, and the content's history.
 
 **Example:** Alice sheds Carol from "Family", which holds 1,000 records.

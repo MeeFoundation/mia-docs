@@ -56,7 +56,7 @@ The question arises under the first two options of the first question alone.
 
 ## Operating conditions
 
-Several identities on one node change the outcome on both sides: the serving node judges by each hosted identity's own records, and the caller's node id resolves to every identity whose records list it. A grant narrowed or revoked changes it too: the gate reads the grant records as the next session would, so a caller loses a payload from its first request after the narrowing reaches the serving node, and what it fetched before stays with it, since revocation is not recall (invariants). A freshly linked device is placed by its identity's own directory, as its sessions are, before any counterparty has heard of it. A restart changes nothing the index does not carry: an index is durable state of the replica it indexes. Clocks and a disk that fills leave the outcome as it is.
+Several identities on one node change the outcome on both sides: the serving node judges by each hosted identity's own records, and the caller's node id resolves to every identity whose records list it. A grant narrowed or revoked changes it too: the gate reads the grant records as the next session would, so a caller loses a payload from its first request after the narrowing reaches the serving node, and what it fetched before stays with it, since revocation is not recall (invariants). A freshly linked device is placed by its identity's own private metadata store (PMS), as its sessions are, before any counterparty has heard of it. A restart changes nothing the index does not carry: an index is durable state of the replica it indexes. Clocks and a disk that fills leave the outcome as it is.
 
 ## Capabilities
 

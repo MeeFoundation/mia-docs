@@ -35,7 +35,7 @@ Nothing is decided. The change settles the questions below, strongest option fir
 ### Where a member's own name for a pod lives, and whether it overrides a shared one
 
 - The member's own data: a member's name for a pod, like the place it files the pod among its others, is the application's record in the identity's own data store, synced across the identity's own devices and never to another member; the platform carries nothing for it.
-- A per-member name on the platform, in the identity's directory beside the pod's record, which the directory carries to the identity's other devices.
+- A per-member name on the platform, in the identity's private metadata store (PMS) beside the pod's record, which the PMS carries to the identity's other devices.
 
 Whichever holds it, a member's own name either stands in for a shared one — an alias the member sees instead of the name every member sees — or appears only where the pod carries none. A name of the member's own beside a shared one arises by itself where names repeat: an application that keeps the names of a member's pods unique side by side shows "Family1" to a member who already files a "Family" there.
 

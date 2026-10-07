@@ -4,7 +4,7 @@
 
 ### Requirement: A granted replica serves the audience identity's devices
 
-A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. On a node hosting several identities, only the directory of the identity the grant is addressed to is consulted.
+A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own private metadata store (PMS), never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. On a node hosting several identities, only the PMS of the identity the grant is addressed to is consulted.
 
 #### Scenario: A sibling catches up while the issuer is offline
 
@@ -23,7 +23,7 @@ A node holding a granted replica SHALL serve a sync session for it to a caller t
 
 #### Scenario: A co-located identity's device is not an audience device
 
-- **WHEN** the serving node hosts a second identity and a caller resolves only in that other identity's directory
+- **WHEN** the serving node hosts a second identity and a caller resolves only in that other identity's PMS
 - **THEN** the session is refused indistinguishably from the replica not being hosted
 
 ### Requirement: A granted replica reconciles with siblings as well as the issuer
@@ -39,7 +39,7 @@ A granted replica's tracked contacts SHALL admit devices of the audience identit
 
 ### Requirement: Unauthorized callers are refused uniformly
 
-A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's directory and the local grant record; every other caller SHALL be refused.
+A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's PMS and the local grant record; every other caller SHALL be refused.
 
 #### Scenario: A ticket holder without a grant learns nothing
 

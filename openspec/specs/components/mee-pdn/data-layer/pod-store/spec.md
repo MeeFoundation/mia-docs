@@ -76,7 +76,7 @@ Creating a pod, on the creator's device:
                              "pdn/pod-creation/v1" ‖ pdn_id ‖ announcement_pubkey ‖ nonce)
 4. write the created event at member/<pdn_id>/1/created/<pdn_id>/0:
    { nonce, announcement_pubkey, signature }   — pdn_id is the key's <pdnid>; pod_id is not stored
-5. pod_id goes to the identity's directory, the invite, links in notes
+5. pod_id goes to the identity's PMS, the invite, links in notes
 
 Counting a created event, on every member device, once its payload has arrived (a fresh device's first session included):
 1. recompute pod_id from the event's pdn_id, announcement_pubkey, nonce → must equal the pod id the device holds
@@ -119,7 +119,7 @@ Counting one, on every member device, once its payload has arrived:
 
 ### Requirement: A pod is two dedicated stores, held per member identity
 
-A pod SHALL be served by exactly two pdn-store namespaces — its membership store and its record store — separate from every data store, every directory, every connection metadata store and every other pod's stores. Two pods SHALL NOT share a store, whatever their member sets. Both stores SHALL be addressed through the pod id, and no domain namespace id is allocated for either. Every member identity SHALL hold a replica of each store of its own, created or imported for that identity ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): two identities of one node that are both members SHALL each hold both stores, the two copies converging inside the process ([in-process sessions](../in-process-sessions/spec.md)) and sharing no replica. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a pod's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a directory, a connection metadata store, another pod's store or the pod's other store — with nothing registered, and a data import SHALL refuse a ticket naming a pod's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
+A pod SHALL be served by exactly two pdn-store namespaces — its membership store and its record store — separate from every data store, every private metadata store (PMS), every connection metadata store and every other pod's stores. Two pods SHALL NOT share a store, whatever their member sets. Both stores SHALL be addressed through the pod id, and no domain namespace id is allocated for either. Every member identity SHALL hold a replica of each store of its own, created or imported for that identity ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): two identities of one node that are both members SHALL each hold both stores, the two copies converging inside the process ([in-process sessions](../in-process-sessions/spec.md)) and sharing no replica. The membership store SHALL hold the membership material and the record store records; an entry that fits neither layout is kept apart and used by nothing, as the requirement on entries outside the key layout states. An import of a pod's store SHALL refuse a ticket whose namespace the importing identity already holds in any other role — a data store, a PMS, a connection metadata store, another pod's store or the pod's other store — with nothing registered, and a data import SHALL refuse a ticket naming a pod's store: a ticket is the word of whoever minted it, and a replica held in two roles is dropped when either role is forgotten.
 
 **Example:** the replicas Alice's tablet a3 holds; a3 hosts Alice-leisure and Alice-work, both members of the pod "Wedding", Alice-leisure a member of "Family" too and Alice-work no member of it, and Alice-work holds Erin's data namespace under her grant.
 
@@ -132,7 +132,7 @@ A pod SHALL be served by exactly two pdn-store namespaces — its membership sto
 | Family's membership store and record store | Alice-leisure alone |
 | Erin's data namespace, under her grant | Alice-work |
 | the connection metadata pair between Erin and Alice-work | Alice-work |
-| each identity's own directory and data store | Alice-leisure, Alice-work |
+| each identity's own PMS and data store | Alice-leisure, Alice-work |
 | An import for Alice-work, as Wedding's record store, of a ticket naming Erin's data namespace is refused, nothing registered, and Erin's namespace is held and reconciled as before. | |
 
 #### Scenario: Creating a pod allocates two dedicated replicas
@@ -197,7 +197,7 @@ both stores' namespace ids are 32-byte public keys of their own, and neither is 
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the pod is judged by the membership fold and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its directory, dialed as that identity, derived afresh whenever the membership store changes, at each run of the store's periodic pass, and whenever the holding identity's directory lists a device it did not — which each store then dials, as that identity, since a sibling whose first dial came before its listing reached this device was refused, and nothing else dials it again before the pass — and replacing the previous list whole — save while the replica folds into no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states. Both stores' sync SHALL start with their contacts as they stand before either starts, since the membership store's first session derives them again, from a fold that may list no device of the inviter yet while the statements' payloads are still on their way. A pull an announcement triggers SHALL address the member the announcement names, when no derivation pairs its sender with a member: the name is the sender's word and picks only which replica of the sender's node the pull addresses, the session judged on both sides as any other. Any other peer no derivation pairs with a member SHALL be dialed as the member whose ticket the store was imported from, whatever the device shares of the store since.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the pod is judged by the membership fold and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its PMS, dialed as that identity, derived afresh whenever the membership store changes, at each run of the store's periodic pass, and whenever the holding identity's PMS lists a device it did not — which each store then dials, as that identity, since a sibling whose first dial came before its listing reached this device was refused, and nothing else dials it again before the pass — and replacing the previous list whole — save while the replica folds into no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states. Both stores' sync SHALL start with their contacts as they stand before either starts, since the membership store's first session derives them again, from a fold that may list no device of the inviter yet while the statements' payloads are still on their way. A pull an announcement triggers SHALL address the member the announcement names, when no derivation pairs its sender with a member: the name is the sender's word and picks only which replica of the sender's node the pull addresses, the session judged on both sides as any other. Any other peer no derivation pairs with a member SHALL be dialed as the member whose ticket the store was imported from, whatever the device shares of the store since.
 
 **Example:** Alice places a claim in "Family" on her phone a1 while Bob's phone b1 is in the record store's swarm and Carol's phone c1 is offline; then a1 goes offline and c1 comes back.
 
@@ -239,7 +239,7 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 #### Scenario: A sibling refused before its listing arrived is dialed once it does
 
-- **WHEN** a member's device takes both stores before its record in the member's directory has reached the member's other device, which refuses its dials, and the record then arrives there
+- **WHEN** a member's device takes both stores before its record in the member's PMS has reached the member's other device, which refuses its dials, and the record then arrives there
 - **THEN** that other device dials the new one on both stores as the member, and the new device holds the pod
 
 #### Scenario: A member's write ticket widens nothing
@@ -275,7 +275,7 @@ The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOpti
 
 ### Requirement: Only member devices are served
 
-A session for either of a pod's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own directory where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member removed from the pod, or one that left it, SHALL be refused the record store from the first session set up after its departure event reaches the serving device, and served the membership store only as the requirement on a departed member's tombstone states; what it obtained while a member is retained.
+A session for either of a pod's stores SHALL name the member whose replica it addresses and the member its caller acts as, and SHALL be served only when the member the caller names is a current member whose records list the caller's authenticated node id: that identity's own PMS where the caller names the identity the serving replica belongs to, as a sibling device of it; that member's device statements in the membership store where the caller names another member, over the network and inside the process alike. Every other caller SHALL be refused indistinguishably from the store not being hosted — a holder of its ticket included, and a caller naming an identity that is no member included, even from a node that hosts a member and so shares its node id. A caller naming a member removed from the pod, or one that left it, SHALL be refused the record store from the first session set up after its departure event reaches the serving device, and served the membership store only as the requirement on a departed member's tombstone states; what it obtained while a member is retained.
 
 **Example:** callers ask Bob's phone b1 for a session on the record store of "Family", addressing Bob's replica; Alice's tablet a3 hosts Alice-leisure, a member, and Alice-work, no member, and Dave, no member, holds the store's ticket on his phone d1.
 
@@ -364,7 +364,7 @@ A member's departure event — its left event, or a removed event in its chain �
 
 #### Scenario: Every device of a departed identity keeps the tombstone
 
-- **WHEN** a member leaves on one device while another device of its identity holds the pod, and the identity's directory syncs
+- **WHEN** a member leaves on one device while another device of its identity holds the pod, and the identity's PMS syncs
 - **THEN** both devices hold the membership store and neither holds the record store
 
 ### Requirement: Membership needs no connection
@@ -375,7 +375,7 @@ Access to a pod's stores SHALL rest on membership alone: no connection between t
 
 | call | answer |
 |---|---|
-| `list_connections` on Carol's directory | `[]` |
+| `list_connections` on Carol's PMS | `[]` |
 | a read of Bob's claim in "Family" | the claim's bytes |
 
 #### Scenario: Three identities share through a pod with no connections
@@ -482,7 +482,7 @@ the fold walks the chain by sequence, whatever order the entries arrived in
 
 #### Scenario: A device holding nothing counts no invented creator, whatever arrives first
 
-- **WHEN** a device freshly linked into member D, holding the pod id from D's directory and no membership store, sessions first with a modified device of member B that serves a created event in B's chain and withholds the creator's, and then with a device of member C
+- **WHEN** a device freshly linked into member D, holding the pod id from D's PMS and no membership store, sessions first with a modified device of member B that serves a created event in B's chain and withholds the creator's, and then with a device of member C
 - **THEN** the linked device holds B's invented chain and counts none of it, and after the session with C lists the members and owners C's device lists
 
 #### Scenario: A promoted event for no member changes nothing

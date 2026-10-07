@@ -40,7 +40,7 @@ None — every capability touched here already exists.
 
 ### Modified Capabilities
 
-- `pdn-node-core`: a granted replica gains the issuer's other devices among its contacts, derived from the device set the issuer publishes in the connection metadata store. The sibling-contacts requirement beside it is modified in one clause: two hosted identities granted by the same issuer bind one replica, so the derived set unions every such audience's siblings instead of consulting only one directory.
+- `pdn-node-core`: a granted replica gains the issuer's other devices among its contacts, derived from the device set the issuer publishes in the connection metadata store. The sibling-contacts requirement beside it is modified in one clause: two hosted identities granted by the same issuer bind one replica, so the derived set unions every such audience's siblings instead of consulting only one private metadata store (PMS).
 - `pdn-node-connection-establishment`: a refused establishment becomes legible to the dialer's own caller — distinguishable from never reaching the inviter, while still carrying no reason. Uniformity toward the dialed peer is untouched.
 - `pdn-node-device-linking`: the same distinction for `link`, which additionally must not read as a catch-up timeout.
 - `data-layer-subset-reconciliation`: the tracked-contact surface is set wholesale per derivation instead of appended to — a list that only ever grows can never let a withdrawn device leave.

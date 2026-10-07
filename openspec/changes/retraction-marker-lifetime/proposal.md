@@ -2,7 +2,7 @@
 
 ## Why
 
-A retraction marker belongs to the device that recorded it. Each device writes its markers with its own author, and both prunes filter by that author: `prune_aged_retractions` in the directory ages out only the markers whose author is this device's, and `prune_retractions`, run by the grant binder's unbind, lists and deletes only this device's markers for the issuer. A sibling that read a marker arms an ingest refusal from it, and the refusal is taken down only by what its own prune returns (`apply_retractions` in pdn-node): arming only ever widens, and a marker that disappears from the listing leaves its refusal standing.
+A retraction marker belongs to the device that recorded it. Each device writes its markers with its own author, and both prunes filter by that author: `prune_aged_retractions` in the private metadata store (PMS) ages out only the markers whose author is this device's, and `prune_retractions`, run by the grant binder's unbind, lists and deletes only this device's markers for the issuer. A sibling that read a marker arms an ingest refusal from it, and the refusal is taken down only by what its own prune returns (`apply_retractions` in pdn-node): arming only ever widens, and a marker that disappears from the listing leaves its refusal standing.
 
 Two cases follow on an identity with two devices, a phone and a laptop. Bob, the issuer, refuses a write of the phone at `notes/x`; the phone records the marker `retractions/<bob>/<phone-author>/notes/x`, its bound the refused entry's timestamp t1 in microseconds, and the laptop reads it, arms the refusal and retracts its copy. In the first case, 14 days later the phone ages the marker out; the laptop no longer lists it but keeps refusing, until it restarts or forgets Bob's namespace. In the second case the phone is lost before the 14 days pass; nothing ever deletes its marker — no device ages it out and no device's unbind prunes it — and the laptop arms the refusal again every time it binds Bob's namespace.
 
@@ -29,7 +29,7 @@ A third case needs one device only. The grant binder's unbind (`unbind_withdrawn
 | 4. `prune_retractions` deletes markers 3 to 5 | 0 |
 | Bob grants again on day 3: the binder's sweep that imports his replica arms the listed markers' refusals, and the laptop refuses Bob's earlier value | |
 
-[Write retraction](../../specs/components/mee-pdn/data-layer/write-retraction/spec.md) and the [private metadata store](../../specs/components/mee-pdn/data-layer/private-metadata-store/spec.md) state this behaviour as it stands, and the directory's tests pin it, author scope included: a device prunes only the markers it recorded, and a refusal it armed from a sibling's marker comes down only when it restarts or forgets the issuer's replica. The consequence falls on the accepted window of a wrong verdict, which write retraction describes: the marker's retention bounds it on the device that recorded the marker, a sibling goes on refusing past that retention until it restarts or forgets the replica, and the marker of a device that never runs again leaves it without a bound. The question is what bounds a marker's life, and the refusals it arms, on every device of the identity.
+[Write retraction](../../specs/components/mee-pdn/data-layer/write-retraction/spec.md) and the [private metadata store](../../specs/components/mee-pdn/data-layer/private-metadata-store/spec.md) state this behaviour as it stands, and the PMS's tests pin it, author scope included: a device prunes only the markers it recorded, and a refusal it armed from a sibling's marker comes down only when it restarts or forgets the issuer's replica. The consequence falls on the accepted window of a wrong verdict, which write retraction describes: the marker's retention bounds it on the device that recorded the marker, a sibling goes on refusing past that retention until it restarts or forgets the replica, and the marker of a device that never runs again leaves it without a bound. The question is what bounds a marker's life, and the refusals it arms, on every device of the identity.
 
 Under [defect-reachability](../../specs/code-practices/defect-reachability.md) the first case is reached by a host through the public surface of pdn-node, on the product path of an identity with more than one device; it obliges a fix. The second needs a device that never runs again, which the platform cannot yet revoke. The third is reached by a host under an operating condition — [the process ends without warning](../../specs/code-practices/operating-conditions.md), the ordinary end of an app on a phone, or a disk that fills — and obliges a fix too.
 
@@ -83,10 +83,10 @@ This question and the first combine freely: under the identity's lifetime a swee
 - A device that restarts — changes the outcome: a refusal is in-memory state, so as the code stands a restart takes it down; the derived refusals make a sweep do it.
 - A device that is lost — changes the outcome, and it is the question itself.
 - Capabilities granted, narrowed and revoked — a bare re-grant of write does not prune a marker under either answer, as the private metadata store requires.
-- Several identities on one node — no change: markers live in the directory of the identity whose author they name.
+- Several identities on one node — no change: markers live in the PMS of the identity whose author they name.
 - The process ends without warning — changes the outcome: a kill between two of the unbind's deletes is the third case.
 - A disk that fills — changes the outcome: a delete it refuses leaves the rest of the markers, as a kill does.
-- An unstable connection, a device linking late — no change beyond replication: a late device reads the markers and the tombstones like any directory entry.
+- An unstable connection, a device linking late — no change beyond replication: a late device reads the markers and the tombstones like any PMS entry.
 
 ## Out of Scope
 

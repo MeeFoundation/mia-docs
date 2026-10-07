@@ -157,7 +157,7 @@ A node SHALL serve one reconciliation session from a store snapshot taken at ses
 
 ### Requirement: A removal travels as the artefact it leaves
 
-Reconciliation converges over a drifting store because what one session misses the next one carries, and that holds for what a set gains: a later session offers an entry an earlier one did not have. It does not hold for what a set loses. A session serves rows that a removal took out after its setup, and the next session carries no news of the removal — only the absence of what was removed, which a peer already holding it cannot tell from a set it is ahead on. What carries a removal is therefore the artefact the removal leaves behind, and every removal SHALL leave one whose reach covers every peer the removed rows can reach. A delete leaves an empty entry at the deleted key, which replicates as any entry does; it replaces its author's older entry at that key and SHALL NOT be replaced in turn by an older entry at that key, whichever side of a session offers first, so a replica that still holds the deleted entry converges on the delete instead of handing the entry back. A retraction leaves a marker in the directory of the identity whose author wrote the retracted entry, which replicates to that identity's devices and arms them to remove the entry and refuse its re-ingest ([write retraction](../write-retraction/spec.md)). The reach that marker has to cover is bounded by what serves the replica: a granted replica is served only to devices of the grant's audience identity and to the issuer, so a retracted entry never reaches a grantee of another identity, whose devices the marker does not reach, and a co-located identity granted by the same issuer holds a replica of its own, which the entry never entered. A removal that would leave no such artefact SHALL instead end the open sessions of its namespace, because nothing else would converge on it. A frozen view therefore delays a removal by at most one session's lifetime and cannot lose it.
+Reconciliation converges over a drifting store because what one session misses the next one carries, and that holds for what a set gains: a later session offers an entry an earlier one did not have. It does not hold for what a set loses. A session serves rows that a removal took out after its setup, and the next session carries no news of the removal — only the absence of what was removed, which a peer already holding it cannot tell from a set it is ahead on. What carries a removal is therefore the artefact the removal leaves behind, and every removal SHALL leave one whose reach covers every peer the removed rows can reach. A delete leaves an empty entry at the deleted key, which replicates as any entry does; it replaces its author's older entry at that key and SHALL NOT be replaced in turn by an older entry at that key, whichever side of a session offers first, so a replica that still holds the deleted entry converges on the delete instead of handing the entry back. A retraction leaves a marker in the private metadata store (PMS) of the identity whose author wrote the retracted entry, which replicates to that identity's devices and arms them to remove the entry and refuse its re-ingest ([write retraction](../write-retraction/spec.md)). The reach that marker has to cover is bounded by what serves the replica: a granted replica is served only to devices of the grant's audience identity and to the issuer, so a retracted entry never reaches a grantee of another identity, whose devices the marker does not reach, and a co-located identity granted by the same issuer holds a replica of its own, which the entry never entered. A removal that would leave no such artefact SHALL instead end the open sessions of its namespace, because nothing else would converge on it. A frozen view therefore delays a removal by at most one session's lifetime and cannot lose it.
 
 **Example:** Bob's grant reads `contact/email` and writes `contact/phone` of Alice's replica, held on a1 (Alice's device), b1 and b2 (Bob's).
 
@@ -166,8 +166,8 @@ delete     a1 deletes Alice's entry at contact/email
   leaves   an empty entry by Alice's author at contact/email: len 0, stamped at the delete
   spreads  as any entry does, to b1 and b2 under the grant; an older contact/email offered back is not inserted
 retract    Alice's gate refuses b1's entry at notes/diary, and b1 retracts it
-  leaves   retractions/<alice-hex>/<bob-author-hex>/notes/diary in Bob's directory
-  spreads  to b2 through Bob's directory; b2 removes the entry if it holds one and refuses its re-ingest
+  leaves   retractions/<alice-hex>/<bob-author-hex>/notes/diary in Bob's PMS
+  spreads  to b2 through Bob's PMS; b2 removes the entry if it holds one and refuses its re-ingest
 ```
 
 #### Scenario: A retraction inside a session is served for the rest of it
@@ -234,9 +234,9 @@ received:    an Op::Put carrying an entry is dropped, never inserted
 
 ### Requirement: Grantees stay outside the gossip swarm
 
-A peer whose access arrived through a grant SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the replica's device set: the issuer's own devices for a data store or a directory, the counterparty's devices too for a connection metadata store, and the devices of every member for each of a pod's stores — a pod has no grantees, its members are its whole audience, so member devices join the swarm as an identity's own devices do. A grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
+A peer whose access arrived through a grant SHALL NOT be a member of the replica's gossip swarm. The swarm SHALL consist of the replica's device set: the issuer's own devices for a data store or a PMS, the counterparty's devices too for a connection metadata store, and the devices of every member for each of a pod's stores — a pod has no grantees, its members are its whole audience, so member devices join the swarm as an identity's own devices do. A grantee's only data path is the reconciliation it initiates. This composes with the content-free topic above: membership conveys announcements, so removing a grantee from the swarm (rather than serving it filtered) keeps even activity metadata about unauthorized claims off its wire, and spares the relaying cost a broadcast presumes members share.
 
-Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a directory, a connection metadata store, a pod's membership store or record store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
+Membership SHALL follow the recorded sync strategy in both directions: a grantee import of a replica that had already joined the swarm — a device-replicated import downgraded to a grantee binding — SHALL leave the swarm as part of the import, not merely stop re-joining (the fork's leave-gossip operation: the topic subscription closes in both directions while the replica stays open, syncing, and subscribed to). A data import SHALL refuse a ticket naming a replica that is tracked but not data-bound (a PMS, a connection metadata store, a pod's membership store or record store): repurposing a device-shared replica's tracking — and, with the downgrade now leaving the swarm, cutting its live path — must not be reachable on the word of whoever minted a ticket.
 
 A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a grant or imported it out of band. Minting restarts the replica's sync as a store of the minting identity's own: the replica rejoins the swarm, and every peer the engine recorded is dialed naming that identity instead of the issuer, which the issuer's devices refuse as not hosted.
 
@@ -245,7 +245,7 @@ A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a gr
 | replica | its swarm |
 |---|---|
 | Alice's data namespace | a1, a2; Bob, a grantee, reconciles and is never in it |
-| Alice's directory | a1, a2 |
+| Alice's PMS | a1, a2 |
 | the connection metadata store Alice writes toward Bob | a1, a2, b1, b2 |
 | both stores of "Family" | a1, a2, b1, b2, c1 |
 | A data import on b1 handed the ticket of the record store of "Family" is refused, and the store's swarm membership and live path are untouched. | |
@@ -267,7 +267,7 @@ A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a gr
 
 #### Scenario: A device-shared replica refuses a data import
 
-- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a directory, a connection metadata store or one of a pod's stores
+- **WHEN** a data import — device or grantee — is handed a ticket naming a replica that this node tracks as a PMS, a connection metadata store or one of a pod's stores
 - **THEN** the import is refused, and the device-shared replica's tracking, swarm membership, and live path are untouched
 
 #### Scenario: Member devices of a pod form its swarm
@@ -277,16 +277,16 @@ A grantee SHALL NOT mint a ticket on the replica, whether it holds it under a gr
 
 ### Requirement: A granted replica serves the audience identity's devices
 
-A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own directory, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. The replica is held for one identity, and the session names it; the caller's named identity is resolved in that identity's own directory, so no other identity hosted on either node takes part in the decision.
+A node holding a granted replica SHALL serve a sync session for it to a caller that resolves, by authenticated node id, as a device of the grant's audience identity — resolved through that identity's own PMS, never through records a counterparty wrote. The session's rights SHALL come from the serving device's locally replicated grant record for the replica's issuer, read at session setup: the record serves through the same claim-set egress filter the issuer applies, and an absent, withdrawn, undecodable, or wrongly-addressed record refuses. A record whose capability names an audience other than the identity resolved SHALL refuse: position in a directional store never substitutes for the capability's named audience. The replica is held for one identity, and the session names it; the caller's named identity is resolved in that identity's own PMS, so no other identity hosted on either node takes part in the decision.
 
 **Example:** b1 (Bob's device) holds Alice's replica under her grant to Bob; b2 is Bob's other device, d1 a device of Dave, a second identity on b1's node.
 
 | caller | grant record `grants/<alice-hex>` on b1 | b1 serves |
 |---|---|---|
-| b2, listed in Bob's directory | audience Bob, claim `contact/email` | `contact/email`, filtered as a1 filters it |
-| b2, listed in Bob's directory | withdrawn: a tombstone | nothing: `AbortReason::NotFound` |
-| b2, listed in Bob's directory | audience Carol | nothing: `AbortReason::NotFound` |
-| d1, listed in Dave's directory only | audience Bob, claim `contact/email` | nothing: `AbortReason::NotFound` |
+| b2, listed in Bob's PMS | audience Bob, claim `contact/email` | `contact/email`, filtered as a1 filters it |
+| b2, listed in Bob's PMS | withdrawn: a tombstone | nothing: `AbortReason::NotFound` |
+| b2, listed in Bob's PMS | audience Carol | nothing: `AbortReason::NotFound` |
+| d1, listed in Dave's PMS only | audience Bob, claim `contact/email` | nothing: `AbortReason::NotFound` |
 
 #### Scenario: A sibling catches up while the issuer is offline
 
@@ -305,12 +305,12 @@ A node holding a granted replica SHALL serve a sync session for it to a caller t
 
 #### Scenario: A co-located identity's device is not an audience device
 
-- **WHEN** the serving node hosts a second identity and a caller resolves only in that other identity's directory
+- **WHEN** the serving node hosts a second identity and a caller resolves only in that other identity's PMS
 - **THEN** the session is refused indistinguishably from the replica not being hosted
 
 ### Requirement: A granted replica reconciles with siblings as well as the issuer
 
-A granted replica's tracked contacts SHALL admit devices of the audience identity and of the issuer alike, each paired with the identity it is dialed as — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records: the devices the issuer published in the connection whose grant bound the replica, the audience identity's own devices listed in its directory, and the ticket's addressing for the published devices it names, this node left out. A derivation that yields at least one device SHALL replace the previous list, so a device absent from it stops being dialed by the periodic reconcile pass and the before-access nudge. A derivation that yields none — the issuer's published device set reads empty, as it does before its records replicate, or every device derived is this node — SHALL leave the previous list in place, so once every derived device is gone the last list set, or the ticket's, goes on being dialed. Both the pass and the nudge SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
+A granted replica's tracked contacts SHALL admit devices of the audience identity and of the issuer alike, each paired with the identity it is dialed as — supplied at import from the ticket, and thereafter set wholesale by the owning runtime as it re-derives the list from the device records: the devices the issuer published in the connection whose grant bound the replica, the audience identity's own devices listed in its PMS, and the ticket's addressing for the published devices it names, this node left out. A derivation that yields at least one device SHALL replace the previous list, so a device absent from it stops being dialed by the periodic reconcile pass and the before-access nudge. A derivation that yields none — the issuer's published device set reads empty, as it does before its records replicate, or every device derived is this node — SHALL leave the previous list in place, so once every derived device is gone the last list set, or the ticket's, goes on being dialed. Both the pass and the nudge SHALL dial the tracked list as it stands at each pass. The engine's own record of peers that once served the replica is separate, unions into each dial, and ages out on its own.
 
 **Example:** b1 holds Alice's replica for Bob; a1 and a2 are Alice's devices, b2 Bob's other one; (a1, as Alice) is a `Contact`; peers the engine recorded itself are left out.
 
@@ -318,7 +318,7 @@ A granted replica's tracked contacts SHALL admit devices of the audience identit
 |---|---|---|
 | import from Alice's ticket, minted on a1 | (a1, as Alice) | a1 |
 | re-derived before Alice's device records reach b1 | unchanged: (a1, as Alice) | a1 |
-| re-derived: Alice publishes a1, a2; Bob's directory has b2 | (a1, as Alice), (a2, as Alice), (b2, as Bob) | a1, a2, b2 |
+| re-derived: Alice publishes a1, a2; Bob's PMS has b2 | (a1, as Alice), (a2, as Alice), (b2, as Bob) | a1, a2, b2 |
 | re-derived: Alice's published set lists a1 alone | (a1, as Alice), (b2, as Bob) | a1, b2 |
 | re-derived: Alice's published set lists no device | unchanged: (a1, as Alice), (b2, as Bob) | a1, b2 |
 
@@ -339,7 +339,7 @@ A granted replica's tracked contacts SHALL admit devices of the audience identit
 
 ### Requirement: Unauthorized callers are refused uniformly
 
-A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's directory and the local grant record; every other caller SHALL be refused.
+A sync request for a hosted replica from a caller with no computable rights SHALL be refused indistinguishably from the replica not being hosted on this node; empty effective rights SHALL be refused the same way. A node SHALL serve a replica only in roles it can judge from its own records — for a granted foreign replica that means exactly the devices of the grant's audience identity, judged through the audience's PMS and the local grant record; every other caller SHALL be refused.
 
 **Example:** callers ask a1 (Alice's device) to sync; Dave holds the ticket of Alice's data replica and no grant, Carol holds nothing.
 

@@ -1,11 +1,11 @@
 # Connection metadata store
 
-The cross-identity channel of a [connection](../../../architecture/language/connection.md): for each connection there are two of these stores, one per direction. The store issued by identity A toward its counterparty B carries A's grants to B — tickets to data stores, and read capabilities once those exist — written only by A's devices and read, whole, by B's devices (Invariant 3). The mechanism is the one the other device stores already use: a dedicated pdn-store replica gated by ticket possession — no new sync machinery, and no domain `NamespaceId`. In code the pair at one side is `ConnectionMetadata { own, peer }`: `own` the replica this side issues, `peer` the counterpart's. The counterparty is the audience of the whole replica, so no per-entry filtering applies inside it — filtered reconciliation (subset-rbsr) matters for the data stores grants point at, not here. Establishment ([connection-establishment](../pdn-node/connection-establishment.md)) creates and exchanges these stores; the [private-metadata directory](private-metadata-store.md) carries their tickets to each identity's other devices.
+The cross-identity channel of a [connection](../../../architecture/language/connection.md): for each connection there are two of these stores, one per direction. The store issued by identity A toward its counterparty B carries A's grants to B — tickets to data stores, and read capabilities once those exist — written only by A's devices and read, whole, by B's devices (Invariant 3). The mechanism is the one the other device stores already use: a dedicated pdn-store replica gated by ticket possession — no new sync machinery, and no domain `NamespaceId`. In code the pair at one side is `ConnectionMetadata { own, peer }`: `own` the replica this side issues, `peer` the counterpart's. The counterparty is the audience of the whole replica, so no per-entry filtering applies inside it — filtered reconciliation (subset-rbsr) matters for the data stores grants point at, not here. Establishment ([connection-establishment](../pdn-node/connection-establishment.md)) creates and exchanges these stores; the [private metadata store (PMS)](private-metadata-store.md) carries their tickets to each identity's other devices.
 
 ## ADDED Requirements
 
 ### Requirement: Each direction of a connection lives in a dedicated replica
-A connection between identities A and B SHALL be served by two dedicated pdn-store replicas: one issued by A toward B and one issued by B toward A. Each SHALL be separate from every data store, from the device stores (connections store, private-metadata directory), and from every other connection's metadata stores; no domain `NamespaceId` is allocated — the store handle returned at creation or import is how the replica is addressed. Metadata stores of several connections and several identities SHALL coexist on one node without sharing a replica.
+A connection between identities A and B SHALL be served by two dedicated pdn-store replicas: one issued by A toward B and one issued by B toward A. Each SHALL be separate from every data store, from the device stores (connections store, PMS), and from every other connection's metadata stores; no domain `NamespaceId` is allocated — the store handle returned at creation or import is how the replica is addressed. Metadata stores of several connections and several identities SHALL coexist on one node without sharing a replica.
 
 #### Scenario: Creating the store allocates a dedicated replica
 - **WHEN** a node creates a connection metadata store
@@ -31,10 +31,10 @@ At each side of a connection the metadata pair SHALL consist of `own` — the re
 - **THEN** the store handle is usable at once, reads return absent until sync delivers content, and later reads return the synced entries
 
 ### Requirement: The issuer writes; the counterparty reads the whole store; others observe nothing
-Write access SHALL be bounded by the store's write ticket, which circulates only through the issuing identity's private-metadata directory — so only the issuer's devices write. Read access SHALL be bounded by the read ticket handed to the counterparty at establishment; the counterparty reads the replica whole — it is the store's entire audience, and no per-entry filtering applies inside it. The replica's namespace identifier and tickets SHALL travel nowhere beyond the establishment dialogue and the two identities' directories, so to any other party the store is not observable — its existence included. (Tickets are bearer tokens today, as in Invariant 1; identity-bound access lands with UWill.)
+Write access SHALL be bounded by the store's write ticket, which circulates only through the issuing identity's PMS — so only the issuer's devices write. Read access SHALL be bounded by the read ticket handed to the counterparty at establishment; the counterparty reads the replica whole — it is the store's entire audience, and no per-entry filtering applies inside it. The replica's namespace identifier and tickets SHALL travel nowhere beyond the establishment dialogue and the two identities' PMSs, so to any other party the store is not observable — its existence included. (Tickets are bearer tokens today, as in Invariant 1; identity-bound access lands with UWill.)
 
 #### Scenario: A linked device of the issuer writes a grant
-- **WHEN** the issuer's second device opens `own` from the directory's write ticket and writes a grant entry
+- **WHEN** the issuer's second device opens `own` from the PMS's write ticket and writes a grant entry
 - **THEN** the write succeeds and the counterparty eventually reads the entry
 
 #### Scenario: The counterparty cannot write
@@ -61,17 +61,17 @@ A grant SHALL live under the key prefix `grants/<issuer-hex>` (64 lowercase hex 
 - **THEN** the counterparty eventually reads that grant as absent (withdrawal of the entry replicates; whether previously delivered data is retained is outside this store — Invariant 2 governs acquisition, not retention)
 
 ### Requirement: Grant reads wait for content
-Reading a grant SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not SHALL read as absent, and a later read (after the payload lands) SHALL return the grant. Entry records and payloads travel independently; consumers poll, as they do for the directory's tickets.
+Reading a grant SHALL return it only once its payload bytes have arrived: an entry whose record has synced but whose payload has not SHALL read as absent, and a later read (after the payload lands) SHALL return the grant. Entry records and payloads travel independently; consumers poll, as they do for the PMS's tickets.
 
 #### Scenario: Record without payload reads as absent
 - **WHEN** a grant entry's record has synced to the counterparty but its payload bytes have not yet been fetched
 - **THEN** reading that grant returns absent, and a later read returns the grant
 
 ### Requirement: Mutations replicate across both identities' devices
-Entries written into `own` on one of the issuer's devices SHALL become visible on the issuer's other devices (each holding `own` through the directory's write ticket) and on the counterparty's devices (each holding `peer` through the directory's read ticket) via standard pdn-store sync, with no additional transport.
+Entries written into `own` on one of the issuer's devices SHALL become visible on the issuer's other devices (each holding `own` through the PMS's write ticket) and on the counterparty's devices (each holding `peer` through the PMS's read ticket) via standard pdn-store sync, with no additional transport.
 
 #### Scenario: Written on the issuer's phone, read on the counterparty's laptop
-- **WHEN** the issuer's phone writes a grant while the issuer's laptop and the counterparty's two devices hold the pair from their directories
+- **WHEN** the issuer's phone writes a grant while the issuer's laptop and the counterparty's two devices hold the pair from their PMSs
 - **THEN** the issuer's laptop and both of the counterparty's devices eventually read the grant
 
 ### Requirement: Concurrent edits resolve by last-writer-wins

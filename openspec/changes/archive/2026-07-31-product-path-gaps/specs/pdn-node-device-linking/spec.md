@@ -12,5 +12,5 @@ Linking SHALL report a refusal by the inviting device to its own caller as a ref
 - **THEN** the first reports a refusal and the second does not, and the two are distinguishable without matching on error text
 
 #### Scenario: A refusal is not a catch-up timeout
-- **WHEN** linking is refused by the inviting device, and separately when the dialogue succeeds but the imported directory does not catch up within the timeout
+- **WHEN** linking is refused by the inviting device, and separately when the dialogue succeeds but the imported private metadata store (PMS) does not catch up within the timeout
 - **THEN** the two are distinguishable without matching on error text, and both leave the newcomer with no local residue of the attempt

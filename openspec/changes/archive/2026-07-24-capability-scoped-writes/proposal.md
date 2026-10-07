@@ -8,7 +8,7 @@ A grant carrying write ships the namespace secret, so its holder can write every
 
 - The grant vocabulary becomes per-claim: a grant names, for each claim, whether write is granted alongside read — one record per issuer still, mixed rights inside it. **BREAKING**: the record payload changes shape (old records decode as no grant, fail-closed) and the publish surface changes signature; live grants must be republished.
 - The fork's ingest hook is installed. The hook learns the session peer; a hosted issuer's data replica admits a synced entry only when the sender resolves as a device of the issuer, or the entry's claim is in the sender identity's recorded write set. Everything else is dropped before persisting — the write-side counterpart of subset reconciliation.
-- Foreign writes become provisional at the writer: the issuer's gate signals a capability refusal back on the reconciliation reply, and the writer retracts the entry at once — physically removed locally, the verdict replicated to sibling devices as a directory marker so a sibling that has not itself reached the issuer converges too, and the issuer's accepted state wins.
+- Foreign writes become provisional at the writer: the issuer's gate signals a capability refusal back on the reconciliation reply, and the writer retracts the entry at once — physically removed locally, the verdict replicated to sibling devices as a private metadata store (PMS) marker so a sibling that has not itself reached the issuer converges too, and the issuer's accepted state wins.
 - The retraction verdict is observable: a log line and a runtime event carrying the address of the lost entry — the refusal is no longer silent, and the marker keeps the payload's address as the seed of a future recovery surface.
 - The writing surface refuses out-of-scope writes up front: a write addressed at a granted namespace outside the local record's write set fails at the API, before the replica is touched.
 - The accepted last-write-wins window is documented: an admitted audience write competes by timestamp, and the fork admits timestamps up to 10 minutes ahead of the receiving clock.
@@ -26,7 +26,7 @@ A grant carrying write ships the namespace secret, so its holder can write every
 - `data-layer-read-capabilities`: the capability carries per-claim commands (write alongside read, per claim); write enforcement stops being deferred; the ticket-mode requirement covers mixed grants (any write in the record ships a write ticket — the secret stays the transport interim, scope moves to the gate).
 - `data-layer-connection-metadata-store`: the grant record's payload carries the per-claim commands; the ticket-mode sentence follows.
 - `data-layer-subset-reconciliation`: the independence scenario stops describing the ingest hook as uninstalled — egress filtering and ingest gating now run together, still independently.
-- `data-layer-private-metadata-store`: the directory gains the retraction-marker record family, keyed by granted issuer, author, and entry path, bounded by a timestamp.
+- `data-layer-private-metadata-store`: the PMS gains the retraction-marker record family, keyed by granted issuer, author, and entry path, bounded by a timestamp.
 - `pdn-node-core`: the connections service publishes per-claim commands; the data service refuses out-of-scope writes up front and exposes the retraction event surface; the write side stops being described as unscoped.
 
 ## Impact

@@ -22,7 +22,7 @@ The platform hides no device's address from the parties it syncs with, and it ke
 
 ## Identities hosted on one node
 
-A node acts as every identity it hosts, and nothing in the platform defends one of those identities against the node. Its process holds the material of each — the identity's directory, with every ticket and key it keeps, and the author the identity writes with — so it can write an entry under any hosted identity's author and open a session naming any of them. Every other device takes the result as that identity's act: a node's claim to act as an identity is checked against the device set the identity publishes, never proven, and every node the identity is linked into is in that set (ADR-0013).
+A node acts as every identity it hosts, and nothing in the platform defends one of those identities against the node. Its process holds the material of each — the identity's private metadata store (PMS), with every ticket and key it keeps, and the author the identity writes with — so it can write an entry under any hosted identity's author and open a session naming any of them. Every other device takes the result as that identity's act: a node's claim to act as an identity is checked against the device set the identity publishes, never proven, and every node the identity is linked into is in that set (ADR-0013).
 
 What the platform separates is how an honest node keeps its identities: each holds replicas of its own, writes with an author of its own and takes part in sessions of its own, so an honest node never answers one identity's caller from another identity's stores, and honest devices attribute each entry to the identity that wrote it. That is attribution among honest devices, never a defence against the node that hosts both.
 

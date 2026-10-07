@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Establishment records the connection for both identities, on all their devices
-On a completed dialogue each side SHALL record the counterparty among the connections records of its private-metadata directory, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory replicates, and a linked device opens the pair from the directory's tickets on demand.
+On a completed dialogue each side SHALL record the counterparty among the connections records of its private metadata store (PMS), assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in the same PMS. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the PMS replicates, and a linked device opens the pair from the PMS's tickets on demand.
 
 #### Scenario: Both sides list each other
 - **WHEN** runtime B establishes with an invite from runtime A
@@ -9,10 +9,10 @@ On a completed dialogue each side SHALL record the counterparty among the connec
 
 #### Scenario: The connection is visible from linked devices
 - **WHEN** establishment ran between A's phone and B's phone, and each identity has a laptop linked
-- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its directory
+- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its PMS
 
 ### Requirement: Re-establishment converges, whichever side invites
-A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's directory holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
+A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each identity's PMS holds one connection record per counterparty, each side's own metadata store toward the peer is reused (the PMS yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
 
 #### Scenario: Establishing twice yields one connection
 - **WHEN** A and B establish, and later establish again from a fresh invite

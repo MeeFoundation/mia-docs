@@ -44,7 +44,7 @@ With no validator installed, whatever a replica syncs from a peer holding its ti
 
 ### D6. First-device provisioning lives beside linking
 
-The sequence "create the connections store, publish its ticket under the directory's connections key, register this device" is protocol, not test setup: the directory key must match what `link_device` discovers, and the ticket must be in the directory before the seed leaves the device. It had been copied into two tests — the key string with it — so it moves into `linking.rs` as `provision_identity`, the first-device counterpart of `link_device`. Data namespaces stay out of it: their discovery at linking is deferred (ADR-0009), and freezing today's manual data-ticket handover into the provisioning API would turn a workaround into a contract.
+The sequence "create the connections store, publish its ticket under the PMS's connections key, register this device" is protocol, not test setup: the PMS key must match what `link_device` discovers, and the ticket must be in the PMS before the seed leaves the device. It had been copied into two tests — the key string with it — so it moves into `linking.rs` as `provision_identity`, the first-device counterpart of `link_device`. Data namespaces stay out of it: their discovery at linking is deferred (ADR-0009), and freezing today's manual data-ticket handover into the provisioning API would turn a workaround into a contract.
 
 ## Risks / Trade-offs
 

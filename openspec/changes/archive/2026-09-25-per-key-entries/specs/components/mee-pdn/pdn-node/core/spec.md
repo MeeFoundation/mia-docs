@@ -20,7 +20,7 @@ Watching SHALL include the counterparty replica's payload arrivals, not only its
 #### Scenario: A linked device binds a grant established elsewhere
 
 - **WHEN** a device is linked into an identity whose connection and grant were established on another of its devices, and the pair and grant records replicate to it
-- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its directory carries
+- **THEN** the newly linked device imports the granted namespace by itself, reaching it through the pair its private metadata store (PMS) carries
 
 #### Scenario: A withdrawn grant unbinds its namespace
 

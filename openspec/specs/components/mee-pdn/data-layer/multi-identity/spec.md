@@ -2,12 +2,12 @@
 
 ## Purpose
 
-One node hosts several identities — for example Alice-at-work and Alice-at-leisure — each with its own store set (the private-metadata directory and the data store), added to a device explicitly and addressed independently. A group of people is no identity a node hosts: its members share a [pod](../../../../architecture/language/pod.md), whose stores each member identity holds as replicas of its own. Read admission to a data store is classified per session — an identity's own devices see it whole, granted counterparties see what their grants cover, other callers are refused ([subset reconciliation](../subset-reconciliation/spec.md), Invariant 2); identity-bound authorization lands with UWill.
+One node hosts several identities — for example Alice-at-work and Alice-at-leisure — each with its own store set (the private metadata store (PMS) and the data store), added to a device explicitly and addressed independently. A group of people is no identity a node hosts: its members share a [pod](../../../../architecture/language/pod.md), whose stores each member identity holds as replicas of its own. Read admission to a data store is classified per session — an identity's own devices see it whole, granted counterparties see what their grants cover, other callers are refused ([subset reconciliation](../subset-reconciliation/spec.md), Invariant 2); identity-bound authorization lands with UWill.
 
 ## Requirements
 
 ### Requirement: A node hosts several identities side by side
-A `SyncNode` SHALL host the store sets of any number of identities concurrently, each with stores of its own ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): each identity's private metadata store (the directory, carrying its device set, tickets, and connections records) and data store are separate replicas, created or imported on the same node. Data stores are addressed by their issuer's `PdnId` within the identity that holds them; the directory is reached through its store handle. The stores of different identities SHALL NOT share a replica, and neither SHALL two identities that acquired one namespace — under two grants of one issuer, or as the two ends of one connection's metadata pair: each holds a replica of its own.
+A `SyncNode` SHALL host the store sets of any number of identities concurrently, each with stores of its own ([identity-scoped replicas](../identity-scoped-replicas/spec.md)): each identity's private metadata store (the PMS, carrying its device set, tickets, and connections records) and data store are separate replicas, created or imported on the same node. Data stores are addressed by their issuer's `PdnId` within the identity that holds them; the PMS is reached through its store handle. The stores of different identities SHALL NOT share a replica, and neither SHALL two identities that acquired one namespace — under two grants of one issuer, or as the two ends of one connection's metadata pair: each holds a replica of its own.
 
 **Example:** node a1 hosting Alice-work and Alice-leisure.
 
@@ -15,7 +15,7 @@ A `SyncNode` SHALL host the store sets of any number of identities concurrently,
 |---|---|
 | the endpoint, and the node id it binds with | a docs engine and its replica store |
 | the router and its ALPNs | a registry: data replicas by issuer `PdnId` |
-| gossip | an access book: its directory, its connections |
+| gossip | an access book: its PMS, its connections |
 | the blob store | an author |
 | the reconcile pass, walking every identity | |
 
@@ -38,15 +38,15 @@ Each identity SHALL arrive on a device through its own explicit linking act, fro
 - **THEN** identity B's stores appear on the device only after a separate linking act with a linking invite for identity B
 
 ### Requirement: Every replica has an owner, and no session is served without a verdict
-Every replica a node holds SHALL be held for an identity that node hosts, and every reconciliation session SHALL be judged before it serves anything: the store SHALL take the verdict of a session access provider on both session roles, and a node SHALL NOT be assemblable without one. A data replica SHALL be judged by the records of the identity that holds it — an identity's directory arms its data namespace, a connection registers its metadata pair — as [subset reconciliation](../subset-reconciliation/spec.md) and [capability-gated ingest](../capability-gated-ingest/spec.md) state, judging it by the identities the session names. A session for a data replica whose identity holds no records to judge the caller by SHALL be refused indistinguishably from the replica not being hosted: possession of a ticket SHALL bound no data replica by itself.
+Every replica a node holds SHALL be held for an identity that node hosts, and every reconciliation session SHALL be judged before it serves anything: the store SHALL take the verdict of a session access provider on both session roles, and a node SHALL NOT be assemblable without one. A data replica SHALL be judged by the records of the identity that holds it — an identity's PMS arms its data namespace, a connection registers its metadata pair — as [subset reconciliation](../subset-reconciliation/spec.md) and [capability-gated ingest](../capability-gated-ingest/spec.md) state, judging it by the identities the session names. A session for a data replica whose identity holds no records to judge the caller by SHALL be refused indistinguishably from the replica not being hosted: possession of a ticket SHALL bound no data replica by itself.
 
-A directory and a connection metadata store SHALL keep the bound Invariants 1 and 3 give them — their ticket — rather than the records: a directory is where the records that judge every other session arrive, and judging it by its own device set, before that set has converged, would close the bootstrap that delivers it.
+A PMS and a connection metadata store SHALL keep the bound Invariants 1 and 3 give them — their ticket — rather than the records: a PMS is where the records that judge every other session arrive, and judging it by its own device set, before that set has converged, would close the bootstrap that delivers it.
 
 **Example:** Bob's replicas on node b1, each synced by a holder of its ticket; b2 is Bob's laptop, Carol is connected to Bob and granted nothing.
 
 | replica | judged by | ticket holder | session |
 |---|---|---|---|
-| Bob's directory | its ticket (Invariant 1) | b2 | served: Bob's device records reach b2 |
+| Bob's PMS | its ticket (Invariant 1) | b2 | served: Bob's device records reach b2 |
 | Bob's connection metadata store toward Carol | its ticket (Invariant 3) | Carol | served: she reads Bob's published devices |
 | Bob's data replica | Bob's records: device set and grants | Carol | refused as not hosted: no record gives her a claim |
 
@@ -54,6 +54,6 @@ A directory and a connection metadata store SHALL keep the bound Invariants 1 an
 - **WHEN** a node holds a data replica for an identity whose access book holds no records that resolve the caller, and a holder of that replica's ticket requests a sync
 - **THEN** the request is refused indistinguishably from the replica not being hosted, and no entry is served
 
-#### Scenario: A directory still replicates between the identity's devices
-- **WHEN** a device of an identity syncs that identity's directory with a sibling holding its ticket
+#### Scenario: A PMS still replicates between the identity's devices
+- **WHEN** a device of an identity syncs that identity's PMS with a sibling holding its ticket
 - **THEN** the session proceeds, so the device records that judge every other session arrive

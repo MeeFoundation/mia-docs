@@ -6,7 +6,7 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 #### Scenario: A subscriber that stops reading holds up no sync
 
-- **WHEN** a device holds a subscription to its directory that it never reads, and a sibling writes more records than the subscription buffers
+- **WHEN** a device holds a subscription to its private metadata store (PMS) that it never reads, and a sibling writes more records than the subscription buffers
 - **THEN** the device takes in every record, its own writes and reads go on answering, and the subscription, read at last, yields a change
 
 #### Scenario: An unread subscription holds up neither entries nor their content
@@ -21,9 +21,9 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 ### Requirement: A change stream reports every change, a burst as one
 
-The change streams of the directory and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield a lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read.
+The change streams of the PMS and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield a lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read.
 
 #### Scenario: A lag notice reads as a change
 
-- **WHEN** a directory's change stream was left unread while more changes arrived than it buffers
-- **THEN** the directory lists every record the dropped changes reported, and the stream yields an item when read
+- **WHEN** a PMS's change stream was left unread while more changes arrived than it buffers
+- **THEN** the PMS lists every record the dropped changes reported, and the stream yields an item when read

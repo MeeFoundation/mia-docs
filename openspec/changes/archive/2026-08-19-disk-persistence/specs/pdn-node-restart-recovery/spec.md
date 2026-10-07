@@ -1,22 +1,22 @@
 ## ADDED Requirements
 
 ### Requirement: The runtime records which identities it hosts
-A runtime with durable storage SHALL keep, in its directory, a record of the identities it hosts: each identity's `PdnId` and the namespace of its private metadata directory. It SHALL record nothing else about them — no data namespace, no connections, no metadata pairs, no bound grants — because the directory is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. Every change to the record SHALL replace it whole — written beside, renamed over — so an interrupted change leaves the previous record intact and the operation failed.
+A runtime with durable storage SHALL keep, in its private metadata store (PMS), a record of the identities it hosts: each identity's `PdnId` and the namespace of its PMS. It SHALL record nothing else about them — no data namespace, no connections, no metadata pairs, no bound grants — because the PMS is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. Every change to the record SHALL replace it whole — written beside, renamed over — so an interrupted change leaves the previous record intact and the operation failed.
 
 #### Scenario: Hosting is recorded when an identity is created
 - **WHEN** an identity is created on a runtime with durable storage
-- **THEN** the record names that identity and its directory namespace, and names nothing else about it
+- **THEN** the record names that identity and its PMS namespace, and names nothing else about it
 
 #### Scenario: Hosting is recorded when a device links
 - **WHEN** a device links to an identity and its catch-up completes
-- **THEN** the record names that identity and the directory namespace it imported
+- **THEN** the record names that identity and the PMS namespace it imported
 
 #### Scenario: A failed record change loses no identity
 - **WHEN** recording a second identity fails — the process killed, the disk full — and the runtime restarts
 - **THEN** the first identity is hosted from the intact previous record, and the second is either fully hosted or absent, never half-recorded
 
 ### Requirement: A restarted runtime recovers each hosted identity along the product path
-At spawn, a runtime SHALL host every identity its record names, by opening that identity's private metadata directory from the replica the node already holds and performing the same registration a newly created identity performs: the directory arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the directory rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records. Recovery SHALL require no peer, no ceremony, and no network.
+At spawn, a runtime SHALL host every identity its record names, by opening that identity's PMS from the replica the node already holds and performing the same registration a newly created identity performs: the PMS arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the PMS rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records. Recovery SHALL require no peer, no ceremony, and no network.
 
 #### Scenario: An identity comes back hosted
 - **WHEN** a runtime restarts on a directory whose record names one identity

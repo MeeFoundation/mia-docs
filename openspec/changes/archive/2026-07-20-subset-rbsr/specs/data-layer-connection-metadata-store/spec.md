@@ -27,7 +27,7 @@ A grant SHALL live as one record at `grants/<issuer-hex>` (64 lowercase hex char
 
 ### Requirement: Each side publishes its device set into its directional store
 
-An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>` records in every connection-metadata store it issues, with the directory's device-record semantics (marker payload, LWW, tombstone on revocation), and SHALL keep them current as devices are linked and revoked — so the counterparty can resolve a transport-authenticated node id to this identity. The identity is authoritative over its own device set; the records widen no access beyond what the connection already grants.
+An identity SHALL publish the node ids of its devices as `devices/<node-id-hex>` records in every connection-metadata store it issues, with the private metadata store (PMS) device-record semantics (marker payload, LWW, tombstone on revocation), and SHALL keep them current as devices are linked and revoked — so the counterparty can resolve a transport-authenticated node id to this identity. The identity is authoritative over its own device set; the records widen no access beyond what the connection already grants.
 
 Publication on opening the pair SHALL be assert-once: a device asserts its record only when the set carries no record of it at all — a live record is left untouched, and a *withdrawn* record (tombstone) is never re-asserted as a side effect of opening. Re-asserting a withdrawn device is a deliberate publication act, distinct from opening. Without this, every pair opening would re-sign the record with a fresh wall-clock timestamp, and a revoked-but-still-running device would out-bid any tombstone the moment it next touched the connection. Revoking the *ability to write* is deferred, recorded in the design (subset-rbsr D9).
 
@@ -43,7 +43,7 @@ Publication on opening the pair SHALL be assert-once: a device asserts its recor
 
 #### Scenario: A foreign device is not resolvable
 
-- **WHEN** a node id appears in no connection's published device set and no directory of the serving node's identities
+- **WHEN** a node id appears in no connection's published device set and no PMS of the serving node's identities
 - **THEN** the serving node resolves it to no identity, and the caller is treated as a stranger
 
 #### Scenario: Opening a pair does not resurrect a withdrawn device

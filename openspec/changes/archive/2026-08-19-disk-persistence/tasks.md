@@ -13,14 +13,14 @@
 ## 2. Opening a store the node already holds
 
 - [x] 2.1 Add the constructor recovery needs to `PrivateMetadataStore`: open on a namespace the node already holds, without a ticket and without creating anything. `create` and `import` are the two that exist, and neither describes a replica that is already here.
-- [x] 2.2 Check that importing a ticket for a replica the store already holds is idempotent — recovery re-imports the identity's own data namespace from the directory's `data` ticket, and the binder re-imports granted namespaces. If it is not idempotent, that is where recovery has to be shaped around it, and the finding belongs in the design rather than in a workaround.
-- [x] 2.3 Test the round trip at the data-layer level: write entries into a directory and a data namespace, shut the node down, spawn one on the same directory, open both, and read the entries with their payloads — with no peer running, so nothing can have arrived over the network.
+- [x] 2.2 Check that importing a ticket for a replica the store already holds is idempotent — recovery re-imports the identity's own data namespace from the PMS's `data` ticket, and the binder re-imports granted namespaces. If it is not idempotent, that is where recovery has to be shaped around it, and the finding belongs in the design rather than in a workaround.
+- [x] 2.3 Test the round trip at the data-layer level: write entries into a PMS and a data namespace, shut the node down, spawn one on the same directory, open both, and read the entries with their payloads — with no peer running, so nothing can have arrived over the network.
 
 ## 3. The hosted-identities record and recovery
 
-- [x] 3.1 Write the record in the runtime's directory when an identity is created and when a link completes, holding the `PdnId` and its directory namespace and nothing else (D4). Write it after provisioning and before hosting, and remove the line when hosting ends (D5). Replace the file whole on every change — written beside, renamed over — never editing it in place.
-- [x] 3.2 Recover at spawn: read the record, and for each line open the directory, register it for session classification, insert the hosted entry, and start the connection armer — the same tail `create` runs after provisioning. Recovery performs no dialogue and dials no peer.
-- [x] 3.3 Bring the identity's data namespace back from the directory's `data` ticket on the same path, so a read addressed to the identity resolves after recovery.
+- [x] 3.1 Write the record in the runtime's directory when an identity is created and when a link completes, holding the `PdnId` and its PMS namespace and nothing else (D4). Write it after provisioning and before hosting, and remove the line when hosting ends (D5). Replace the file whole on every change — written beside, renamed over — never editing it in place.
+- [x] 3.2 Recover at spawn: read the record, and for each line open the PMS, register it for session classification, insert the hosted entry, and start the connection armer — the same tail `create` runs after provisioning. Recovery performs no dialogue and dials no peer.
+- [x] 3.3 Bring the identity's data namespace back from the PMS's `data` ticket on the same path, so a read addressed to the identity resolves after recovery.
 - [x] 3.4 Fail the start when the record cannot be read or parsed, naming the file; treat an absent record as a first start. A start that hosts nothing while looking healthy is the outcome this refuses.
 - [x] 3.5 Test recovery at the runtime level: an identity created, an entry written, the runtime shut down, a runtime spawned on the same directory — the identity hosted, the entry readable, and the node id unchanged. Break the record deliberately (remove the line) and confirm the identity is not hosted and reads are refused as not hosted, so the test is not passing on something else.
 - [x] 3.6 Test the several-identities case: two identities with a connection each, restarted, each hosting its own and listing its own connections only.
@@ -29,7 +29,7 @@
 
 ## 4. Connections, grants, and what an outage does to them
 
-- [x] 4.1 Check that the connection armer's first sweep after recovery opens each pair from the directory's published tickets, and that `own_store_toward` finds the own replica through the directory rather than creating a second one — a restart that split the own replica would be this change's own defect.
+- [x] 4.1 Check that the connection armer's first sweep after recovery opens each pair from the PMS's published tickets, and that `own_store_toward` finds the own replica through the PMS rather than creating a second one — a restart that split the own replica would be this change's own defect.
 - [x] 4.2 Check that the grant binder's first sweep after recovery imports what the counterparty's replica grants, and that the binding it records is the one a later withdrawal removes.
 - [x] 4.3 Test the withdrawal during an outage: a grant live, the audience's runtime stopped, the grant withdrawn, the runtime started and reconnected — the namespace stops being readable and its issuer resolves to nothing. Pair it with the re-grant over the same claim afterwards, which must import again with no ceremony.
 - [x] 4.4 Test that a replica no live grant explains is never served after a restart: reads refused, sessions refusing, whatever bytes remain on the disk. This is the fail-closed half of D6 and the only one this change asserts.

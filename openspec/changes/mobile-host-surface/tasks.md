@@ -76,4 +76,4 @@ Group 1 is a gate, not a warm-up: nothing below the facade has ever been compile
 
 - [ ] 7.1 `just check` and `just test` green
 - [ ] 7.2 Stress pass per [flaky-tests](../../specs/code-practices/flaky-tests.md) on the facade's scenario tests under `--stress-count`, sized by the rule of three; any failure diagnosed as a defect of this change before anything is built on top
-- [ ] 7.3 `openspec validate --all --strict` before archiving. The delta's relative links are written for the archive destination, not for the delta's own directory
+- [ ] 7.3 `openspec validate --all --strict` before archiving. The delta's relative links are written for the archive destination, not for the delta's own private metadata store (PMS)

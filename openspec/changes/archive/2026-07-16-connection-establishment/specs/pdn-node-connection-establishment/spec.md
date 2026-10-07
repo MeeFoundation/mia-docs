@@ -37,7 +37,7 @@ Establishment SHALL dial the invite payload's node address under the dedicated p
 - **THEN** the operation fails with an unknown-identity error and no dialogue runs
 
 ### Requirement: The secret is verified and burned atomically, before any state
-On a presented secret the inviter SHALL atomically check-and-burn against its pending set: present and unexpired → burned and the dialogue proceeds; expired, already burned, or unknown → refused. The check SHALL precede every state change, so a refused attempt leaves no observable state on the inviter: no replica created, no ticket issued, no connections entry, no directory entry. An unpresented secret SHALL expire at the end of its lifetime and thereafter be refused. A refused presentation SHALL NOT burn a live pending invite (a guess cannot extinguish a ceremony in progress), and refusals SHALL be uniform — the dialer cannot distinguish wrong from expired from already burned.
+On a presented secret the inviter SHALL atomically check-and-burn against its pending set: present and unexpired → burned and the dialogue proceeds; expired, already burned, or unknown → refused. The check SHALL precede every state change, so a refused attempt leaves no observable state on the inviter: no replica created, no ticket issued, no connections entry, no private metadata store (PMS) entry. An unpresented secret SHALL expire at the end of its lifetime and thereafter be refused. A refused presentation SHALL NOT burn a live pending invite (a guess cannot extinguish a ceremony in progress), and refusals SHALL be uniform — the dialer cannot distinguish wrong from expired from already burned.
 
 #### Scenario: A second presentation of the same secret is refused
 - **WHEN** establishment completed against an invite and a second establish presents the same secret
@@ -45,14 +45,14 @@ On a presented secret the inviter SHALL atomically check-and-burn against its pe
 
 #### Scenario: An expired secret is refused
 - **WHEN** a secret is presented after its lifetime has elapsed
-- **THEN** the attempt is refused and no observable state exists on the inviter — no replica, no ticket, no connections entry, no directory entry
+- **THEN** the attempt is refused and no observable state exists on the inviter — no replica, no ticket, no connections entry, no PMS entry
 
 #### Scenario: A wrong secret is refused and burns nothing
 - **WHEN** a dialer presents a secret that was never minted while an invite is pending
 - **THEN** the attempt is refused with no observable state on the inviter, and a subsequent presentation of the pending invite's real secret succeeds
 
 ### Requirement: Establishment records the connection for both identities, on all their devices
-On a completed dialogue each side SHALL record the counterparty in its connections store, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in its private-metadata directory. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the directory and the connections store replicate, and a linked device opens the pair from the directory's tickets on demand.
+On a completed dialogue each side SHALL record the counterparty in its connections store, assemble the metadata pair — creating its own store if none exists toward this peer, importing the counterpart's from the received read ticket — and publish the pair's tickets in its PMS. Establishment performed on one device of each identity SHALL thereby reach the identities' other devices: the PMS and the connections store replicate, and a linked device opens the pair from the PMS's tickets on demand.
 
 #### Scenario: Both sides list each other
 - **WHEN** runtime B establishes with an invite from runtime A
@@ -60,10 +60,10 @@ On a completed dialogue each side SHALL record the counterparty in its connectio
 
 #### Scenario: The connection is visible from linked devices
 - **WHEN** establishment ran between A's phone and B's phone, and each identity has a laptop linked
-- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its directory
+- **THEN** each laptop eventually lists the counterparty among its identity's connections and reads the counterpart's metadata store opened from its PMS
 
 ### Requirement: Re-establishment converges, whichever side invites
-A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each connections store holds one entry per counterparty, each side's own metadata store toward the peer is reused (the directory yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
+A fresh invite between identities that already share establishment state — a completed connection, or the residue of a handshake that failed after the burn — SHALL establish cleanly and converge: each connections store holds one entry per counterparty, each side's own metadata store toward the peer is reused (the PMS yields the same replica, so tickets from different attempts address the same namespace), and no duplicate replicas exist — regardless of which side mints the fresh invite.
 
 #### Scenario: Establishing twice yields one connection
 - **WHEN** A and B establish, and later establish again from a fresh invite
