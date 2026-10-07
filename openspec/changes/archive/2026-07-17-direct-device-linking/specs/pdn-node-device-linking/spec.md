@@ -68,13 +68,13 @@ After the burn, the inviter SHALL write the newcomer's device record into its ow
 - **THEN** the second linking completes and the device set contains the newcomer's node id once
 
 ### Requirement: The reply hands over the bootstrap tickets
-The linking reply SHALL carry write tickets to the identity's directory and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through directory ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the directory as the identity's directory replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, founder or not.
+The linking reply SHALL carry write tickets to the identity's directory and to its data namespace, both minted fresh from replicas the inviting device hosts locally — the ceremony reads nothing through directory ticket entries, so no payload wait sits in the critical path. The dialing runtime SHALL import both: the directory as the identity's directory replica, the data namespace registered under the payload's identity. Every device of an identity can therefore mint a linking invite — the store set is hosted wherever creation or linking brought it up, first device or not.
 
 #### Scenario: The newcomer comes up with the full store set
 - **WHEN** runtime B links into an identity and the directory's first sync completes
 - **THEN** B hosts the identity's directory and its data namespace, and an entry written under the identity on either runtime becomes readable on the other
 
-#### Scenario: Linking through a non-founder device
+#### Scenario: Linking through a linked device
 - **WHEN** device 2 was itself linked into an identity, and device 3 links from an invite minted on device 2
 - **THEN** device 3 comes up with the directory and the data namespace, and all three devices' device sets converge to three
 

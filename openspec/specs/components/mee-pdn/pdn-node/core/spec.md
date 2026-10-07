@@ -326,8 +326,8 @@ One node may host several identities granted by the same issuer, and each holds 
 
 #### Scenario: The publishing device is not special
 
-- **WHEN** the grant is published from a device the issuer linked later — the founder never touches the grant surface — and the publishing device then goes offline
-- **THEN** the audience converges on the granted claims from the founder
+- **WHEN** the grant is published from a device the issuer linked later — the first device never touches the grant surface — and the publishing device then goes offline
+- **THEN** the audience converges on the granted claims from the first device
 
 #### Scenario: Audiences hosted together keep separate replicas
 
