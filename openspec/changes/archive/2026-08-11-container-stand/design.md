@@ -60,7 +60,7 @@ The workspace can point the store fork at the checkout beside it — through the
 
 One consequence in the image: the dependency stage receives only the recipe, so a recipe naming a local path would resolve nothing — a small stage ahead of it turns both optional inputs into "present, possibly empty", and the dependency stage then resolves exactly what the final build does.
 
-The cost is two lines of the allowed set, not a different shape of it: the context's bulk — the agent worktrees, the private notes, the earlier prototypes, the docs repository — is excluded either way, and the fork folds into this repository shortly, after which its source is a workspace member that the context must carry regardless.
+The cost is two lines of the allowed set, not a different shape of it: the context's bulk — the agent worktrees, the private notes, the earlier prototypes, the docs repository — is excluded either way, and the fork merges into this repository shortly, after which its source is a workspace member that the context must carry regardless.
 
 Nothing is given up by allowing it: a pull-request build starts from a clean checkout with no local configuration file, so what merges is built against the published fork regardless of what any developer's tree resolves to.
 

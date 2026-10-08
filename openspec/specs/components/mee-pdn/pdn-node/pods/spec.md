@@ -67,7 +67,7 @@ trait PodsService {
     /// Mints a one-time invite: the inviting device's address, the secret, the pod id. Any member. Writes nothing to the pod:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
     async fn invite(&self, identity: PdnId, pod: PodId, lifetime: Option<Duration>) -> Result<PodInvite>;
-    /// Joins through the invite's dialogue and returns once both stores have caught up and its replica folds the identity as a member; the identity joins as a plain member.
+    /// Joins through the invite's dialogue and returns once both stores have caught up and its membership view lists the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: PodInvite) -> Result<PodId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences.
     /// `Remove` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the pod's tombstone.
@@ -182,7 +182,7 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 
 ### Requirement: A pod reaches a member's other devices
 
-A pod created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's PMS carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the pod from its PMS registers itself: once its replica of the membership store folds the member, and at every later change to that store and every run of the pod stores' pass, it SHALL check that the member's device list, as the [pod stores](../../data-layer/pod-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the pod, a co-located one on a member's node included: it lists no such pod, and its calls on the pod fail with the unknown-pod error.
+A pod created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's PMS carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the pod from its PMS registers itself: once the membership view of its replica lists the member, and at every later change to that store and every run of the pod stores' pass, it SHALL check that the member's device list, as the [pod stores](../../data-layer/pod-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the pod, a co-located one on a member's node included: it lists no such pod, and its calls on the pod fail with the unknown-pod error.
 
 **Example:** Alice-leisure's PMS once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 

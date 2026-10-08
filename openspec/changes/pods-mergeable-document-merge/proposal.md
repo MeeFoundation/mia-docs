@@ -50,7 +50,7 @@ A mergeable-document is a markdown note or a rich text held as a JSON tree of te
 A key orders one writer's operations; a merge across writers needs the operations each edit saw.
 
 - The dependencies in the payload, as a CRDT's change format carries them. The key layout stays, and a device merges once it holds a change's dependencies, which whole-store reconciliation brings.
-- The dependencies read by the record view, which reads an operation only once the operations it depends on are held, as the membership fold counts an event only once what it rests on is held. A document is never merged over a gap, at the cost of a second reading of the payload below pdn-layer.
+- The dependencies read by the record view, which reads an operation only once the operations it depends on are held, as the membership view counts an event only once what it rests on is held. A document is never merged over a gap, at the cost of a second reading of the payload below pdn-layer.
 
 **Example:** Carol's deletion of the line saw Bob's operation 3 and not his operation 4, and reaches Alice's laptop a2 before operation 3 does.
 
@@ -63,7 +63,7 @@ A key orders one writer's operations; a merge across writers needs the operation
 
 Every operation is an entry for as long as the pod lives: no operation and no record leaves the store.
 
-- A snapshot operation that folds the history below it, the operations it covers then removed: the record store gains a removal of operations, and who may write a snapshot of a document under another member's name is a question of the pod's rights.
+- A snapshot operation that collapses the history below it, the operations it covers then removed: the record store gains a removal of operations, and who may write a snapshot of a document under another member's name is a question of the pod's rights.
 - A new record that starts from the document's state: the platform stays as it is, links keep naming the old record, and the old record's history stays beside the new one for as long as records stay.
 - None: a document's operations grow for as long as it lives.
 

@@ -19,7 +19,7 @@ Nothing is decided. The change settles how a listed node consents to its listing
 
 ### How a listed node consents to its listing
 
-- The listed device countersigns its listing with its node key: each device in a statement carries a signature by the node it names, over a fixed prefix, the pod id, the member's `PdnId` and the author it writes with there, made by the device that adds itself and copied into every later version, and the fold counts no listing whose countersignature fails. A member then lists no node it does not run, at the cost of 64 bytes per listed device in every version and one verification per listing.
+- The listed device countersigns its listing with its node key: each device in a statement carries a signature by the node it names, over a fixed prefix, the pod id, the member's `PdnId` and the author it writes with there, made by the device that adds itself and copied into every later version, and the membership view counts no listing whose countersignature fails. A member then lists no node it does not run, at the cost of 64 bytes per listed device in every version and one verification per listing.
 - A backoff on refused contacts: a member device dials a listed node that refused a session for the pod less and less often, up to a bound. Nothing changes in the statement, and the node outside the pod is still dialed by every member device at the bound's interval, for good.
 
 **Example:** Bob's modified phone b1 lists the server as above.
@@ -35,9 +35,9 @@ Several identities on one node: a node listed under two members carries a counte
 
 ## Capabilities
 
-None is settled. Countersigning touches `components/mee-pdn/data-layer/pod-store`, for the statement's shape and the fold's count of it, and `components/mee-pdn/pdn-node/pods`, for the device that adds itself; a backoff touches `components/mee-pdn/data-layer/pod-store`, for the dialing of a pod's contacts.
+None is settled. Countersigning touches `components/mee-pdn/data-layer/pod-store`, for the statement's shape and the membership view's count of it, and `components/mee-pdn/pdn-node/pods`, for the device that adds itself; a backoff touches `components/mee-pdn/data-layer/pod-store`, for the dialing of a pod's contacts.
 
 ## Impact
 
-- **`crates/data-layer`**: the device statement and the fold's count of it, or the dialing of a pod's contacts.
+- **`crates/data-layer`**: the device statement and the membership view's count of it, or the dialing of a pod's contacts.
 - **`crates/pdn-node`**: the device that adds itself to its member's statement.

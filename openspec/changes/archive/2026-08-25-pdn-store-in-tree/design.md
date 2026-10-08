@@ -46,7 +46,7 @@ Formatting is the workspace's: `cargo fmt --all` under `rustfmt.toml`, verified 
 
 `just check` lints the workspace under default features, which is the store's default feature set too; `just test` runs its tests under those features as it runs every crate's. What neither compiles — every feature, no feature, the wasm32 target — is the store's own concern and gets its own recipes: `check-store` (clippy on the two other sets with warnings denied, rustdoc with warnings denied, the featureless build for `wasm32-unknown-unknown` with `getrandom_backend="wasm_js"` named through `RUSTFLAGS`, where it is unavoidable), and `test-store` (nextest on the two other sets, then the doctests under every feature). Both join `precommit-check` and `fix`, and the pipeline runs them in a `store` job beside the workspace's job rather than inside it, so the two extra builds of the iroh stack run in parallel with the workspace's instead of after it.
 
-Alternative considered: folding both into `just check` and `just test`. It would keep two recipes fewer at the price of three more builds of the iroh stack on every inner-loop run, for configurations only the store has.
+Alternative considered: merging both into `just check` and `just test`. It would keep two recipes fewer at the price of three more builds of the iroh stack on every inner-loop run, for configurations only the store has.
 
 `cargo docs-rs` on nightly is not carried. The crate denies `missing_docs` and `rustdoc::broken_intra_doc_links` at its root, and `cargo doc` on stable with `RUSTDOCFLAGS=-Dwarnings` catches the rest of what the nightly run caught — an intra-doc link to a private item among them.
 
