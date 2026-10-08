@@ -2,13 +2,13 @@
 
 ## Why
 
-A member's device statement lists, for each of the member's devices, the node id it is dialed by and the author the member writes with there, and counts on the signature of the member's announcement key alone ([pod stores](../../specs/components/mee-pdn/data-layer/pod-store/spec.md)); every member device dials the listed nodes as that member's contacts on every reconcile pass. A member's modified device can therefore list the node id of a node outside the pod. Every member device then dials that node as the member, the node refuses each session as one for a store it does not host, and the dials go on; with address lookup bound, a node id reaches any node on the network. The node dialed is outside the pod and trusted with nothing, so this is a modified node reaching a denial of service against an honest node, which obliges a fix; pods accept it while they serve load testing.
+A member's device statement lists, for each of the member's devices, the node id it is dialed by and the author the member writes with there, and counts on the signature of the member's identity key alone ([pod stores](../../specs/components/mee-pdn/data-layer/pod-store/spec.md)); every member device dials the listed nodes as that member's contacts on every reconcile pass. A member's modified device can therefore list the node id of a node outside the pod. Every member device then dials that node as the member, the node refuses each session as one for a store it does not host, and the dials go on; with address lookup bound, a node id reaches any node on the network. The node dialed is outside the pod and trusted with nothing, so this is a modified node reaching a denial of service against an honest node, which obliges a fix; pods accept it while they serve load testing.
 
 **Example:** Bob's modified phone b1 lists, in Bob's device statement, the node id of a server outside "Family", whose 100 members hold 2 devices each.
 
 | on the members' devices | the server |
 |---|---|
-| Bob's statement counts: Bob's announcement key signed it | dialed as Bob by 200 member devices on every reconcile pass, 10 s apart by default |
+| Bob's statement counts: Bob's identity key signed it | dialed as Bob by 200 member devices on every reconcile pass, 10 s apart by default |
 | each session is refused | dialed for good: a member's device list only grows |
 
 ## What Changes

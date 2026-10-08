@@ -109,7 +109,7 @@ An identity keeps one log for every pod it is a member of, and a log verifies on
 
 ### How the last owner who lost every device returns
 
-The last owner losing every device writes no event: the owner stays listed and nobody acts as one, which pods accept until KERI arrives and for good where the identity's KERI backup is lost too. KERI's pre-rotated keys restore control of the identity on a new device, which signs its device statement under the rotated key in the announcement key's slot; the owner's chain holds no left event, so the role stands. The PMS that held the pod's tickets is lost with the devices, so the return needs a path by which any member hands the pod's tickets to a device of an identity proven through KERI, writing no joined event, since a join makes a plain member. Open: which member's device hands the tickets over, and what it checks of the proof.
+The last owner losing every device writes no event: the owner stays listed and nobody acts as one, which pods accept until KERI arrives and for good where the identity's KERI backup is lost too. KERI's pre-rotated keys restore control of the identity on a new device, which signs its device statement under the rotated key in the identity key's slot; the owner's chain holds no left event, so the role stands. The PMS that held the pod's tickets is lost with the devices, so the return needs a path by which any member hands the pod's tickets to a device of an identity proven through KERI, writing no joined event, since a join makes a plain member. Open: which member's device hands the tickets over, and what it checks of the proof.
 
 **Example:** Alice, the one owner of "Family", loses her phone a1 and her laptop a2 in one fire; Bob and Carol are plain members.
 
