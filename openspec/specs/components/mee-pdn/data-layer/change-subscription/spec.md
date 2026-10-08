@@ -34,6 +34,23 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 - **WHEN** a subscriber stops reading, and the store emits more events into one of the subscription's two buffers than it holds
 - **THEN** the subscriber, reading again, receives that buffer's events that fitted and then one lag notice for them, with the other buffer's events merged in before or after it, and a drop in that buffer after the subscriber has read the notice leaves a notice of its own
 
+### Requirement: The live engine takes its events while it waits on the store
+
+The store's live engine SHALL keep taking the events of its waiting delivery while it waits for any answer of the store, and SHALL handle them in the order they arrived once the step that waited is over. The store waits for room in that delivery's buffer of 1,024 events and answers nothing meanwhile, so an engine that waited on the store without reading would leave both waiting for good as soon as the store had more events to emit ahead of the engine's request than the buffer holds. A first catch-up does exactly that: a node that holds nothing of a store receives all of the store's entries in one message, and the store inserts them in one step. While the engine waits on anything other than the store — gossip, the blob store — the store still waits for it, so a session cannot run ahead of the engine.
+
+**Example:** Bob's node imports a ticket to a store of 2,000 entries, and its engine restarts the store's sync while the catch-up runs.
+
+| step | Bob's store | Bob's engine |
+|---|---|---|
+| the catch-up message arrives | inserts its 2,000 entries in one step, one insert event each | asks the store for the store's recorded peers; the request waits behind the insert step |
+| the 1,025th insert event | waits for room in the engine's buffer | takes events out of the buffer while it waits, and holds them |
+| the insert step ends | answers the engine's request | handles the 2,000 held events in order, queueing a download for each entry |
+
+#### Scenario: A catch-up larger than the engine's buffer finishes while the engine asks the store
+
+- **WHEN** a node imports a store of more entries than the engine's buffer holds, and its engine asks the store for the store's recorded peers again and again during the catch-up
+- **THEN** the node holds every entry, and each of the engine's requests is answered
+
 ### Requirement: A change stream reports every change, dropped ones by a lag notice
 
 The change streams of the PMS and of the connection metadata store SHALL yield an item after every change of the replica — an entry written on this device, an entry arrived by sync, or a payload become readable — and SHALL yield each lag notice as one such item, so a consumer that reads the replica again on each item misses no change, and a burst the subscription could not buffer costs it one read for each of the two buffers the burst overflowed.
