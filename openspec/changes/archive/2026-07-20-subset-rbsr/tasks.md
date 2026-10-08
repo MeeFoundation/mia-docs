@@ -8,7 +8,7 @@ Scope: capability-filtered reconciliation enforcing Invariant 2 — a serving no
 - [x] 1.2 Interim claim identity: `ClaimId` derived from (issuer, entry path) via a domain-separated key-derivation hash (D3); evaluation always goes key→id→set membership, never id→location
 - [x] 1.3 Issuance: an issuer grants an audience read (optionally + write) on a set of claims; the grant record's ticket is minted to match — read-only → `ShareMode::Read`, with write → `ShareMode::Write` (D11)
 - [x] 1.4 Per-entry evaluation from the caller's effective grants; own-identity → authorized without a grant
-- [x] 1.5 One width-tagged grant record per issuer: `grants/<issuer-hex>` replaces the ticket+capability slot pair — publish of either width replaces wholesale, withdrawal is one tombstone, and the classifier derives width only from a present decoded record (absence, replication lag, and undecodable payloads all classify as no grant; the tag is the structural format version). Recipient reads are variant-selective; `withdraw_scoped_grant` folded into the one `withdraw_grant` (delta: `data-layer-connection-metadata-store`)
+- [x] 1.5 One width-tagged grant record per issuer: `grants/<issuer-hex>` replaces the ticket+capability slot pair — publish of either width replaces wholesale, withdrawal is one tombstone, and the classifier derives width only from a present decoded record (absence, replication lag, and undecodable payloads all classify as no grant; the tag is the structural format version). Recipient reads are variant-selective; `withdraw_scoped_grant` merged into the one `withdraw_grant` (delta: `data-layer-connection-metadata-store`)
 
 ## 2. Egress filter (pdn-store)
 

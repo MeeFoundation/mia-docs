@@ -91,14 +91,14 @@ The periodic reconcile pass SHALL walk every pair of co-located identities that 
 
 ### Requirement: A pod's two stores reconcile inside the process in the order two nodes take them
 
-Between two co-located identities that are both members of a pod, every reconciliation of the pod's record store SHALL follow a reconciliation of its membership store between the same two identities, to convergence, as a session between two nodes takes them ([pod stores](../pod-store/spec.md)) — on an announced write into either store, on a dialed contact that names this node and on the periodic pass alike — and the record store's session SHALL be served by the membership folded after that membership store's session.
+Between two co-located identities that are both members of a pod, every reconciliation of the pod's record store SHALL follow a reconciliation of its membership store between the same two identities, to convergence, as a session between two nodes takes them ([pod stores](../pod-store/spec.md)) — on an announced write into either store, on a dialed contact that names this node and on the periodic pass alike — and the record store's session SHALL be served by the membership view built after that membership store's session.
 
 **Example:** Alice's tablet a3 hosts Alice-leisure and Alice-work, both members of "Wedding"; Alice-leisure's replicas took Dave's joined event, his device statement and his first claim from Erin's phone e1, while Alice-work's replicas hold none of them, and a3 reaches no other node; `<dave>`: 64 lowercase hex chars of Dave's `PdnId`; `<id>`: the id `put_record` minted.
 
 | step of the next pass on a3 | Alice-work's replicas |
 |---|---|
 | 1. the membership store reconciled inside the process | take Dave's joined event and his device statement, listing his phone d1 |
-| 2. the membership folded | Dave a member at his sequence 1, writing on d1 |
+| 2. the membership view built | Dave a member at his sequence 1, writing on d1 |
 | 3. the record store reconciled inside the process | take `by/<dave>/claim/<id>/1` from d1's author, which Alice-work's record view reads at Dave's sequence 1 in this pass |
 
 #### Scenario: A co-located member takes a newcomer's record in the pass that brings its membership

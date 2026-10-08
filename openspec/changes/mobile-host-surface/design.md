@@ -39,7 +39,7 @@ The runtime's read of a peer's grant returns the capability next to the replica'
 
 ### D4. The facade's error table is written out, not inherited by reference
 
-The HTTP host's closed table folds an unreachable counterparty and every ceremony timeout into its unrecognized failure, and says so deliberately: for a container test the distinction a denial rested on was a refusal against a defect, and nothing needed more. A person holding a phone needs different actions from those outcomes — move closer or check the network, mint a fresh code, try again — and needs to be told that a scanned code came from an older build rather than that the phone is broken. So the facade names them.
+The HTTP host's closed table maps an unreachable counterparty and every ceremony timeout onto its unrecognized failure, and says so deliberately: for a container test the distinction a denial rested on was a refusal against a defect, and nothing needed more. A person holding a phone needs different actions from those outcomes — move closer or check the network, mint a fresh code, try again — and needs to be told that a scanned code came from an older build rather than that the phone is broken. So the facade names them.
 
 The table is this change's own, stated in its spec, and its divergence from the HTTP host's is written down rather than discovered later. Whether the two converge is a question for `pdn-node-http`'s own change; reaching into another component's spec from here would be the wrong place to settle it.
 
