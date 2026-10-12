@@ -361,6 +361,11 @@ A member's departure event â€” its left event, or a removed event in its chain â
 - **WHEN** a member device dials a device of member C while C is a member, the session reaches C's device only after C's removal and a record placed after it, and C's device has not learned of the removal
 - **THEN** C's device holds no record placed after the removal
 
+#### Scenario: A session accepted before a removal and served after it carries nothing placed after the removal
+
+- **WHEN** a device of member C dials a member device while C is a member, the member device decides to serve it, and C's removal and a record placed after it land on the member device before the session's snapshot opens
+- **THEN** C's device holds no record placed after the removal
+
 #### Scenario: A left event written offline reaches the members
 
 - **WHEN** a member leaves on a device with no member device reachable, and that device later reaches a member device
