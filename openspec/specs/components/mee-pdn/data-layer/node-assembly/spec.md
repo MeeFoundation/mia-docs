@@ -66,6 +66,22 @@ All protocols — the built-in stack and every supplied handler — SHALL share 
 - **WHEN** node B dials node A's supplied protocol through B's dial handle
 - **THEN** the connection A's handler observes carries B's node id as the remote identity
 
+### Requirement: One connection carries a gossip stream for each of up to 4,096 stores two nodes share
+
+The endpoint SHALL let a peer hold up to 4,096 unidirectional streams open on one connection. Gossip holds one such stream for every [swarm](../../../../architecture/language/swarm.md) topic two nodes share, for as long as they share it, and a sender past the count sends that peer nothing on any topic, and once its queue for that peer fills, nothing to any peer; a [pod](../../../../architecture/language/pod.md)'s two stores are two topics, so the count SHALL NOT stop live delivery between two nodes until the stores they share exceed 4,096, about 2,000 pods. One connection SHALL buffer no more than 248,750,000 bytes across all its streams, the product of the 199 streams and the 1,250,000-byte stream window the transport's defaults allowed, so that the larger count gives a caller more streams and no more memory.
+
+**Example:** Alice's phone a1 and Bob's phone b1 share 60 pods, 120 swarm topics, and no connection; Bob places a claim in the first of them.
+
+| unidirectional streams per connection | Bob's claim on a1 |
+|---|---|
+| 100, the transport's default | arrives only with the pod stores' pass, up to 5 minutes later, and after a burst of Bob's writes b1 stops answering |
+| 4,096 | arrives over the swarm at once |
+
+#### Scenario: Two nodes sharing more stores than the transport's default stream count keep live delivery
+
+- **WHEN** two members on two nodes share 60 pods, the pod stores' passes out of reach, and each places a claim in the first and in the last of them
+- **THEN** each claim reaches the other node over the swarm, and after a burst of writes the writer's node still creates a pod
+
 ### Requirement: A supplied handler's panic is contained
 A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHALL be caught, failing only that one connection, while the built-in protocols keep serving. (Under a `panic = "abort"` build no catch is possible; the spawn form's contract asks handlers not to panic.)
 

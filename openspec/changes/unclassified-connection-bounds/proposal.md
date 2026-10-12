@@ -6,19 +6,18 @@ A stranger who knows only a node's address can make the node spend memory withou
 
 Two levers stand before classification, and they multiply.
 
-The first is what one connection buffers. The endpoint takes iroh's default transport configuration: a caller may open 100 bidirectional and 100 unidirectional streams at once, each with a receive window of 1,250,000 bytes, and the connection as a whole has no receive window at all (`VarInt::MAX`). The transport creates a stream when its first frame arrives and buffers that stream's data until the application reads it, whether or not the application ever accepts the stream. The sync handler accepts one bidirectional stream, so bytes sent on the other 199 sit in the transport's buffers for as long as the connection lives, and the product comes to 248,750,000 bytes, about 237 MiB, for a single connection. iroh documents the same worst case on its own configuration: memory use is proportional to the number of streams times the stream receive window, bounded above by the connection's receive window.
+The first is what one connection buffers. The endpoint sets two numbers of its transport configuration and takes iroh's defaults for the rest: a caller may open 100 bidirectional and 4,096 unidirectional streams at once, each with a receive window of 1,250,000 bytes, and the connection as a whole has a receive window of 248,750,000 bytes, the product the transport's default 199 streams allowed. The transport creates a stream when its first frame arrives and buffers that stream's data until the application reads it, whether or not the application ever accepts the stream. The sync handler accepts one bidirectional stream, so bytes sent on every other stream sit in the transport's buffers for as long as the connection lives, up to the connection's window: 248,750,000 bytes, about 237 MiB, for a single connection. iroh documents the same worst case on its own configuration: memory use is proportional to the number of streams times the stream receive window, bounded above by the connection's receive window.
 
 The second is the number of connections. Beyond what the transport buffers, each connection whose first message is still incomplete holds up to 32 KiB of the node's own buffer (`MAX_OPENING_FRAME`) for up to 300 seconds, and nothing limits how many connections one peer opens, so both figures multiply by a number the caller chooses.
 
-**Example:** Carol (outsider) knows only the address of Alice's laptop a1. She dials `/iroh-sync/1`, sends all but the last byte of a 32,768-byte first message, and writes on every other stream the transport lets her open (iroh 1.1.0 and noq 1.2.0 defaults).
+**Example:** Carol (outsider) knows only the address of Alice's laptop a1. She dials `/iroh-sync/1`, sends all but the last byte of a 32,768-byte first message, and writes on every other stream the transport lets her open (the node's transport settings over iroh 1.1.0 and noq 1.2.0).
 
 | | one connection | 10 connections |
 |---|---|---|
-| streams the sync handler never accepts | 99 bidi + 100 uni = 199 | 1,990 |
+| streams the sync handler never accepts | 99 bidi + 4,096 uni = 4,195 | 41,950 |
 | bytes buffered per stream | 1,250,000 (`stream_receive_window`) | |
-| bytes in a1's transport | 248,750,000 | 2,487,500,000 (about 2.3 GiB) |
+| bytes in a1's transport | 248,750,000, the connection's window | 2,487,500,000 (about 2.3 GiB) |
 | bytes in a1's own buffer | 32,771 | 327,710 |
-| bound over the whole connection | none (`receive_window` is `VarInt::MAX`) | |
 | held for | up to 300 s (`SYNC_SESSION_TIMEOUT`), and then Carol dials again | |
 
 Buffered bytes show up as resident memory one for one. Measured against a running node on the first message, before that message had a ceiling of its own: a message announced at 1 GiB grew the receiving node's resident memory in step with the bytes that arrived, about 523 MiB for 512 MiB sent, and the node answered nothing while the message was still incomplete. The first message now has its ceiling; the transport's buffers behind it do not.
@@ -35,10 +34,10 @@ Nothing is decided. The change settles two questions — how much one connection
 
 `Endpoint::builder` takes a `QuicTransportConfig`, so every number below is one call in `bind_endpoint`. The first three combine; the question is which of them the node sets and to what value, and each trades against throughput, because a window smaller than what a link carries in one round trip caps that link's throughput.
 
-- A connection receive window. `receive_window` bounds the bytes buffered across all streams of one connection at once, and it is `VarInt::MAX` today, which is what makes the product above unbounded rather than merely large. One number covers every protocol on the endpoint.
-- A lower stream count, `max_concurrent_bidi_streams` and `max_concurrent_uni_streams`. This bounds the same product from the other side, and the protocols on this endpoint open streams of their own. iroh-blobs opens a bidirectional stream per request, so a request past the bidirectional count waits for a slot, and its need is measured before a number is chosen. iroh-gossip opens one unidirectional stream per topic on a connection and keeps it open for all of that topic's messages until the topic disconnects, and pdn-store gossips one topic per namespace; the unidirectional count therefore caps how many namespaces two nodes gossip about over one connection, and a slot stays taken for as long as the namespace is shared. The default count of 100 is such a cap as well. A sender past the count waits in `open_uni` and meanwhile sends that peer nothing on any topic, and once 64 of its messages wait for that peer, the sending node's gossip stops toward every peer.
+- A lower connection receive window. `receive_window` bounds the bytes buffered across all streams of one connection at once, and it is 248,750,000 bytes today. One number covers every protocol on the endpoint.
+- A lower stream count, `max_concurrent_bidi_streams` (100 today) and `max_concurrent_uni_streams` (4,096 today). This bounds the same product from the other side, and the protocols on this endpoint open streams of their own. iroh-blobs opens a bidirectional stream per request, so a request past the bidirectional count waits for a slot, and its need is measured before a number is chosen. iroh-gossip opens one unidirectional stream per topic on a connection and keeps it open for all of that topic's messages until the topic disconnects, and pdn-store gossips one topic per namespace; the unidirectional count therefore caps how many namespaces two nodes gossip about over one connection, and a slot stays taken for as long as the namespace is shared. A sender past the count waits in `open_uni` and meanwhile sends that peer nothing on any topic, and once 64 of its messages wait for that peer, the sending node's gossip stops toward every peer. A pod's two stores are two topics, so the transport's default count of 100 stops two honest nodes at 51 shared pods, and a lower unidirectional count is bounded below by the namespaces two honest nodes share.
 - A lower `stream_receive_window` than the default 1,250,000 bytes. The same trade, per stream rather than per connection.
-- The defaults stay, and the memory an unclassified caller makes the node spend is recorded as accepted. This amends defect-reachability, which counts the number of a modified node's connections among its levers, and the amendment covers every later finding of the same kind.
+- The present settings stay, and the memory an unclassified caller makes the node spend is recorded as accepted. This amends defect-reachability, which counts the number of a modified node's connections among its levers, and the amendment covers every later finding of the same kind.
 
 **Example:** Carol's connection from the case above, and an honest peer on a 100 ms round trip, the one noq sizes its default stream window for. Each sample setting holds one connection to about 12,500,000 bytes; none is proposed.
 
@@ -46,8 +45,8 @@ Nothing is decided. The change settles two questions — how much one connection
 |---|---|---|
 | `receive_window` 12,500,000 | 12,500,000 | all streams of a connection together at most 125,000,000 bytes/s |
 | 5 bidirectional and 5 unidirectional streams | 9 × 1,250,000 = 11,250,000 | a sixth concurrent blob request waits for a stream slot; a sixth namespace it gossips about with a1 waits until the topic of one of the five disconnects, and its gossip to a1 stops for every namespace meanwhile |
-| `stream_receive_window` 62,500 | 199 × 62,500 = 12,437,500 | each stream at most 625,000 bytes/s |
-| the defaults stay | 199 × 1,250,000 = 248,750,000 | nothing: each stream up to 12,500,000 bytes/s |
+| `stream_receive_window` 2,980 | 4,195 × 2,980 = 12,501,100 | each stream at most 29,800 bytes/s |
+| the present settings stay | 248,750,000, the connection's window | nothing: each stream up to 12,500,000 bytes/s |
 
 ### How many connections a node holds before it has classified them
 
