@@ -138,7 +138,7 @@ What the node reads before it knows whom a connection addresses SHALL be bounded
 
 ### Requirement: The node removes the payloads no replica it holds references
 
-The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store, a data replica, the replica of a withdrawn grant — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
+The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A payload an identity writes, or fetches for an entry it received, SHALL stay through every run whose read of the replicas predates that entry, so that a run already under way when the entry lands SHALL NOT remove its payload. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store, a data replica, the replica of a withdrawn grant — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
 
 **Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; the pod's record store held Bob's lease scan and a photo whose bytes Carol also keeps in her own data namespace.
 
@@ -161,3 +161,13 @@ The node SHALL run blob collection over its one blob store at an interval `Spawn
 
 - **WHEN** two identities hosted on one node hold replicas referencing one payload, one of them forgets its replica, and a collection run passes
 - **THEN** the blob store still holds the payload, and the other identity reads it
+
+#### Scenario: A payload written while a collection run is under way stays
+
+- **WHEN** an identity writes an entry after a collection run has read the replicas and before that run removes anything
+- **THEN** the blob store still holds the entry's payload after the run, and the entry reads
+
+#### Scenario: A payload fetched while a collection run is under way stays
+
+- **WHEN** an entry arrives from a peer after a collection run has read the replicas, and its payload is fetched before that run removes anything
+- **THEN** the blob store still holds the payload after the run, and the entry reads
