@@ -125,14 +125,15 @@ The pods service SHALL create a pod for a hosted identity: it draws a random non
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the pod id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter, reporting beside it the highest sequence of its own chain its replica holds, a tombstone's included; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes — past the newcomer's chain as the inviter's replica holds it and past the run the newcomer reports, so a departure that has reached the newcomer's devices and not yet the inviter's is not left standing — and the version and device list its device statement extends — the identity's own, when the pod has listed it before — write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's join statement, signed over that sequence by the joining steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. The inviter SHALL write the invite act before it hands over the tickets, and the newcomer's device SHALL record both tickets and the pod's private metadata store (PMS) entry before it catches up, so the armer's sweep finishes a catch-up that a dropped connection, a dropped `join` future or a restart interrupts. A secret presented by an identity the pod already lists as a member SHALL write no joined event: the inviter hands over both tickets again, and writes the device statement the dialogue carries when the member's device list does not name that device. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the pod id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter, reporting beside it the highest sequence of its own chain its replica holds, a tombstone's included; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes — past the newcomer's chain as the inviter's replica holds it and past the run the newcomer reports, so a departure that has reached the newcomer's devices and not yet the inviter's is not left standing — and send the pod's created event, write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The newcomer SHALL refuse an offer whose created event does not derive the invited pod id or does not verify, or whose sequence lies more than one past its own history — the run it reported or the sequence its private metadata store (PMS) records the pod at, whichever runs further — and SHALL refuse tickets to any stores but the two that created event names, so it signs nothing over a sequence it has not reached and records no store under a pod id the inviter misnames. The dialogue SHALL carry the newcomer's join statement, signed over that sequence and the joining device by the joining steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, which the inviter writes as the invite act into the replica of the identity the secret was minted for; the device it names is the newcomer's from then on, so the inviter serves the newcomer's first session. The inviter SHALL write the invite act before it hands over the tickets, and the newcomer's device SHALL record both tickets and the pod's PMS entry before it catches up, so the armer's sweep finishes a catch-up that a dropped connection, a dropped `join` future or a restart interrupts. A secret presented by an identity the pod already lists as a member SHALL write no joined event: the inviter hands over both tickets again, and the dialogue carries instead the member's statement at version 0 naming the presenting device alone, which the inviter writes when the member's device list does not name that device, since member devices serve no device the member's statements do not list. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 **Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `ad58a3faa04cdc5576c8dc5823a347c6`, no ticket — and Bob hands it to Carol; three presentations follow.
 
 | presented to b1 | b1 |
 |---|---|
 | a secret b1 never minted | refuses; nothing is written, and the pending invite stays live |
-| the invite's secret, by Carol's phone c1 | burns it, then writes into Bob's replica Carol's joined event, a plain member, and her device statement, and hands c1 both stores' write tickets; `join` on c1 returns caught up |
+| the invite's secret, by Carol's phone c1 | burns it, then writes into Bob's replica Carol's joined event, a plain member, its join statement naming c1, and hands c1 both stores' write tickets; `join` on c1 returns caught up |
+| had b1 been modified, offering Carol sequence 3, or Wedding's created event, or Wedding's tickets | c1 refuses: it signs nothing past its own history, records nothing, and `join` fails with a refusal |
 | the same secret again | refuses, as it refused the never-minted one |
 
 #### Scenario: A newcomer joins and catches up
@@ -169,6 +170,26 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 
 - **WHEN** the connection drops after the inviter wrote newcomer C's joined event and before its reply reached C, and C then presents a second invite
 - **THEN** the second dialogue writes no joined event and hands C both tickets, C catches up, and every member device lists C by the one joined event
+
+#### Scenario: An offer past the joiner's history is refused
+
+- **WHEN** an inviting device offers newcomer C a sequence more than one past C's own history
+- **THEN** C's join is refused, C signs and records nothing, and no joined event of C's reaches the inviter's replica
+
+#### Scenario: An offer naming another pod's created event is refused
+
+- **WHEN** an inviting device offers newcomer C the created event of another pod than the one the invite names
+- **THEN** C's join is refused before C signs anything, and C records nothing
+
+#### Scenario: Tickets to stores the created event does not name are refused
+
+- **WHEN** an inviting device hands newcomer C tickets to stores other than the two the pod's created event names
+- **THEN** C imports and records nothing and holds no store under the pod's id, and a later honest invite brings C the pod
+
+#### Scenario: A member reaches the pod from an unlisted device through an invite
+
+- **WHEN** member B's one listed device never received the pod, and B presents an invite from another device no statement of B's lists
+- **THEN** the dialogue writes B's statement at version 0 naming that device, and the device catches up and reads the pod
 
 #### Scenario: A wrong secret burns nothing
 
