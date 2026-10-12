@@ -356,6 +356,11 @@ A member's departure event â€” its left event, or a removed event in its chain â
 | a session on the record store naming Carol | refused with `00 00 00 02 02 00` |
 | a record Alice places afterwards | reaches b1 and never c1 |
 
+#### Scenario: A dial set up before a removal and arriving after it carries nothing placed after the removal
+
+- **WHEN** a member device dials a device of member C while C is a member, the session reaches C's device only after C's removal and a record placed after it, and C's device has not learned of the removal
+- **THEN** C's device holds no record placed after the removal
+
 #### Scenario: A left event written offline reaches the members
 
 - **WHEN** a member leaves on a device with no member device reachable, and that device later reaches a member device
