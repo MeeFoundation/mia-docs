@@ -10,12 +10,12 @@ The membership store is two shapes: what a device writes — an act — and what
 /// One entry a device writes into the membership store.
 enum MembershipAct {
     /// The creator's first act: itself a member and an owner. Self-authored; subject = actor; subject_seq = 1; the root.
-    /// Derives the pod id and is checked against it by the steps below.
-    Create  { nonce: [u8; 16], identity_key: PublicKey, signature: Signature },
+    /// Derives the pod id and is checked against it by the steps below, and names the two namespaces the creator made for the pod.
+    Create  { nonce: [u8; 16], identity_key: PublicKey, membership_store: NamespaceId, record_store: NamespaceId, signature: Signature },
     /// Written by the inviting device once the newcomer's one-time secret is verified and burned, never when the invite is minted.
-    /// Any member; subject ≠ actor; `identity_key` and `subject_signature` are the newcomer's join statement, made and
-    /// counted by the joining steps below. Held as `Joined`.
-    Invite  { subject: PdnId, subject_seq: Seq, actor_seq: Seq, identity_key: PublicKey, subject_signature: Signature },
+    /// Any member; subject ≠ actor; `identity_key`, `device` and `subject_signature` are the newcomer's join statement, made and
+    /// counted by the joining steps below; `device` is the one the newcomer joins from. Held as `Joined`.
+    Invite  { subject: PdnId, subject_seq: Seq, actor_seq: Seq, identity_key: PublicKey, device: MemberDevice, subject_signature: Signature },
     /// The member itself; subject = actor.
     Leave   { subject_seq: Seq, actor_seq: Seq },
     /// An owner; subject ≠ actor.
@@ -25,7 +25,7 @@ enum MembershipAct {
     /// An owner; subject ≠ actor.
     Demote  { subject: PdnId, subject_seq: Seq, actor_seq: Seq },
     /// The member's devices, one key per version; counted by the embedded signature under the member's identity key, whoever writes it.
-    /// `signature` by the identity key over "pdn/pod-devices/v1" ‖ version ‖ devices.
+    /// `signature` by the identity key over "pdn/pod-devices/v1" ‖ pod_id ‖ pdn_id ‖ version ‖ devices.
     AnnounceDevices { version: u64, devices: Vec<MemberDevice>, signature: Signature },
 }
 
@@ -36,8 +36,8 @@ struct MemberDevice { node: NodeId, author: AuthorId }
 /// A member's chain: `member/<pdnid>/<seq>/<kind>/<by>/<by_seq>`, walked in `seq` order. `by` is the actor the key names, `by_seq`
 /// the actor's own sequence then; the entry's author counts only among `by`'s devices.
 enum MembershipEvent {
-    Created  { seq: Seq, nonce: [u8; 16], identity_key: PublicKey },       // by the member itself; the creator's seq 1 only
-    Joined   { seq: Seq, by: PdnId, by_seq: Seq, identity_key: PublicKey }, // by any member other than the member
+    Created  { seq: Seq, nonce: [u8; 16], identity_key: PublicKey, membership_store: NamespaceId, record_store: NamespaceId }, // by the member itself; the creator's seq 1 only
+    Joined   { seq: Seq, by: PdnId, by_seq: Seq, identity_key: PublicKey, device: MemberDevice }, // by any member other than the member
     Left     { seq: Seq, by_seq: Seq },                                         // by the member itself
     Removed   { seq: Seq, by: PdnId, by_seq: Seq },                              // by an owner other than the member
     Promoted { seq: Seq, by: PdnId, by_seq: Seq },                              // by an owner
@@ -72,46 +72,53 @@ Creating a pod, on the creator's device:
 2. pod_id     = BLAKE3 derive_key(context "pdn/pod-id/v1",
                                   pdn_id[32] ‖ identity_pubkey[32] ‖ nonce[16]), first 16 bytes
                 text form: 32 lowercase hex characters
-3. signature  = Ed25519 sign(identity_secret,
-                             "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce)
-4. write the created event at member/<pdn_id>/1/created/<pdn_id>/0:
-   { nonce, identity_pubkey, signature }   — pdn_id is the key's <pdnid>; pod_id is not stored
-5. pod_id goes to the identity's PMS, the invite, links in notes
+3. create both stores: membership_store and record_store are their namespace ids
+4. signature  = Ed25519 sign(identity_secret,
+                             "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce ‖ membership_store[32] ‖ record_store[32])
+5. write the created event at member/<pdn_id>/1/created/<pdn_id>/0:
+   { nonce, identity_pubkey, membership_store, record_store, signature }   — pdn_id is the key's <pdnid>; pod_id is not stored
+6. pod_id goes to the identity's PMS, the invite, links in notes
 
 Counting a created event, on every member device, once its payload has arrived (a fresh device's first session included):
 1. recompute pod_id from the event's pdn_id, identity_pubkey, nonce → must equal the pod id the device holds
-2. recompute pdn_id from identity_pubkey → must equal the key's <pdnid>
-3. verify signature under identity_pubkey over "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce
-4. any check fails → the event counts for nothing, whatever order it arrived in
+2. membership_store must equal the namespace of the store the event lies in
+3. recompute pdn_id from identity_pubkey → must equal the key's <pdnid>
+4. verify signature under identity_pubkey over "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce ‖ membership_store ‖ record_store
+5. any check fails → the event counts for nothing, whatever order it arrived in
 ```
 
 The join statement:
 
 ```text
 Joining, in the join dialogue:
-1. the inviting device, once it has burned the secret, names subject_seq: the first sequence past the newcomer's chain, as the inviting device holds it or as the newcomer reports its own, whichever runs further
-2. subject_signature = Ed25519 sign(identity_secret, on the newcomer's device,
-                                    "pdn/pod-join/v1" ‖ pdn_id ‖ identity_pubkey ‖ pod_id[16] ‖ subject_seq[8])
-3. the inviting device writes the invite act at member/<pdn_id>/<subject_seq>/joined/<actor>/<actor_seq>:
-   { identity_pubkey, subject_signature }   — pdn_id and subject_seq are the key's; pod_id is not stored
+1. the inviting device, once it has burned the secret, names subject_seq: the first sequence past the newcomer's chain, as the inviting device holds it or as the newcomer reports its own, whichever runs further, and sends the pod's created event
+2. the newcomer checks the created event by the counting steps above, against the pod id of the invite, and refuses a subject_seq more than one past its own history
+3. subject_signature = Ed25519 sign(identity_secret, on the newcomer's device,
+                                    "pdn/pod-join/v1" ‖ pdn_id ‖ identity_pubkey ‖ pod_id[16] ‖ subject_seq[8] ‖ node_id[32] ‖ author[32])
+                       node_id and author being the device the newcomer joins from
+4. the inviting device writes the invite act at member/<pdn_id>/<subject_seq>/joined/<actor>/<actor_seq>:
+   { identity_pubkey, node_id, author, subject_signature }   — pdn_id and subject_seq are the key's; pod_id is not stored
+5. the newcomer imports the stores only when the tickets it receives name the membership_store and record_store the created event names
 
 Counting a joined event, on every member device, once its payload has arrived:
 1. recompute pdn_id from identity_pubkey → must equal the key's <pdnid>
-2. verify subject_signature under identity_pubkey over "pdn/pod-join/v1" ‖ pdn_id ‖ identity_pubkey ‖ pod_id ‖ subject_seq
+2. verify subject_signature under identity_pubkey over "pdn/pod-join/v1" ‖ pdn_id ‖ identity_pubkey ‖ pod_id ‖ subject_seq ‖ node_id ‖ author
 3. either check fails → the event counts for nothing, whatever order it arrived in
+4. both pass → the device it names is among the member's devices, as a statement's are, whatever the joined event itself counts for
 ```
 
 A device-list statement:
 
 ```text
 Writing one, on a device of the member:
-1. signature  = Ed25519 sign(identity_secret, "pdn/pod-devices/v1" ‖ version[8] ‖ (node_id[32] ‖ author[32])…)
-2. write it at member/<pdn_id>/devices/<version>: { devices, signature }   — version is the key's
+1. signature  = Ed25519 sign(identity_secret, "pdn/pod-devices/v1" ‖ pod_id[16] ‖ pdn_id[32] ‖ version[8] ‖ (node_id[32] ‖ author[32])…)
+2. write it at member/<pdn_id>/devices/<version>: { devices, signature }   — version is the key's; pod_id is not stored
+   a join dialogue that writes no joined event carries the member's statement at version 0, naming the presenting device alone
 
 Counting one, on every member device, once its payload has arrived:
 1. the identity key: the one a held created or joined event in the member's chain carries that derives the member's pdn_id
    → none held yet: the statement counts once one is
-2. verify signature under that key over "pdn/pod-devices/v1" ‖ version ‖ devices, version being the key's
+2. verify signature under that key over "pdn/pod-devices/v1" ‖ pod_id ‖ pdn_id ‖ version ‖ devices, pod_id being the pod's, pdn_id and version the key's
 3. the check fails → the statement counts for nothing, whatever order it arrived in
 ```
 
@@ -173,8 +180,10 @@ pdn_id                65bcff20d2b149925daa94e3750937044e8ef27385d24cb6cb7bf4182b
 nonce                 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a
 pod_id                ad58a3faa04cdc5576c8dc5823a347c6
                       the first 16 bytes of BLAKE3 derive_key("pdn/pod-id/v1", pdn_id ‖ identity_pubkey ‖ nonce)
-signature             806ce2029b681a9a…0420513704, 64 bytes of Ed25519
-                      over "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce, 99 bytes
+membership_store      4d4d…4d, 32 bytes of 4d standing in for the membership store's namespace id
+record_store          5252…52, 32 bytes of 52 standing in for the record store's namespace id
+signature             81532fb40a10f1a4…7c050a01, 64 bytes of Ed25519
+                      over "pdn/pod-creation/v1" ‖ pdn_id ‖ identity_pubkey ‖ nonce ‖ membership_store ‖ record_store, 163 bytes
 a created event in Alice's chain under another identity key, d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48,
 with the same nonce, derives 0b1c51caa1cc711a3079f791899c43a7, its key deriving another pdn_id than Alice's, and every device holding ad58a3faa04cdc5576c8dc5823a347c6 counts it for nothing
 both stores' namespace ids are 32-byte public keys of their own, and neither is the pod id
@@ -184,6 +193,11 @@ both stores' namespace ids are 32-byte public keys of their own, and neither is 
 
 - **WHEN** an identity creates a pod
 - **THEN** recomputing the pod id from the created event's `PdnId`, identity key and nonce gives the pod id, and the event's signature verifies under that identity key, both by the pod id steps above
+
+#### Scenario: A created event roots only the store it names
+
+- **WHEN** a pod's created event is copied into another namespace than the membership store it names
+- **THEN** every device holding that namespace counts the event for nothing, and the creator is no member there, while the store the event names counts it
 
 #### Scenario: The pod id is not a namespace id
 
@@ -197,7 +211,7 @@ both stores' namespace ids are 32-byte public keys of their own, and neither is 
 
 ### Requirement: Every member device holds both stores whole and their write tickets
 
-Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the pod is judged by the membership view and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its PMS, dialed as that identity, derived afresh whenever the membership store changes, at each run of the store's periodic pass, and whenever the holding identity's PMS lists a device it did not — which each store then dials, as that identity, since a sibling whose first dial came before its listing reached this device was refused, and nothing else dials it again before the pass — and replacing the previous list whole — save while the replica's membership view lists no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states. Both stores' sync SHALL start with their contacts as they stand before either starts, since the membership store's first session derives them again, from a membership view that may list no device of the inviter yet while the statements' payloads are still on their way. A pull an announcement triggers SHALL address the member the announcement names, when no derivation pairs its sender with a member: the name is the sender's word and picks only which replica of the sender's node the pull addresses, the session judged on both sides as any other. Any other peer no derivation pairs with a member SHALL be dialed as the member whose ticket the store was imported from, whatever the device shares of the store since.
+Every device of every member SHALL hold both stores whole — every record readable by every member — and SHALL hold the write ticket of each: a session between two member devices delivers every entry of either store with no egress filter, and what an entry counts for inside the pod is judged by the membership view and the record view per entry, never by ticket mode — a member's write ticket widens nothing they refuse. Member devices SHALL form each store's swarm, so a write reaches the other member devices through the content-free announcement and the pull it triggers, and a member device SHALL be able to catch up from any other member device, not only from an entry's author. A store's contacts SHALL be the devices the current members' statements list, each paired with the member it is dialed as, and the holding identity's own other devices by its PMS, dialed as that identity, derived afresh whenever the membership store changes, at each run of the store's periodic pass, and whenever the holding identity's PMS lists a device it did not — which each store then dials, as that identity, since a sibling whose first dial came before its listing reached this device was refused, and nothing else dials it again before the pass — and replacing the previous list whole — save while the replica's membership view lists no identity, holding nothing yet, when the contacts its ticket named stay — each peer of either store dialed as the member a derivation pairs it with; a contact naming this node's own address SHALL be reached inside the process, and a write SHALL announce to a co-located member's replica directly, as the in-process sessions spec states. Both stores' sync SHALL start with their contacts as they stand before either starts, since the membership store's first session derives them again, from a membership view that may list no device of the inviter yet while the statements' payloads are still on their way. A pull an announcement triggers SHALL address the member the announcement names when no derivation pairs its sender with a member and a contact of the store or its import already names that member, and SHALL otherwise address the member whose ticket the store was imported from: the name is the sender's word, so it picks only among the names this device gave, and a sender naming fresh identities opens no exchange for each. Any other peer no derivation pairs with a member SHALL be dialed as the member whose ticket the store was imported from, whatever the device shares of the store since.
 
 **Example:** Alice places a claim in "Family" on her phone a1 while Bob's phone b1 is in the record store's swarm and Carol's phone c1 is offline; then a1 goes offline and c1 comes back.
 
@@ -226,6 +240,11 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 - **WHEN** a device of member B whose node no statement lists writes an entry, and a device of member A receives its announcement
 - **THEN** A's device pulls the entry addressing B, and reads it
+
+#### Scenario: A pull from a node no contact names is addressed as a member this device named
+
+- **WHEN** a node no derivation pairs with a member announces a write to a member device, its announcement naming an identity no contact of the store names
+- **THEN** the member device's pull addresses the member whose ticket the store was imported from, never the identity the announcement names
 
 #### Scenario: A newcomer's share reaches its inviter as the inviter
 
@@ -309,7 +328,7 @@ A session for either of a pod's stores SHALL name the member whose replica it ad
 
 ### Requirement: A pod store holds whatever a session it serves carries
 
-Either store of a pod SHALL hold every entry a session carries from a caller it serves — a member device's session whole, a former member's over its departure's past — and SHALL drop only what pdn-store drops on its own: a key over 8,192 bytes, a timestamp more than 10 minutes ahead, an entry whose signature does not verify. No entry SHALL be judged at ingest by its author, its key or the membership, and no entry SHALL wait at ingest. What an entry counts for SHALL follow from the whole set of entries a device holds, whatever order they arrived in: the membership view counts an event, and the record view reads a record's entry, by the rules the requirements below state, and an entry whose payload or whose dependencies have not arrived counts once they have. Every member device then holds the same entries, and a forged entry is held and relayed by every member device and counts on none.
+Either store of a pod SHALL hold every entry a session carries from a caller it serves — a member device's session whole, a former member's over its departure's past — and SHALL drop only what pdn-store drops on its own: a key over 8,192 bytes, a timestamp more than 10 minutes ahead, an entry whose signature does not verify. Outside a dial toward a callee the store serves nothing, no entry SHALL be judged at ingest by its author, its key or the membership, and no entry SHALL wait at ingest. What an entry counts for SHALL follow from the whole set of entries a device holds, whatever order they arrived in: the membership view counts an event, and the record view reads a record's entry, by the rules the requirements below state, and an entry whose payload or whose dependencies have not arrived counts once they have. Every member device then holds the same entries, and a forged entry is held and relayed by every member device and counts on none. A dial toward a callee the store serves nothing SHALL take from it only the entries a device of a current member signed — a device the counted statements of a member the membership view counts list — and the device statements of the current member the callee names, whose member's signature the membership view checks whoever authored the entry, and SHALL take everything while the membership view counts no member or lists no device of the current member the callee names, as while a newcomer's first entries and the payloads of its statements are on their way; a replica whose own identity departed SHALL take nothing from such a callee. A callee the store does not serve vouches for nobody, while a current member's signature makes the same entry whichever node relays it.
 
 **Example:** Bob's modified phone b1, Bob being a plain member of "Family", carries into a session with Carol's phone c1 Alice's claim, an entry of its own at that claim's key, and a promoted event for Bob it wrote; `<alice>`: 64 lowercase hex chars of Alice's `PdnId`; `<id>`: the claim's id.
 
@@ -320,10 +339,35 @@ Either store of a pod SHALL hold every entry a session carries from a caller it 
 | a promoted event in Bob's chain | b1's | held, and counted for nothing: Bob is no owner |
 | a later session between c1 and b1 | | finds no difference |
 
+**Example:** Bob's phone b1 dials, on the record store of "Family", devices it serves nothing, each serving the session whole: Dave's phone d1, which holds the store's ticket and no membership; Carol's modified phone c1, Carol having been removed; and a node answering as Alice that no statement of Alice lists. `<dave>`, `<carol>`: 64 lowercase hex chars of their `PdnId`s.
+
+| entry the callee carries | its author | on b1 |
+|---|---|---|
+| Alice's claim, relayed by d1 | a1's | held, and read as Alice's claim |
+| `by/<dave>/claim/<id>/1` | d1's | not taken |
+| `by/<carol>/claim/<id>/1`, placed after Carol's removal | c1's | not taken |
+| `by/<alice>/claim/<id>/1`, from the node answering as Alice | that node's | not taken |
+| `member/<alice>/devices/1`, from the node answering as Alice | that node's | held, and counted for nothing: Alice did not sign it |
+
 #### Scenario: A forged entry is held and counts for nothing
 
 - **WHEN** a device of member B, no owner, carries into a session with a device of member C member A's claim, an entry of its own at that claim's key, and a promoted event for B
 - **THEN** C's device holds all three, reads A's claim as A's and nothing of B's entry at its key, lists B as a plain member, and a later session between the two devices finds no difference
+
+#### Scenario: A dial takes from a callee it serves nothing only what current members signed
+
+- **WHEN** a member device dials a device it serves nothing — a removed member's, or that of a ticket holder that is no member — which serves the session whole and carries a current member's record beside a claim of its own
+- **THEN** the dialing device holds and reads the current member's record and holds neither callee's own claim
+
+#### Scenario: A device no statement lists passes its member's statement to a member pulling from it
+
+- **WHEN** a device of member C whose node no statement lists holds C's statement listing it and a record of its own, and a device of member A dials it as C
+- **THEN** A's device takes the statement and lists the device among C's, and takes its record in a session after that
+
+#### Scenario: A node answering as a member no statement lists it for passes nothing it signed
+
+- **WHEN** a member device dials, as a current member, a node no statement of that member lists, and that node carries an entry it signed under that member's name
+- **THEN** the dialing device does not hold the entry
 
 #### Scenario: Entries arriving in any order converge
 
@@ -341,6 +385,16 @@ A member's departure event — its left event, or a removed event in its chain �
 | a session on the membership store naming Carol | served over the past of her left event: b1 takes the left event and sends what of that past c1 lacks, and not Dave's joined event |
 | a session on the record store naming Carol | refused with `00 00 00 02 02 00` |
 | a record Alice places afterwards | reaches b1 and never c1 |
+
+#### Scenario: A dial set up before a removal and arriving after it carries nothing placed after the removal
+
+- **WHEN** a member device dials a device of member C while C is a member, the session reaches C's device only after C's removal and a record placed after it, and C's device has not learned of the removal
+- **THEN** C's device holds no record placed after the removal
+
+#### Scenario: A session accepted before a removal and served after it carries nothing placed after the removal
+
+- **WHEN** a device of member C dials a member device while C is a member, the member device decides to serve it, and C's removal and a record placed after it land on the member device before the session's snapshot opens
+- **THEN** C's device holds no record placed after the removal
 
 #### Scenario: A left event written offline reaches the members
 
@@ -544,7 +598,7 @@ A session between two member devices SHALL reconcile the membership store to con
 
 | step of the session | a2 |
 |---|---|
-| 1. the membership store reconciled to convergence | takes Dave's joined event and his device statement, listing his phone d1 |
+| 1. the membership store reconciled to convergence | takes Dave's joined event, its join statement naming his phone d1 |
 | 2. the membership view built | Dave a member at his sequence 1, writing on d1 |
 | 3. the record store reconciled | takes `by/<dave>/claim/<id>/1` from d1's author, which the record view reads at Dave's sequence 1 at once |
 
@@ -704,17 +758,19 @@ An entry in either store whose key fits neither store's layout, or fits one only
 
 ### Requirement: A member's devices are announced by the member itself
 
-A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL count by the signature embedded in it — made by the identity key over the prefix `pdn/pod-devices/v1` followed by the statement — verified against the identity key the member's join statement, or the creator's created event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. A statement whose embedded signature does not verify under the member's identity key SHALL count for nothing on every member device, held as every entry is. A statement SHALL count once its payload has arrived and the event carrying the member's identity key is held, whatever order the two arrive in, and an entry whose author only that statement lists SHALL read from then on. Device resolution SHALL follow the union of every validly signed statement of the member a device holds, whatever its version, whichever author wrote each and never by entry timestamps, so a device that a later version leaves out stays listed by the version that named it, and two statements written at one version by two authors list every device either names.
+A member's device-list statement — each device's node id beside the author the member writes with on that device — SHALL count by the signature embedded in it — made by the identity key over the prefix `pdn/pod-devices/v1` followed by the pod id, the member's `PdnId` and the statement — verified against the identity key the member's join statement, or the creator's created event, carries — never by the entry's author or the session peer: a statement written by a freshly linked device of the member itself and a statement relayed by any other member earn the same verdict. The device a member's join statement names SHALL count among the member's devices by the same rule, by the signature the join statement carries, whatever the joined event itself counts for, so a newcomer's device needs no statement of its own; that device is the one the newcomer signs for, never a list the inviting device chooses. Wherever this spec speaks of the devices a member's statements list, the devices its join statements name are among them. A statement whose embedded signature does not verify under the member's identity key, for this pod and this member, SHALL count for nothing on every member device, held as every entry is: a statement the member signed for another pod lists nothing here. A statement SHALL count once its payload has arrived and the event carrying the member's identity key is held, whatever order the two arrive in, and an entry whose author only that statement lists SHALL read from then on. Device resolution SHALL follow the union of every validly signed statement of the member a device holds, whatever its version, whichever author wrote each and never by entry timestamps, so a device that a later version leaves out stays listed by the version that named it, and two statements written at one version by two authors list every device either names.
 
-**Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
+**Example:** device statements in "Wedding"; Erin invited Bob, whose phone is b1, and Alice-work, whose one device is Alice's tablet a3; Bob invited Alice-leisure, whose phone is a1, and a3 was later linked into Alice-leisure too; Dave, a member, has the phone d1; `<bob>`, `<erin>`, `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
 | entry | written by | signed by | every member device |
 |---|---|---|---|
-| `member/<bob>/devices/1`: b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's identity key | counts it: the writer is not the member |
-| `member/<alice-leisure>/devices/2`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's identity key | counts it, whoever relays it, and adds a3 to Alice-leisure's devices |
-| `member/<bob>/devices/2` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding version 1 alone | Bob's identity key | counts both and resolves Bob's devices to b1, b2 and b3 |
-| `member/<bob>/devices/3`: b1, b2, b3 and d1 | d1 | Dave's identity key | holds it and counts it for nothing |
-| `member/<alice-work>/devices/1`: a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's identity key | counts it: a3 stands under two authors, one per member |
+| `member/<bob>/1/joined/<erin>/1`, its join statement naming b1 with b1's author | e1, Erin's phone, in the join dialogue that brought Bob in | Bob's identity key | lists b1 among Bob's devices: the writer is not the member, and Bob writes no statement of his own |
+| `member/<alice-leisure>/devices/1`: a1, and a3 with a3's author for Alice-leisure | a3, just linked into Alice-leisure | Alice-leisure's identity key | counts it, whoever relays it, and adds a3 to Alice-leisure's devices |
+| `member/<bob>/devices/1` twice: b1 and b2 under b2's author, b1 and b3 under b3's author | b2 and b3, each just linked into Bob while holding his join statement alone | Bob's identity key | counts both and resolves Bob's devices to b1, b2 and b3 |
+| `member/<bob>/devices/0`: b4 alone | e1, in a join dialogue Bob, a member already, ran from b4, which no statement listed | Bob's identity key | counts it and adds b4 |
+| `member/<bob>/devices/2`: b1, b2, b3 and d1 | d1 | Dave's identity key | holds it and counts it for nothing |
+| `member/<bob>/devices/5`: b1 and d1, which Bob signed for "Family" | d1 | Bob's identity key, over Family's pod id | holds it and counts it for nothing: d1 is no device of Bob's in Wedding |
+| `member/<alice-work>/1/joined/<erin>/1`, its join statement naming a3 with a3's author for Alice-work | e1, in the join dialogue that brought Alice-work in | Alice-work's identity key | lists a3 among Alice-work's devices: a3 stands under two authors, one per member |
 
 #### Scenario: A new device registers itself through its siblings
 
@@ -725,6 +781,16 @@ A member's device-list statement — each device's node id beside the author the
 
 - **WHEN** identities B and D, hosted on one node, are both members of a pod and each places a record from that node
 - **THEN** B's and D's statements list the same node id under two different authors, and every member device resolves each record to the one member whose author signed it
+
+#### Scenario: A join statement lists the device it names
+
+- **WHEN** a device of A writes B's joined event, its join statement naming B's device X, and no statement of B is held
+- **THEN** every member device lists X among B's devices and counts an event X authors as B's, while a join statement whose device another node swapped counts for nothing and lists that device for nobody
+
+#### Scenario: A statement signed for another pod counts for nothing
+
+- **WHEN** a device of M writes into pod P a device statement member B signed for another pod
+- **THEN** every member device of P holds it and counts it for nothing, and no device it names joins B's devices in P, while the same devices signed by B for P count
 
 #### Scenario: A statement under a wrong key counts for nothing
 

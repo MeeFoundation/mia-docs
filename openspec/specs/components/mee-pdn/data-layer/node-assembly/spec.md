@@ -66,6 +66,22 @@ All protocols — the built-in stack and every supplied handler — SHALL share 
 - **WHEN** node B dials node A's supplied protocol through B's dial handle
 - **THEN** the connection A's handler observes carries B's node id as the remote identity
 
+### Requirement: One connection carries a gossip stream for each of up to 4,096 stores two nodes share
+
+The endpoint SHALL let a peer hold up to 4,096 unidirectional streams open on one connection. Gossip holds one such stream for every [swarm](../../../../architecture/language/swarm.md) topic two nodes share, for as long as they share it, and a sender past the count sends that peer nothing on any topic, and once its queue for that peer fills, nothing to any peer; a [pod](../../../../architecture/language/pod.md)'s two stores are two topics, so the count SHALL NOT stop live delivery between two nodes until the stores they share exceed 4,096, about 2,000 pods. One connection SHALL buffer no more than 248,750,000 bytes across all its streams, the product of the 199 streams and the 1,250,000-byte stream window the transport's defaults allowed, so that the larger count gives a caller more streams and no more memory.
+
+**Example:** Alice's phone a1 and Bob's phone b1 share 60 pods, 120 swarm topics, and no connection; Bob places a claim in the first of them.
+
+| unidirectional streams per connection | Bob's claim on a1 |
+|---|---|
+| 100, the transport's default | arrives only with the pod stores' pass, up to 5 minutes later, and after a burst of Bob's writes b1 stops answering |
+| 4,096 | arrives over the swarm at once |
+
+#### Scenario: Two nodes sharing more stores than the transport's default stream count keep live delivery
+
+- **WHEN** two members on two nodes share 60 pods, the pod stores' passes out of reach, and each places a claim in the first and in the last of them
+- **THEN** each claim reaches the other node over the swarm, and after a burst of writes the writer's node still creates a pod
+
 ### Requirement: A supplied handler's panic is contained
 A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHALL be caught, failing only that one connection, while the built-in protocols keep serving. (Under a `panic = "abort"` build no catch is possible; the spawn form's contract asks handlers not to panic.)
 
@@ -138,7 +154,7 @@ What the node reads before it knows whom a connection addresses SHALL be bounded
 
 ### Requirement: The node removes the payloads no replica it holds references
 
-The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store, a data replica, the replica of a withdrawn grant — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
+The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A payload an identity writes, or fetches for an entry it received, SHALL stay through every run whose read of the replicas predates that entry, so that a run already under way when the entry lands SHALL NOT remove its payload. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store, a data replica, the replica of a withdrawn grant — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
 
 **Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; the pod's record store held Bob's lease scan and a photo whose bytes Carol also keeps in her own data namespace.
 
@@ -161,3 +177,13 @@ The node SHALL run blob collection over its one blob store at an interval `Spawn
 
 - **WHEN** two identities hosted on one node hold replicas referencing one payload, one of them forgets its replica, and a collection run passes
 - **THEN** the blob store still holds the payload, and the other identity reads it
+
+#### Scenario: A payload written while a collection run is under way stays
+
+- **WHEN** an identity writes an entry after a collection run has read the replicas and before that run removes anything
+- **THEN** the blob store still holds the entry's payload after the run, and the entry reads
+
+#### Scenario: A payload fetched while a collection run is under way stays
+
+- **WHEN** an entry arrives from a peer after a collection run has read the replicas, and its payload is fetched before that run removes anything
+- **THEN** the blob store still holds the payload after the run, and the entry reads
