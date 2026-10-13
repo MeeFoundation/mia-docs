@@ -268,7 +268,7 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 ### Requirement: A pod store's periodic pass reaches at most 5 peers every 5 minutes
 
-The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOptions::pod_reconcile_interval`, 5 minutes by default, and each run SHALL open sessions for that store with at most 5 peers, drawn at random on every run from the store's contacts and the peers the engine recorded. Every other replica a node tracks SHALL keep `SpawnOptions::reconcile_interval` and every contact. Live delivery inside a pod rides the swarm's announcements and the pulls they trigger; the pass bounds how long an announcement gossip lost delays an entry.
+The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOptions::pod_reconcile_interval`, 5 minutes by default, and each run SHALL open sessions for that store with at most 5 peers, drawn at random on every run from the store's contacts alone — the devices its membership view derives, or its ticket's while that view lists nobody — and the store's sync SHALL start with its contacts alone when the store is created, imported or reopened, so a node the derivation leaves out, a former member's device or a member's device a converged tombstone is done with, is reached by no run and no such start. Every other replica a node tracks SHALL keep `SpawnOptions::reconcile_interval` and every contact. Live delivery inside a pod rides the swarm's announcements and the pulls they trigger; the pass bounds how long an announcement gossip lost delays an entry.
 
 **Example:** Bob's phone b1 holds 50 pods of 100 members on 2 devices each, and Bob's data namespace, which his laptop b2 holds too.
 
@@ -286,6 +286,11 @@ The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOpti
 
 - **WHEN** a device of member B misses the announcement of member A's write, and holds at most 5 contacts for the store
 - **THEN** the next run of the pass over that store brings the write
+
+#### Scenario: A run reaches no former member's device
+
+- **WHEN** a member's device had sessions with a device of member C, C departs, and C's tombstone has converged
+- **THEN** no later run of the member's device's pass dials C's device, and no run of C's tombstone dials the member's device
 
 #### Scenario: A pod store keeps its own interval
 
@@ -376,7 +381,7 @@ Either store of a pod SHALL hold every entry a session carries from a caller it 
 
 ### Requirement: A departed member's devices keep the membership store as the pod's tombstone
 
-A member's departure event — its left event, or a removed event in its chain — SHALL end its devices' hold on the record store and SHALL NOT end their hold on the membership store: every device of the departed member's identity SHALL keep the membership store for good as the pod's tombstone, and forget the record store. The departure's past SHALL be the departure event and every entry it depends on — the earlier events of its subject's chain, its actor's chain up to the point it names, and, for each of these in turn, the same, with the joined events and device statements that resolve their authors — down to the created event. A member device SHALL serve a session naming a former member, from a device the former member's statements list, on the membership store alone and over the departure's past alone, in both directions, and SHALL serve it nothing outside that past; a sibling device of the former member SHALL serve it the tombstone whole. A device whose own identity departed SHALL hold its sessions with member devices to its departure's past in both directions as well, taking beside it the events of its own chain after the departure, so that a member device that does not yet know of the departure sends it nothing outside that past and a join after the departure reaches it. A tombstone SHALL be reconciled with member devices until one session with a member device has converged over the departure's past, and then with the identity's own devices alone.
+A member's departure event — its left event, or a removed event in its chain — SHALL end its devices' hold on the record store and SHALL NOT end their hold on the membership store: every device of the departed member's identity SHALL keep the membership store for good as the pod's tombstone, and forget the record store. The departure's past SHALL be the departure event and every entry it depends on — the earlier events of its subject's chain, its actor's chain up to the point it names, and, for each of these in turn, the same, with the joined events and device statements that resolve their authors — down to the created event. A member device SHALL serve a session naming a former member, from a device the former member's statements list, on the membership store alone and over the departure's past alone, in both directions, and SHALL serve it nothing outside that past; a sibling device of the former member SHALL serve it the tombstone whole. A device whose own identity departed SHALL hold its sessions with member devices to its departure's past in both directions as well, taking beside it the events of its own chain after the departure, so that a member device that does not yet know of the departure sends it nothing outside that past and a join after the departure reaches it. A tombstone SHALL be reconciled with member devices until one session with a current member's replica — on another node or on this one, a co-located member's included — has converged over the departure's past, and then with the identity's own devices alone.
 
 **Example:** Carol leaves "Family" on her phone c1 while c1 is offline, and an hour later c1 reaches Bob's phone b1; meanwhile Bob invited Dave, and nothing in Carol's departure depends on Dave's join.
 
@@ -420,6 +425,11 @@ A member's departure event — its left event, or a removed event in its chain �
 
 - **WHEN** a member leaves on one device while another device of its identity holds the pod, and the identity's PMS syncs
 - **THEN** both devices hold the membership store and neither holds the record store
+
+#### Scenario: A session with a co-located member's replica converges a tombstone
+
+- **WHEN** identity W departs a pod whose one remaining member L is hosted on W's node, and W's tombstone has a session with L's replica inside the process
+- **THEN** the tombstone has converged, and is reconciled with W's own devices alone from then on
 
 ### Requirement: Membership needs no connection
 
