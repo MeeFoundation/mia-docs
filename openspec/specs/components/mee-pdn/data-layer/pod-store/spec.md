@@ -246,11 +246,6 @@ Every device of every member SHALL hold both stores whole — every record reada
 - **WHEN** a node no derivation pairs with a member announces a write to a member device, its announcement naming an identity no contact of the store names
 - **THEN** the member device's pull addresses the member whose ticket the store was imported from, never the identity the announcement names
 
-#### Scenario: A newcomer's share reaches its inviter as the inviter
-
-- **WHEN** a newcomer whose derived contacts list no device of the inviter is out of the record store's swarm while the inviter writes an entry, and then shares its own tickets to both stores
-- **THEN** the dials the share's restart makes reach the inviter's device as the inviter, and the newcomer receives the entry
-
 #### Scenario: A newcomer's record store reaches the inviter whatever the first membership session derives
 
 - **WHEN** a newcomer imports both stores, and the membership store's first session derives contacts listing no device of the inviter before the record store's sync starts
@@ -268,7 +263,7 @@ Every device of every member SHALL hold both stores whole — every record reada
 
 ### Requirement: A pod store's periodic pass reaches at most 5 peers every 5 minutes
 
-The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOptions::pod_reconcile_interval`, 5 minutes by default, and each run SHALL open sessions for that store with at most 5 peers, drawn at random on every run from the store's contacts alone — the devices its membership view derives, or its ticket's while that view lists nobody — and the store's sync SHALL start with its contacts alone when the store is created, imported or reopened, so a node the derivation leaves out, a former member's device or a member's device a converged tombstone is done with, is reached by no run and no such start. Every other replica a node tracks SHALL keep `SpawnOptions::reconcile_interval` and every contact. Live delivery inside a pod rides the swarm's announcements and the pulls they trigger; the pass bounds how long an announcement gossip lost delays an entry.
+The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOptions::pod_reconcile_interval`, 5 minutes by default, and each run SHALL open sessions for that store with at most 5 peers, drawn at random on every run from the store's contacts alone — the devices its membership view derives, or its ticket's while that view lists nobody. The store's sync SHALL start with its contacts alone when the store is created, imported or reopened, and minting the store's ticket — as a member's device does for every join it serves — SHALL dial no one, so a node the derivation leaves out, a former member's device or a member's device a converged tombstone is done with, is reached by no run, no such start and no join. Every other replica a node tracks SHALL keep `SpawnOptions::reconcile_interval` and every contact. Live delivery inside a pod rides the swarm's announcements and the pulls they trigger; the pass bounds how long an announcement gossip lost delays an entry.
 
 **Example:** Bob's phone b1 holds 50 pods of 100 members on 2 devices each, and Bob's data namespace, which his laptop b2 holds too.
 
@@ -291,6 +286,11 @@ The periodic reconcile pass SHALL reconcile each of a pod's stores at `SpawnOpti
 
 - **WHEN** a member's device had sessions with a device of member C, C departs, and C's tombstone has converged
 - **THEN** no later run of the member's device's pass dials C's device, and no run of C's tombstone dials the member's device
+
+#### Scenario: A join served after a departure reaches no former member's device
+
+- **WHEN** a member's device had sessions with a device of member C, C departs, and the member's device then mints its tickets to the pod's stores for a join it serves
+- **THEN** the mint dials no one, C's device included
 
 #### Scenario: A pod store keeps its own interval
 
