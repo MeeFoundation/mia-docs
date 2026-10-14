@@ -220,7 +220,7 @@ The image SHALL be built from the workspace alone — its manifests, its lock fi
 | `Cargo.toml`, `Cargo.lock`, `crates/` | carried, `crates/pdn-store` among them |
 | `target/`, `.git`, `.env`, `CLAUDE*.md` | left out, at any depth |
 | `.cargo/config.toml` | left out: whatever the file does not name is excluded |
-| `rust-toolchain.toml` | left out: the base image `rust:1.98-bookworm` picks the compiler |
+| `rust-toolchain.toml` | left out: the compiler comes from the base image `rust:<minor>-trixie`, at the minor version the file pins |
 | `mia-docs/`, `ops/`, `scripts/` | left out |
 
 #### Scenario: A store edit reaches the image
