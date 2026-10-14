@@ -2,9 +2,9 @@
 
 ## Why
 
-A node speaks three formats a peer has to parse exactly: the sync protocol's messages under the ALPN `/iroh-sync/1`, which pdn-store keeps under upstream's name; the pairing and linking dialogues under `/pdn/pairing/0` and `/pdn/linking/0`; and the document ticket both of them carry, encoded as the one variant `Variant0` of `TicketWireFormat`. Only the payloads a person carries from one device to another — the invite and the linking payload — carry a format version and refuse another one by name (`UnsupportedInviteVersion`, `UnsupportedLinkingVersion`). Nothing else names its version.
+A node speaks four formats a peer has to parse exactly: the sync protocol's messages under the ALPN `/iroh-sync/1`, which pdn-store keeps under upstream's name; the announcements in a replica's gossip topic, pdn-store's `Op` under iroh-gossip's ALPN; the pairing, linking and pod join dialogues under `/pdn/pairing/0`, `/pdn/linking/0` and `/pdn/pod-join/0`; and the document ticket the dialogues carry, encoded as the one variant `Variant0` of `TicketWireFormat`. Only the payloads a person carries from one device to another — the invite, the linking payload and the pod invite — carry a format version and refuse another one by name (`UnsupportedInviteVersion`, `UnsupportedLinkingVersion`, `UnsupportedPodInviteVersion`). Nothing else names its version.
 
-The formats change while their names stay. The identity-scoped-replicas change made the first message of a sync session name two identities, and gave the ticket an identity field inside the unchanged `Variant0`; every ALPN stayed as it was. Before that, the message part that carries a rejection had already diverged from upstream under the same sync ALPN.
+The formats change while their names stay. The identity-scoped-replicas change made the first message of a sync session name two identities, and gave the ticket an identity field inside the unchanged `Variant0`; every ALPN stayed as it was. Before that, the message part that carries a rejection had already diverged from upstream under the same sync ALPN. The pods change then added the identity a sync report names to the gossip announcement under the same gossip ALPN: a node of the new build drops the old 75-byte report as an invalid message, logged at debug level, while the old build reads the new 107-byte one and ignores its tail.
 
 A mismatch between two builds is silent. The encoding carries no description of itself, so a node reading the other shape fails to decode it, or decodes nonsense identities that are then refused as not hosted. On the sync ALPN the accepting side drops the connection without a terminal frame — the one refusal in pdn-store that sends none — so the initiator sees a stream cut short, exactly as a broken network cuts it; iroh logs one warning that names neither a version nor an incompatibility, and the pair retries every reconcile interval and exchanges nothing. In the pairing dialogue a new scanner and an old inviter part worst: the old inviter parses the request and commits its half of the connection, the new scanner cannot parse the reply and rolls back, and the old side goes on dialing a connection nobody holds.
 
@@ -21,7 +21,7 @@ Under [defect-reachability](../../specs/code-practices/defect-reachability.md), 
 
 ## What Changes
 
-Nothing is decided. The change settles how a change to a format is marked and what a node does when its peer speaks another format, for the three formats together, and then specifies and applies the answer before the first deployment that holds data. The options are listed under Open Questions, and none of them is chosen.
+Nothing is decided. The change settles how a change to a format is marked and what a node does when its peer speaks another format, for the four formats together, and then specifies and applies the answer before the first deployment that holds data. The options are listed under Open Questions, and none of them is chosen.
 
 ## Open Questions
 
