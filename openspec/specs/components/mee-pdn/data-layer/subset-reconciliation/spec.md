@@ -210,14 +210,15 @@ A session cut short at the bound loses what it had not delivered, not what it ha
 
 ### Requirement: The gossip topic carries no content
 
-A replica's gossip topic SHALL carry only content-free announcements, never entries. A local insert SHALL broadcast a content-free author-head digest (a sync report) to neighbors; the entry itself SHALL NOT be broadcast, and an entry received over gossip SHALL be dropped, never inserted. Content SHALL flow only over the classified reconciliation an announcement triggers — the receiver, seeing it has news, pulls, and re-announces to its own neighbors after pulling (the cascade). Because the topic id equals the namespace id and topic membership is unauthorized, a subscriber that knows the id therefore obtains only activity metadata (author heads, timing), never keys, hashes, or values — and for a data namespace, the reconciliation the announcement triggers is gated, so an unresolvable subscriber obtains nothing at all. (The content hash a fetch-hint announcement carries, and the blob channel behind it, are a separate, deferred gap.)
+A replica's gossip topic SHALL carry only content-free announcements, never entries. A local insert SHALL broadcast a content-free author-head digest (a sync report) to neighbors, naming the identity whose replica sends it so a pull it triggers addresses that identity; the entry itself SHALL NOT be broadcast, and an entry received over gossip SHALL be dropped, never inserted. Content SHALL flow only over the classified reconciliation an announcement triggers — the receiver, seeing it has news, pulls, and re-announces to its own neighbors after pulling (the cascade). Because the topic id equals the namespace id and topic membership is unauthorized, a subscriber that knows the id therefore obtains only activity metadata (author heads, timing, and the identity whose replica announces), never keys, hashes, or values — and for a data namespace, the reconciliation the announcement triggers is gated, so an unresolvable subscriber obtains nothing at all. For a data namespace or a PMS the identity an announcement names is the issuer, whom a holder of the namespace id knows already; in a pod's swarm a holder of the stores' tickets that is no member learns which members' replicas write, as the [threat model](../../threat-model.md) records. (The content hash a fetch-hint announcement carries, and the blob channel behind it, are a separate, deferred gap.)
 
 **Example:** a1 and a2 are Alice's devices; a1 writes `contact/email`, and the topic of her replica, whose id is the namespace id, carries this.
 
 ```
-message:     Op::SyncReport(SyncReport { namespace, heads })
-encoded as:  75 bytes: 02 (Op variant 2), the 32-byte namespace id, 29 (length 41), then heads
+message:     Op::SyncReport(SyncReport { namespace, heads, identity })
+encoded as:  107 bytes: 02 (Op variant 2), the 32-byte namespace id, 29 (length 41), then heads, then the 32-byte identity
 heads:       one pair: the write's timestamp, an 8-byte varint, and Alice's 32-byte author id, after a count of 1
+identity:    Alice's PdnId, whose replica a1 holds, as a2 addresses its pull
 not in it:   the key contact/email, its content hash, its value; a2 pulls them over the reconciliation the message triggers
 received:    an Op::Put carrying an entry is dropped, never inserted
 ```

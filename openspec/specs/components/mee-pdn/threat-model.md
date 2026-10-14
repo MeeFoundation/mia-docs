@@ -15,8 +15,11 @@ The platform provides neither network anonymity nor unlinkability. Every connect
 | whoever runs the relay a1 is homed on | the node ids of a1 and of every device it reaches through that relay, and the IP address a1 connects from |
 | anyone who holds a1's node id | whether a1 is up and which relay it is homed on, through address lookup; no withdrawal takes that back |
 | Dave, connected to two identities of Alice's that a1 hosts | that the two share a node: both device sets list a1's node id (ADR-0013) |
+| Dave, holding the tickets to "Family"'s stores and no membership | that a1 writes or pulls in Family, and as which member: each announcement in the stores' swarms names the identity whose replica sends it |
 
 Two identities hosted on one node share its node id, which the device set of each lists, so a party connected to both sees that they share a device; each identity writes under its own author, so the entries themselves do not link them (ADR-0013). An endpoint per identity, or a device per identity, separates the node ids and leaves the link the network makes: two devices on one home network reach their peers from one public IP address and go online together.
+
+A replica's announcements in its swarm carry the `PdnId` of the identity whose replica sends them, so a pull it triggers addresses that identity. Whoever sits in a swarm learns which identities' replicas write there and when: for a data namespace or a PMS that identity is the issuer, whom the holder of the namespace id knows already, while in a pod's swarm a holder of its tickets that is no member — a removed member above all — learns which members write, though every session refuses it.
 
 The platform hides no device's address from the parties it syncs with, and it keeps two identities of one person apart by their authors alone; any further separation comes from which devices and networks the person uses, outside the platform. A person whose safety depends on hiding where they are, or on two of their identities staying unlinked, cannot rely on the platform for either.
 
