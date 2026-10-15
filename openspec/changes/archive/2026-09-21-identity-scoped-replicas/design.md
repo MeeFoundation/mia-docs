@@ -36,7 +36,7 @@ The count this is sized for is 1 to 10 identities on a node, all of one person. 
 
 ### D1. A hosted identity owns an engine, a replica store and an author
 
-A hosted identity holds its own half of the node: its own docs engine with its own replica store, its own persisted author, its own registry of bound namespaces and its own access book. The node keeps one endpoint, one gossip instance and one blob store under all of them. Two identities granted by one issuer therefore hold two replicas of that issuer's namespace, each reconciled on its own and each serving what its own grant covers, and a pod that two identities of one person are members of is held twice on that node. Each hosted identity's store work runs on that identity's own actor thread and against its own database, so identities busy at the same time occupy several cores, and the two halves of a session between two co-located identities run on two threads.
+A hosted identity holds its own half of the node: its own docs engine with its own replica store, its own persisted author, its own registry of bound namespaces and its own access book. The node keeps one endpoint, one gossip instance and one blob store under all of them. A pod that two identities of one person are members of is therefore held twice on that node, each replica reconciled on its own and served by its own member's records. Each hosted identity's store work runs on that identity's own actor thread and against its own database, so identities busy at the same time occupy several cores, and the two halves of a session between two co-located identities run on two threads.
 
 **Rejected alternatives:**
 
@@ -58,7 +58,7 @@ pdn-store calls the party a replica is held for, and the party a caller acts for
 
 The first message of a sync session carries the identity whose replica is addressed and the identity the caller acts for, beside the namespace it already carries. The dialing side knows both: the contact it dials was derived from a device set or a member statement, which names the identity it belongs to, and the identity it acts as is the identity the session was started for.
 
-A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the issuer for a data namespace, the identity for a store its own devices share. Without that statement a recorded peer would be dialed as the dialing side's own identity, which is right for a sibling and wrong for every other case — a granted replica's peers are the issuer's devices, and naming the wrong identity is refused as not hosted. The act that brings the replica makes the statement, and a grantee mints no ticket on its replica: the fork's share restarts the replica's sync with the minting identity in the statement's place, and back in the swarm.
+A peer the engine recorded as useful carries a node id and nothing else, so a replica also states whom such a peer is dialed as: the identity for a store its own devices share, the member whose ticket brought it for a pod's store. Without that statement a recorded peer would be dialed as the dialing side's own identity, which is right for a sibling and wrong for every other case — a pod store's peers are other members' devices, and naming the wrong identity is refused as not hosted. The act that brings the replica makes the statement.
 
 **Rejected alternatives:**
 
@@ -67,9 +67,9 @@ A peer the engine recorded as useful carries a node id and nothing else, so a re
 
 ### D4. A caller acts as an identity whose device set lists its node id
 
-The serving side admits the caller's named identity when the records it can read of that identity list the caller's node id as one of its devices, and refuses the session as not hosted otherwise. Which records those are follows from who is serving: a device of the identity resolves it in that identity's own private metadata store (PMS), and a hosted issuer serving a counterparty resolves it in the device set that counterparty published into their connection's metadata store, which is the resolution each side already uses for read rights. This is the resolution the node id already carried; naming an identity selects among the identities a node is genuinely a device of, and a node that is a device of none of them selects nothing.
+The serving side admits the caller's named identity when the records it can read of that identity list the caller's node id as one of its devices, and refuses the session as not hosted otherwise. Which records those are follows from who is serving: a device of the identity resolves it in that identity's own private metadata store (PMS), and a member's device serving another member resolves it in the device statements that member published into the pod's membership store, which is the resolution each side already uses for read rights. This is the resolution the node id already carried; naming an identity selects among the identities a node is genuinely a device of, and a node that is a device of none of them selects nothing.
 
-A device the serving side has not yet seen published is refused until its record reaches it, and no longer: the records that admit a caller travel over a directory and a connection metadata store, whose bound is their ticket rather than the device set they carry (D17), so a device that joined while the counterparty was away carries its own record there and the next session admits it.
+A device the serving side has not yet seen published is refused until its record reaches it, and no longer: the records that admit a caller travel over the PMS, whose bound is its ticket rather than the device set it carries (D17), and over the membership store, so a device that joined while the other member was away carries its own record there and the next session admits it.
 
 **Rejected alternatives:**
 
@@ -79,9 +79,9 @@ A device the serving side has not yet seen published is refused until its record
 
 ### D5. Rights, write admission and contacts belong to the named identity
 
-Session rights are computed from the named identity alone: for a hosted issuer, whether the caller is one of its devices and otherwise what that connection's grant record carries; for a replica held under a grant, the grant record of the identity that holds it. Write admission is recorded per hosted identity, replica and caller, and a granted replica's contacts are addresses paired with the identity each is dialed as, derived from the one connection that bound that replica.
+Session rights are computed from the named identity alone: for a store of the identity's own, whether the caller is one of its devices; for a pod's store, the membership view of the identity that holds it. A pod store's contacts are addresses paired with the identity each is dialed as, derived from that membership view.
 
-The write set travels with the session it was decided for, the way the egress filter already does, rather than being deposited under the pair it was decided for. A deposit outlives its session: two sessions of one node acting as two identities overwrite each other's, and a session that resolves to a closed egress still ingests — under whatever a withdrawn grant left behind. Both are how a peer comes to write past a right it no longer has, or to draw a refusal for an entry it was entitled to write, which it acts on by retracting an entry it holds legitimately.
+The ingest verdict travels with the session it was decided for, the way the egress already does, rather than being deposited under the pair it was decided for. A deposit outlives its session: two sessions of one node acting as two identities overwrite each other's, and a session that resolves to a closed egress still ingests under whatever an earlier session left behind — which is how a peer comes to write past a right it no longer has.
 
 ### D6. An accepted connection is dispatched by its first message
 
@@ -89,7 +89,7 @@ The docs protocol handler reads the first message of an accepted connection, res
 
 ### D7. Two identities of one node sync over in-process streams
 
-A dial whose target address carries this node's own endpoint id runs the session over an in-memory pair of streams: the same codec, the same session setup on both sides, the same access provider call, the same ingest gate and the same egress filter, with the peer node id supplied as this node's own. The rule is a property of the address, so it also covers a contact list or a ticket that names this node after a restart, and no caller chooses between transports.
+A dial whose target address carries this node's own endpoint id runs the session over an in-memory pair of streams: the same codec, the same session setup on both sides, the same access provider call, the same ingest verdict and the same egress, with the peer node id supplied as this node's own. The rule is a property of the address, so it also covers a contact list or a ticket that names this node after a restart, and no caller chooses between transports.
 
 **Rejected alternatives:**
 
@@ -99,15 +99,15 @@ A dial whose target address carries this node's own endpoint id runs the session
 - A loopback address or a second endpoint bound to the same key.
   - **Cons:** iroh refuses by comparing endpoint ids, before the address is looked at, and two endpoints on one key are one id.
 
-### D8. The pairing dialogue between two identities of one node runs the same way
+### D8. A ceremony between two identities of one node runs the same way
 
-Establishment between two identities of one node runs the pairing dialogue over an in-memory pair of streams, with the one-time secret verified and burned as it is over the network, and the stores assembled by the same steps. The dialogue's message exchange becomes generic over its streams so that one implementation serves both transports.
+A pod's join between two identities of one node runs its dialogue over an in-memory pair of streams, with the one-time secret verified and burned as it is over the network, and the stores assembled by the same steps. The dialogue's message exchange is generic over its streams, so one implementation serves both transports.
 
 ### D9. A write announces to the identities of its own node directly
 
 A write broadcasts to the swarm as it does now, and in the same step notifies the co-located identities that hold the same namespace, which then reconcile over the in-process path. An announcement names the identity of the replica that wrote it, so a receiving node knows which replica to address when it pulls.
 
-The engine hands that notification to its node, and a dial of D7 that resolves to this node the same way, as a request on a channel; a task of the node finds the co-located identities and opens the sessions. An engine holds nothing of its node but that channel's sending end, and the node's task holds the map of hosted identities weakly, ending once the last engine is gone. The task serving an engine's API holds the engine, and a handle into that API can sit inside what the engine itself holds — its access provider and its ingest validator hold replica handles — so that task is owned by the engine's protocol handle and stops with it. Ownership runs from the node down, and a node dropped without a shutdown while its process goes on releases its engines, its stores and its directory.
+The engine hands that notification to its node, and a dial of D7 that resolves to this node the same way, as a request on a channel; a task of the node finds the co-located identities and opens the sessions. An engine holds nothing of its node but that channel's sending end, and the node's task holds the map of hosted identities weakly, ending once the last engine is gone. The task serving an engine's API holds the engine, and a handle into that API can sit inside what the engine itself holds — its access provider holds replica handles — so that task is owned by the engine's protocol handle and stops with it. Ownership runs from the node down, and a node dropped without a shutdown while its process goes on releases its engines, its stores and its directory.
 
 **Rejected alternatives:**
 
@@ -123,11 +123,11 @@ The engine hands that notification to its node, and a dial of D7 that resolves t
 
 ### D10. Each hosted identity writes with its own author
 
-Every hosted identity holds one author, persisted with its replicas and stable across restarts, and every write it performs is signed by that author. A write into a replica the identity holds under a grant therefore carries the author of the identity that was granted, and what a pod or a counterparty binds to a member is the author of that member on that device. The runtime's provisional-write tracker judges an entry by the author of the identity whose replica holds it, and a retraction verdict is recorded in that identity's PMS, which the verdict's author names.
+Every hosted identity holds one author, persisted with its replicas and stable across restarts, and every write it performs is signed by that author. What a pod binds to a member is therefore the author of that member on that device.
 
 ### D11. An import names the identity the replica is held for
 
-Importing a ticket names the identity the replica is held for, and the import lands in that identity. The runtime imports the ticket a connection's grant record carries only for the identity the grant is addressed to: the grant binder reads a connection's grants for the identity at that connection's end, and a record addressed to anyone else is not a grant to it. An explicit import by the host is checked against no grant, because a ticket carries no record of the grant or the connection it came from, so the host can place a grant's ticket in another hosted identity. Nothing follows from that: the issuer answers only the audiences it granted, and what one identity imports is served to nobody (D17), so the identity the ticket landed in obtains nothing. A replica an identity holds is therefore no evidence that a grant was made to it — the data service's import of a ticket obtained out of band gives a replica with no grant behind it by design.
+Importing a ticket names the identity the replica is held for, and the import lands in that identity. A pod's join imports its tickets for the joining identity, and the armer for the identity whose PMS records them. An import by a caller of the data layer is checked against nothing else, because a ticket carries no record of how it was obtained, so a caller can place a pod's ticket in another hosted identity. Nothing follows from that: a pod's member devices answer only current members, and what one identity imports is served to nobody (D17), so the identity the ticket landed in obtains nothing. A replica an identity holds is therefore no evidence that the identity is a member.
 
 ### D12. The storage directory holds a subdirectory per hosted identity, and each records its own hosting
 
@@ -145,11 +145,11 @@ The subdirectories with a record are also what a store's share of the cache budg
   - **Pros:** one file answers who is hosted without listing the subdirectories.
   - **Cons:** every change rewrote it from the hosted set in memory, so a record a start had skipped vanished at the next create or link, and with it the only pointer to the identity it named; its skip provisioned the identity first and left an empty store behind, which the subdirectory count took as an identity and so shrank every share of the budget; and one unreadable file stopped every identity's start at once.
 - The PMS found by reading the identity's replicas.
-  - **Cons:** the store holds the PMS beside the data replica, the connection metadata stores, the replicas received under grants and a pod's stores, and telling them apart by content breaks the first time a kind of replica is added.
+  - **Cons:** the store holds the PMS beside a pod's stores, and telling them apart by content breaks the first time a kind of replica is added.
 
 ### D13. Every create and every import names its identity
 
-Creating or importing a replica names the identity it is held for, the PMS and the connection metadata stores included. An assembly hosts the identity whose replicas it holds, as the product does, so the records that judge a session are there wherever a replica is.
+Creating or importing a replica names the identity it is held for, the PMS included. An assembly hosts the identity whose replicas it holds, as the product does, so the records that judge a session are there wherever a replica is.
 
 **Rejected alternatives:**
 
@@ -161,16 +161,16 @@ Creating or importing a replica names the identity it is held for, the PMS and t
 
 ### D17. No replica is served without an owner and a verdict
 
-Every replica sits in the identity of an identity the node hosts, and a data replica's session is judged by that identity's records; a session the records cannot judge is refused. The store takes a session access provider as a requirement of assembling it, so a consumer states what judges its sessions before it can serve one. A PMS and a connection metadata store keep the ticket bound Invariants 1 and 3 give them, because a PMS carries the records every other verdict reads and judging it by its own unconverged device set would close the bootstrap that delivers them.
+Every replica sits in the identity of an identity the node hosts, and a pod store's session is judged by that identity's records; a session the records cannot judge is refused. The store takes a session access provider as a requirement of assembling it, so a consumer states what judges its sessions before it can serve one. A PMS keeps the ticket bound Invariant 1 gives it, because it carries the records every other verdict reads and judging it by its own unconverged device set would close the bootstrap that delivers them.
 
-A session no one can judge is refused, so a store starts syncing only once it can be judged. A PMS or a connection metadata store imported for an identity is tracked at the import and starts its sync when it is armed: hosting the identity starts the PMS's, hosting the connection its two halves'. The grantee import registers its binding before its first sync for the same reason. Two sides of a connection arm at moments neither controls, and a first session the earlier side sends toward a later one is refused there; hosting a connection therefore points the identity's own half at the devices its peer half is dialed at, which hold both halves under the same identity each, so the side that arms second reaches the first over both.
+A session no one can judge is refused, so a store starts syncing only once it can be judged. A PMS imported for an identity is tracked at the import and starts its sync when it is armed: hosting the identity starts it. A pod's stores register before their first sync for the same reason.
 
 **Rejected alternatives:**
 
 - Start a device-shared store's sync at the import, as the library's own import does.
   - **Cons:** the first dial reaches this identity's own book before the store is armed and is refused, and nothing retries it before the next reconcile pass — for two identities of one node, which share no gossip, a whole interval, and for a link with a tight budget a catch-up that times out.
 - Name the store's role in the import, so the import arms it.
-  - **Cons:** the knowledge of what kinds of device-shared store exist moves from the runtime into the data layer, and a connection, armed as a pair, would need both halves imported in one act.
+  - **Cons:** the knowledge of what kinds of device-shared store exist moves from the runtime into the data layer.
 - Keep the store's provider optional, with an unset provider serving every session whole.
   - **Pros:** the fork's constructor and its upstream-derived suites stay as upstream wrote them.
   - **Cons:** the permissive posture is what a consumer gets by forgetting, on a fork whose reason to exist is the gate.
@@ -203,22 +203,11 @@ What a modified node can obtain is bounded by the identities it is genuinely a d
 | --- | --- |
 | names an identity whose device set does not list it | refused as not hosted (D4) |
 | names one of the identities it is a device of | served that identity's rights alone, never a union (D5) |
-| opens a session per identity it hosts | obtains what each identity was granted, which its own stores already hold |
+| opens a session per identity it hosts | obtains what each identity is a member of, which its own stores already hold |
 | authors an entry as another member | the entry's signature fails; author keys are held by that member's devices |
-| places its own entry under another member's name in a pod | dropped by the gate, which resolves the author to a member through that member's statements |
-| writes outside the write set of its grant | refused at the issuer's gate and retracted at the writer |
-| imports a grant's ticket into another identity it hosts | its own state, not refused; that identity obtains nothing, since the issuer answers only the audience it granted (D11) |
+| places its own entry under another member's name in a pod | counts for nothing on every member device, which resolves the author to a member through that member's statements |
+| imports a pod's ticket into another identity it hosts | its own state, not refused; that identity obtains nothing, since the pod's member devices answer only current members (D11) |
 | asks for payload bytes by hash | served, as it is today |
-
-### D16. A grant binds and unbinds for the identity it addresses
-
-The namespace a grant names is imported into the identity of the identity the grant is addressed to, and a withdrawal takes that replica out of that identity. One pair binds one issuer there — a grant names its own identity as the data issuer, and an identity holds one connection per counterparty — so the binder decides from the pair it swept and the registry that identity holds.
-
-**Rejected alternatives:**
-
-- The count of bound pairs, narrowed from the node to the identity.
-  - **Pros:** the decision stays exact under a delegated grant naming another identity's data, the one arrangement that puts two pairs of one hosted identity on one issuer.
-  - **Cons:** a mechanism and a spec paragraph that decide nothing under the arrangements the platform has, and a scenario that can be arranged only by clearing the binder's bookkeeping by hand.
 
 ## Operating conditions
 
@@ -228,13 +217,13 @@ Walked against [operating-conditions](../../specs/code-practices/operating-condi
 - **One device or several** changes the outcome twice: an identity's replicas reconcile with that identity's other devices as they do now, and a co-located identity reaches them only through the in-process path (D7).
 - **A device that restarts** changes the outcome: each hosted identity comes back with its own store and author from the hosting record in its own subdirectory, a record whose store is gone is skipped without opening one and stays for the next start, and contacts that name this node's own address route to the in-process path rather than failing to dial (D7, D10, D12).
 - **A device linking before, during or after a process** keeps its shape, because linking is one identity's act and stays within that identity's own stores.
-- **Capabilities granted, narrowed, widened, revoked and granted again** change the outcome: a withdrawal toward one identity now unbinds that identity's replica and leaves the other's untouched, which is the property four of the reachability scenarios currently assert in the opposite direction.
+- **A membership that moves** changes the outcome: removing one identity from a pod closes that identity's replica and leaves a co-located member's untouched.
 - **An unstable connection** is unchanged for network sessions and absent for in-process ones, which fail only as a local error.
 - **A disk that fills** is affected in degree: a namespace held by two identities of one node is stored twice, and the storage a node needs grows with the identities it hosts, not with the namespaces alone. A hosting record the disk refuses at the commit point fails that create or link and leaves no record, so the identity comes back at no start and the identities already recorded are untouched (D12).
 
 ## Measurement
 
-What the decisions above leave to measurement, taken against a store of 100,000 entries — a 64 MiB replica store file, the size a personal store of a few years of claims and connection metadata reaches. The figures come from a release build on one machine, over loopback, with the blob store in memory, one namespace, payloads of one small size, and nothing else touching either store while they run; they are stable across runs to a tenth of a percent, and they are orders of magnitude rather than budgets to hold anyone to.
+What the decisions above leave to measurement, taken against a store of 100,000 entries — a 64 MiB replica store file, the size a personal store of a few years of claims reaches. The figures come from a release build on one machine, over loopback, with the blob store in memory, one namespace, payloads of one small size, and nothing else touching either store while they run; they are stable across runs to a tenth of a percent, and they are orders of magnitude rather than budgets to hold anyone to.
 
 **A catch-up is the receiving identity's actor thread, almost entirely (D1).** Reconciling those 100,000 entries into an empty replica takes 6.0 seconds of wall clock, of which 5.6 seconds — 93% — is spent inside the receiving store's actor thread and 0.11 seconds — under 2% — inside the serving one's. The receiving side pays per entry (the insert, the ingest verdict, the index write); the serving side only reads ranges. So a store per hosted identity buys close to the whole parallelism it looks like it should: two identities catching up on one actor thread would serialise, and on two threads they do not. It also answers the second question in the negative for this case — the serving side's 2% is all a cached fingerprint tree could cut, and the cost is not there.
 
@@ -246,15 +235,14 @@ What the decisions above leave to measurement, taken against a store of 100,000 
 
 ## Risks / Trade-offs
 
-- [Two identities on one node stay linkable] → accepted; one endpoint publishes one node id into both device sets, and a counterparty of both sees it; separating the node ids is what an endpoint per identity would take, and this arrangement stays open without moving what sits above it (D1).
+- [Two identities on one node stay linkable] → accepted; one endpoint publishes one node id into both device sets, and a member of both identities' pods sees it; separating the node ids is what an endpoint per identity would take, and this arrangement stays open without moving what sits above it (D1).
 - [The blob store is shared and serves any hash to any caller] → entries belong to an identity, payload bytes do not; a caller that learns a hash gets the bytes and can probe whether this node holds content it already has; the gate arrives with the identity-bound authorization work, and iroh-blobs already offers the hook it needs.
 - [A node that hosts two identities is one trust domain] → it holds the secrets of both, so acting as either identity is free to it; the checks bound it to the identities it is a device of, and the separation it gains is of honest storage and authorship, not of a compromised process (D4, D15).
 - [A second transport is a second place to be wrong] → the in-process path runs the same codec, the same session setup and the same gates, and every scenario that crosses it is paired with the check that a deliberately broken gate fails it (D7, D8).
 - [A namespace held by two identities of one node is stored and synced twice] → accepted as the price of separation; the in-process path keeps the second copy cheap in bandwidth, not in disk, and the second pair costs a fingerprint walk on every pass whether anything changed or not (D1, D7, Measurement).
 - [A thread and a replica store per hosted identity] → the cost is linear in identities, paid at each one's creation, and affordable at the count this is sized for; what one thread buys and what one store's cache uses are measured above.
 - [Replica store caches multiply] → the cache cap is per database and one database per node made it invisible; with a store per identity the size becomes configuration with one stated default, and the value a phone passes is that application's own decision (D14).
-- [The protocol's first message changes shape] → nothing deployed speaks it, and the changes that build on it — the trigger transport of reconcile-trigger, the mobile facade, pods — are named in the proposal's Impact.
-- [Four scenarios that rest on one replica shared by two audiences are rewritten or removed] → they defend a property the change removes on purpose; three are restated as the separated expectation and keep their paired denial, and the one that pins the count of bound grants goes with the count (D16).
+- [The protocol's first message changes shape] → nothing deployed speaks it, and the change that builds on it — pods — is named in the proposal's Impact.
 
 ## Migration Plan
 

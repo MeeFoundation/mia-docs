@@ -9,10 +9,8 @@ Two further things make the gap worth closing now rather than tolerating it. The
 ## What Changes
 
 - A sync session serves its egress from a store snapshot frozen at session setup: every fingerprint, split boundary, offer, and item derives from that one view, and a write landing mid-session travels on the next session. Opening the snapshot commits the store's pending write batch, and the snapshot is released on every exit path — completion, refusal, failure, and cancellation alike.
-- Ingest keeps reading the live store, and the reason is stated: the last-writer-wins comparison, so an older remote entry never overwrites a newer local write the snapshot predates, and the rejection gate, so a refusal never names an entry the replica took in after session setup.
-- The read side's per-session rights freeze becomes a requirement in its own right, with the bound it places on revocation stated explicitly: a withdrawal takes effect from the next session, and what a peer obtained while granted stays with it.
-- Capability-gated ingest gains the second cause that brings an already-held entry back to its gate. Narrowing a grant hides such an entry behind the egress filter; a session snapshot hides it when the entry lands after session setup. Both make the sender re-offer what the receiver keeps, and the gate reads live state in both.
-- Write retraction records a window the archived capability-scoped-writes change left implicit: a rejection states that the *refusing device* lacks the entry, which on a multi-device issuer is narrower than the issuer lacking it.
+- Ingest keeps reading the live store, and the reason is stated: the last-writer-wins comparison, so an older remote entry never overwrites a newer local write the snapshot predates.
+- The per-session rights freeze becomes a requirement in its own right, with the bound it places on a change of access stated explicitly: a removal takes effect from the next session, and what a device obtained before it stays with it.
 
 ## Capabilities
 
@@ -31,4 +29,3 @@ Two further things make the gap worth closing now rather than tolerating it. The
 - `pdn-store`: a session registry in the sync actor keyed by session id, a guard that releases the snapshot on every session exit path, a `session_snapshot` field on `StoreInstance` consumed by `get_first` and `get_range`, and session ids threaded through `sync_initial_message` / `sync_process_message` from `net/codec.rs`.
 - `crates/*`: no source change — the fork's public surface the workspace consumes is unchanged, and sessions are opened inside the fork.
 - Held read transactions pin store pages for a session's lifetime, so the guard's release on cancellation is load-bearing rather than tidy.
-- One window is recorded, not closed: a device of a multi-device issuer can reject an entry a sibling holds, and the writer retracts a write the issuer kept.

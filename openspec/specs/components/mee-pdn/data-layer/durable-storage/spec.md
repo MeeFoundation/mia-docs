@@ -2,7 +2,7 @@
 
 ## Purpose
 
-What a node keeps on disk, and where. Storage is named at the spawn — memory, or a directory — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([data store](../data-store/spec.md), [private metadata store](../private-metadata-store/spec.md), [connection metadata store](../connection-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts, their connections, the namespaces they were granted — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
+What a node keeps on disk, and where. Storage is named at the spawn — memory, or a directory — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([private metadata store](../private-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts and the pods they hold — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
 
 ## Requirements
 
@@ -63,6 +63,7 @@ A configured directory SHALL hold everything a node needs to be itself: a subdir
 #### Scenario: A leftover staging file does not block the start
 - **WHEN** a node is spawned on a directory holding a half-written key staging file and no key
 - **THEN** a key is minted, the leftover is gone, and a later start on the directory reads the committed key back
+
 ### Requirement: The node's wire identity is stable across starts
 A node spawned on a directory holding a key SHALL bind its endpoint with that key, so its node id is the one it had before. A node's device records, the tickets it minted, and the contacts its peers hold all name that id, so a node that came back under a different id would be unreachable by everything it handed out.
 
@@ -126,18 +127,19 @@ A directory SHALL be used by one running node at a time. A node spawned on a dir
 ### Requirement: A storage failure is reported, never swallowed
 A write the storage layer refuses — an exhausted disk above all — SHALL surface as a failed operation to the caller that made it. A refused write SHALL NOT be reported as stored, and a replica whose last transaction did not commit SHALL NOT be reported as converged.
 
-**Example:** the stand's node with `/var/lib/pdn` on a 16 MiB tmpfs; `<Alice>` is its one identity; each write a distinct 256 KiB payload.
+**Example:** the stand's node with `/var/lib/pdn` on a 16 MiB tmpfs; `<Alice>` is its one identity and `<family>` her pod; each placement a distinct 256 KiB payload.
 
 | request | answer |
 |---|---|
-| `PUT /debug/data/<Alice>/<Alice>/fill/0000` | 204, while the filesystem has room |
-| `PUT …/fill/<n>`, the first write refused | 500, and the host logs "unmapped host error: …" with the storage failure |
-| `GET …/fill/<n>` | not the refused payload |
-| `POST /debug/identities` | an error: the replica store commits nothing more until a restart |
+| `POST /debug/identities/<Alice>/pods/<family>/records?kind=claim` | 200 and the record's reference, while the filesystem has room |
+| the same `POST`, the first placement refused | 500, and the host logs "unmapped host error: …" with the storage failure |
+| `GET` of each record the pod lists | none reads the refused payload |
+| `GET /ready` | an error status: the blob store refuses the readiness lookup |
 
 #### Scenario: A write on a full disk fails loudly
-- **WHEN** a node's directory is on a filesystem with no free space and an entry write is attempted
+- **WHEN** a node's directory is on a filesystem with no free space and a record placement is attempted
 - **THEN** the write fails with an error naming the storage failure, and a subsequent read does not report the entry as stored
+
 ### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
 A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory records as hosted — each subdirectory holding a hosting record — with the opening identity counted whether or not its record is written yet. A subdirectory with no record, which is what an unfinished create or link leaves, SHALL take no share. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory records, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
 
@@ -166,15 +168,15 @@ A node SHALL be spawned with the memory its replica stores may hold together, an
 - **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
 
 ### Requirement: One author per hosted identity, persisted with that identity's stores
-Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a counterparty or a pod binds to an identity on this device is that identity's author and not the node's.
+Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a pod binds to an identity on this device is that identity's author and not the node's.
 
-**Example:** Alice writes `contact/email`, the node restarts, she writes it again; A1 and A2 are authors.
+**Example:** a1 writes its device record `devices/<a1-hex>` into Alice's PMS, the node restarts, and it writes the record again; A1 and A2 are authors.
 
 | | author persisted in `default-author` | author minted per start |
 |---|---|---|
-| before the restart | `(A1, contact/email) = "before"` | `(A1, contact/email) = "before"` |
-| after the rewrite | `(A1, contact/email) = "after"` | `(A1, contact/email) = "before"`, `(A2, contact/email) = "after"` |
-| live records at the path | 1 | 2, and the stale one replicates |
+| before the restart | `(A1, devices/<a1-hex>)` | `(A1, devices/<a1-hex>)` |
+| after the rewrite | `(A1, devices/<a1-hex>)`, the newer one | `(A1, devices/<a1-hex>)`, `(A2, devices/<a1-hex>)` |
+| live records at the key | 1 | 2, and the stale one replicates |
 
 #### Scenario: A rewritten key keeps one live record
 - **WHEN** a hosted identity writes a path, the node restarts, and it writes the same path again

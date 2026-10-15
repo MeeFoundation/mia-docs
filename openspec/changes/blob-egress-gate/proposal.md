@@ -2,17 +2,17 @@
 
 ## Why
 
-A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever it was granted, a member removed from a pod fetches every payload whose hash it saw before the removal, and, while its device stays in the pod's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
+A node serves payload bytes by hash to any caller that asks. `SyncNode::spawn_with` in `crates/data-layer/src/node.rs` mounts blob transfer, `/iroh-bytes/4`, with no event sender, and iroh-blobs then serves every get, get-many and observe request without telling the node of it; only push, which writes into the store, is disabled. The blob store is one per node, under the replicas of every identity the node hosts, so what a session withholds as an entry, a request for its hash hands out as bytes: a party that learns a hash outside the platform fetches the payload whatever pods it belongs to, a member removed from a pod fetches every payload whose hash it saw before the removal, and, while its device stays in the pod's swarm, every payload placed after it, whose hash a member device announces to its swarm neighbours once its download completes (`Op::ContentReady` in the fork), and a party that holds the hash of a known file learns whether the node keeps it. ADR-0013 records the gap: the isolation it gives covers entries and not payload transfer.
 
-**Example:** requests to Bob's phone b1 today; Bob granted Alice-leisure `contact/email` of his data namespace, the payload of his `notes/diary` entry has the hash `<diary>`, Alice's tablet a3 hosts Alice-leisure and Alice-work, Carol was removed from "Family", of which Bob is a member, and Dave's phone d1 holds a connection with nobody.
+**Example:** requests to Bob's phone b1 today; Bob and Alice-leisure are members of "Family", Bob keeps a diary record in a pod of one whose payload has the hash `<diary>`, Alice's tablet a3 hosts Alice-leisure and Alice-work, Carol was removed from "Family", and Dave's phone d1 shares no pod with anybody.
 
 | caller | asks b1 for | b1 answers |
 |---|---|---|
-| a3 | the payload of Bob's `contact/email` entry | the payload, which Alice-leisure's grant covers |
-| a3 | `<diary>`, learned outside the platform | the diary, which neither identity on a3 was granted |
+| a3 | the payload of a claim Bob placed in "Family" | the payload, which Alice-leisure reads as a member |
+| a3 | `<diary>`, learned outside the platform | the diary, a record of a pod neither identity on a3 is a member of |
 | Carol's phone c1 | the hash of a scan in "Family" she saw before the removal | the scan |
 | c1, still in the swarm of Family's record store | the hash of a photo Alice placed after the removal, which a member device announced there | the photo |
-| d1 | the hash of a public tax form Bob keeps in his data namespace | the form, and with it the fact that Bob keeps it |
+| d1 | the hash of a public tax form Bob keeps in his pod of one | the form, and with it the fact that Bob keeps it |
 
 Closing the gap needs no proof of which identity asks. A session admits its caller by the authenticated node id against the device sets the serving identity's records hold, and a request for a hash can be judged by the same records. The request names no identity, and it needs none: a node acts as every identity it hosts (threat model), so what all of them may read is what the node reaches anyway, one session per identity. A request judged before the store is read gets one answer for a hash the node keeps and a hash it lacks alike, whenever the caller is not entitled to it.
 
@@ -24,26 +24,26 @@ Nothing is decided. The change settles what a request for a hash is checked agai
 
 ### What a request for a hash is checked against
 
-- The entries that reference the hash. A payload is served only to a caller that one of the node's hosted identities would serve, in a session, an entry referencing that hash: a device of that identity itself, a counterparty whose grant's egress filter covers the entry, a member of the pod whose store holds it. Through a hash the caller reaches exactly what it reaches through a session, and nothing more.
-- The replicas that reference the hash. A payload is served to a caller that one of the node's hosted identities would serve a session on a replica holding an entry with that hash, whatever the entry. A grantee under a claim-scoped grant then fetches the payload of any claim of the namespace whose hash it learns.
-- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a counterparty, a pod member — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a grantee, a counterparty of a co-located identity, and a removed member that is still a counterparty fetch every payload whose hash they hold.
+- The entries that reference the hash. A payload is served only to a caller that one of the node's hosted identities would serve, in a session, an entry referencing that hash: a device of that identity itself, a current member's device of the pod whose store holds it, a former member's device for an entry of its departure's past. Through a hash the caller reaches exactly what it reaches through a session, and nothing more.
+- The replicas that reference the hash. A payload is served to a caller that one of the node's hosted identities would serve a session on a replica holding an entry with that hash, whatever the entry. Inside a pod, whose current members are served both stores whole, it answers as the entries do; a former member's device, served the membership store over its departure's past, then fetches the payload of any entry of that store whose hash it learns.
+- Known callers. A payload is served to a caller whose node id the records of any hosted identity place at all — a sibling, a member of any of its pods — and the node keeps no lookup from hash to entry. It stops a stranger and a stranger's probe; a member of one pod fetches the payloads of every other pod whose hashes it holds, and a removed member that still shares another pod with a hosted identity fetches every payload whose hash it holds.
 - Accepted, as the node does today, and recorded in the threat model.
 
-Whatever the answer, a removed member reads no payload placed after its removal: the swarm hands a member's device that stays in it the hash of every new payload, so an answer that serves such a device leaves a removal without effect on payloads. Accepting does so for good, and known callers for as long as the removed member is a counterparty of a hosted identity.
+Whatever the answer, a removed member reads no payload placed after its removal: the swarm hands a member's device that stays in it the hash of every new payload, so an answer that serves such a device leaves a removal without effect on payloads. Accepting does so for good, and known callers for as long as the removed member shares another pod with a hosted identity.
 
 **Example:** the requests of Why under each option.
 
 | request to b1 | the entries | the replicas | known callers | accepted |
 |---|---|---|---|---|
-| a3 asks for the `contact/email` payload | served | served | served | served |
-| a3 asks for `<diary>` | refused: no grant covers `notes/diary` | served: Alice-leisure holds a session on Bob's namespace | served | served |
-| c1 asks for the scan or the photo | refused: Carol is no member | refused: Carol is served no session on the pod's stores | served while Bob holds a connection with Carol, refused otherwise | served |
+| a3 asks for the payload of Bob's claim in "Family" | served | served | served | served |
+| a3 asks for `<diary>` | refused: no pod of Alice's holds it | refused: Bob's pod of one serves a3 no session | served: Alice-leisure shares "Family" with Bob | served |
+| c1 asks for the scan or the photo | refused: Carol is no member | refused: Carol is served no session on the record store | served while Carol shares another pod with Bob, refused otherwise | served |
 | d1 asks for the tax form | refused | refused | refused | served |
 
 ### How the node finds the entries that reference a hash
 
 - An index beside each replica, from content hash to the keys whose entries carry it, which pdn-store keeps on every insert and on every entry it replaces or removes. A request costs one lookup; the index costs one row per entry and a change to the fork, which brings the stress pass of the flaky-tests practice with it.
-- A scan of every replica the node holds, per request. No new storage and no change to the fork, but linear in the entries the node holds, per request: a caller any record places — a counterparty with the narrowest grant — makes the node read everything it holds once for every request it sends.
+- A scan of every replica the node holds, per request. No new storage and no change to the fork, but linear in the entries the node holds, per request: a caller any record places — a member of the smallest pod — makes the node read everything it holds once for every request it sends.
 
 The question arises under the first two options of the first question alone.
 
@@ -56,11 +56,11 @@ The question arises under the first two options of the first question alone.
 
 ## Operating conditions
 
-Several identities on one node change the outcome on both sides: the serving node judges by each hosted identity's own records, and the caller's node id resolves to every identity whose records list it. A grant narrowed or revoked changes it too: the gate reads the grant records as the next session would, so a caller loses a payload from its first request after the narrowing reaches the serving node, and what it fetched before stays with it, since revocation is not recall (invariants). A freshly linked device is placed by its identity's own private metadata store (PMS), as its sessions are, before any counterparty has heard of it. A restart changes nothing the index does not carry: an index is durable state of the replica it indexes. Clocks and a disk that fills leave the outcome as it is.
+Several identities on one node change the outcome on both sides: the serving node judges by each hosted identity's own records, and the caller's node id resolves to every identity whose records list it. A removal changes it too: the gate reads the membership view as the next session would, so a removed member's device loses a payload from its first request after the removal reaches the serving node, and what it fetched before stays with it, since removal is not recall (Invariant 2). A freshly linked device is placed by its identity's own private metadata store (PMS) on its siblings and by its member's device statements on the other members' devices, as its sessions are. A restart changes nothing the index does not carry: an index is durable state of the replica it indexes. Clocks and a disk that fills leave the outcome as it is.
 
 ## Capabilities
 
-None is settled. Every option but the last touches `components/mee-pdn/data-layer/node-assembly`, where blob transfer is mounted, and `components/mee-pdn/data-layer/subset-reconciliation`, whose egress filter the gate reads; an index touches `components/mee-pdn/pdn-store/crate`. The threat model's section on payload bytes changes with the answer.
+None is settled. Every option but the last touches `components/mee-pdn/data-layer/node-assembly`, where blob transfer is mounted, and `components/mee-pdn/data-layer/reconciliation-sessions`, whose egress the gate follows; an index touches `components/mee-pdn/pdn-store/crate`. The threat model's section on payload bytes changes with the answer.
 
 ## Impact
 

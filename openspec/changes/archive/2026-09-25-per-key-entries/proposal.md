@@ -8,18 +8,15 @@ Pruning an issuer's markers one key at a time, which the per-key rule needs, exp
 
 - An entry, empty or not, affects only its own key, per author: it replaces the entry at that key when it is newer, an empty one included, and touches no other key. An entry is refused only by a newer or equal entry at its own key.
 - The store's delete addresses one key. The prefix delete leaves the store, the Replica, the actor and the API (`delete_prefix` becomes `delete`; `DelRequest` carries `key`).
-- The PMS's pruning of an issuer's retraction markers deletes this device's markers for that issuer one key at a time.
 - The store's ingest reads the entry at one key instead of every byte prefix of it: one lookup per entry where the current store makes one per byte of the key.
 - Tests of prefix deletion itself are rewritten for deletion at one key; the regression tests of both defects fail on the current store.
 - The store waits on no subscriber outside itself: a subscription opened through its interface drops what its full buffer cannot take and receives a lag notice after the last event it still gets; only the store's live engine subscribes with a delivery that waits. The live engine's own events reach their subscribers the same lossy way.
-- The PMS's and the connection metadata store's change streams report a lag notice as a change; the PMS's catch-up wait goes on to the next session when it missed one.
-- The connection armer and the grant binder take every change already buffered before they sweep, so a burst of changes costs one sweep.
-- The marker sweep applies each marker version once: it reads the payload, arms and removes only for a version not yet applied, and a disarm or a restart forgets what was applied.
+- The PMS's change stream reports a lag notice as a change; the PMS's catch-up wait goes on to the next session when it missed one.
+- The armer takes every change already buffered before it sweeps, so a burst of changes costs one sweep.
 
 Out of scope, by decision:
 
 - Stores written before this change are not migrated, and nodes on either side of it are not expected to sync with each other: a prefix delete already on disk stops acting on longer keys. The platform has no real users.
-- `disconnect` in the PMS has the same exposure as grant withdrawal, but no host reaches it through pdn-node; the store's rule covers it, and it gets no scenario of its own.
 
 ## Capabilities
 

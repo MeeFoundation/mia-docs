@@ -1,6 +1,6 @@
 ## Context
 
-The node serves blobs, gossip, docs, pairing and linking on one iroh endpoint, assembled by `bind_endpoint` and `SyncNode::spawn_with` in data-layer's `node.rs`. iroh's `Router` dispatches on ALPN, so a connection from an unknown key reaches its handler with nothing known about the caller but its node id. The router runs each connection's handler in a task of its own, and in that task pdn-store's `accept_session` reads the first message under a 32 KiB ceiling and a 300 second timeout; the node keeps no count of these tasks. A first message naming an identity the node does not host is refused in the same task (`refuse_session`). One naming a hosted identity is handed to that identity's engine and spawned in its `running_sync_accept` JoinSet — one per hosted identity — which serves or refuses it (`handle_session`). Either way the node then waits for the caller to close its side, for up to another 300 seconds.
+The node serves blobs, gossip, docs, linking and a pod's join on one iroh endpoint, assembled by `bind_endpoint` and `SyncNode::spawn_with` in data-layer's `node.rs`. iroh's `Router` dispatches on ALPN, so a connection from an unknown key reaches its handler with nothing known about the caller but its node id. The router runs each connection's handler in a task of its own, and in that task pdn-store's `accept_session` reads the first message under a 32 KiB ceiling and a 300 second timeout; the node keeps no count of these tasks. A first message naming an identity the node does not host is refused in the same task (`refuse_session`). One naming a hosted identity is handed to that identity's engine and spawned in its `running_sync_accept` JoinSet — one per hosted identity — which serves or refuses it (`handle_session`). Either way the node then waits for the caller to close its side, for up to another 300 seconds.
 
 What iroh 1.1 exposes decides which options are open. `Endpoint::builder` takes a `QuicTransportConfig`, so `receive_window`, `stream_receive_window`, `max_concurrent_bidi_streams` and `max_concurrent_uni_streams` are the node's to set. `bind_endpoint` sets `max_concurrent_uni_streams` to 4,096 and `receive_window` to 248,750,000 bytes, and leaves the other two at their defaults. There is no connection limit on the builder. `ServerConfigBuilder::set_max_incoming` bounds only the connections waiting to be accepted, and it is applied through `Incoming::accept_with`, which the `Router` does not call. Two hooks stand before any handler instead. `RouterBuilder::incoming_filter` decides on every `Incoming` before the TLS handshake — accept, refuse, ignore, or ask for a retry — and an `Incoming` on a direct path carries the caller's IP address and nothing else that names it, so anything enforced there is per address. `EndpointHooks::after_handshake`, installed on the endpoint builder, sees the remote node id and the ALPN of every connection, of every protocol, and can close one before its handler runs.
 
@@ -14,13 +14,13 @@ The `running_sync_connect` and `download_tasks` JoinSets are node-initiated — 
 
 **Goals:**
 - Bound the memory a stranger can make the node spend before classification, both per connection and in total.
-- Keep every bound sized for a node that hosts several identities and serves all their devices and counterparties at once.
+- Keep every bound sized for a node that hosts several identities and serves all their devices and the devices of their pods' members at once.
 - Preserve the 300 second bound on the exchange as a whole, which covers a first sync of a large store over a slow link.
 
 **Non-Goals:**
 - The size of the messages a classified session reads after its first (the sync-resource-bounds change).
 - The ceiling on the first message, in place at 32 KiB.
-- The serving halves of the pairing and linking ceremonies, `PairingHandler::serve` and `LinkingHandler::serve`, which a stranger reaches on the same endpoint. Each reads its request under a 64 KiB ceiling but waits in `accept_bi` and `read_message` with no timeout, since the 15 second `ESTABLISHMENT_DIALOGUE_TIMEOUT` bounds only the pairing scanner's dialogue, so a stranger's quiet connection there is held for as long as iroh's keep-alive keeps it open. The count this design recommends, kept in the sync handler, does not see those connections; the gap stays open outside this change.
+- The serving halves of the linking ceremony and a pod's join, `LinkingHandler::serve` and `JoinHandler::serve`, which a stranger reaches on the same endpoint. Each reads its request under a 64 KiB ceiling but waits in `accept_bi` and `read_message` with no timeout, since the linking caller's budget and the 15 second `JOIN_DIALOGUE_TIMEOUT` bound only the dialing side, so a stranger's quiet connection there is held for as long as iroh's keep-alive keeps it open. The count this design recommends, kept in the sync handler, does not see those connections; the gap stays open outside this change.
 
 ## Open question: how much one connection may buffer
 
@@ -68,8 +68,8 @@ A ceiling across the whole node on the sync connections whose first message has 
 
 ## Operating conditions
 
-- **Several identities on one node.** Every honest device and counterparty of every hosted identity dials the same endpoint, so the floor under a ceiling across the node is the sum across identities, not a per-identity figure. The recommended ceiling counts only connections whose first message has not arrived, so that floor is how many of them arrive within one first-message delay of each other, not how many connections the node holds.
-- **One device or several.** A counterparty with several devices opens a connection from each, so the floor counts devices, not identities.
+- **Several identities on one node.** Every honest device of every hosted identity and of every member of its pods dials the same endpoint, so the floor under a ceiling across the node is the sum across identities, not a per-identity figure. The recommended ceiling counts only connections whose first message has not arrived, so that floor is how many of them arrive within one first-message delay of each other, not how many connections the node holds.
+- **One device or several.** A member with several devices opens a connection from each, so the floor counts devices, not identities.
 - **An unstable connection.** An honest peer redials after a drop, and a change of network can make every peer of a1 redial at once, so the floor is sized for that burst. A slow or lossy link stretches an honest first message, and the budget has to allow for it.
 - **A device with little memory.** The number that bounds a connection's buffer is sized here, and a device that cannot afford 248,750,000 bytes per connection is the reason the bound exists.
 - **A restart.** Plays no part: nothing a connection holds survives it, and a limit is rebuilt from the connections that are open.

@@ -4,11 +4,11 @@
 
 A node reads the first message of an accepted sync session under a ceiling of 32 KiB (`MAX_OPENING_FRAME` in pdn-store's codec), before anything classifies the caller, and refuses a longer one on its length prefix ([node assembly](../../specs/components/mee-pdn/data-layer/node-assembly/spec.md)). Every later message of the session is read under `MAX_MESSAGE_SIZE`, 1 GiB, and the reader holds a message whole in its buffer until the last byte has arrived. The buffer grows with the bytes that arrive and reserves nothing in advance, so the memory a message costs is what its sender chooses to send, up to that ceiling.
 
-Only a caller the node has classified and allowed reaches those later messages: a device of the identity itself, a counterparty's device serving or reading a replica under a grant or the connection metadata store of that connection, and every member device of a pod. A node that dials a peer reads the peer's answers under the same ceiling, so a peer the node chooses to sync with holds the same lever in the other direction.
+Only a caller the node has classified and allowed reaches those later messages: a device of the identity itself, on its private metadata store, and every member device of a pod, on the pod's stores. A node that dials a peer reads the peer's answers under the same ceiling, so a peer the node chooses to sync with holds the same lever in the other direction.
 
 The ceiling cannot simply come down. The reconciliation does not split a message by size: when one side of a first sync holds nothing, the other side sends every entry of the range in one message, so an honest message grows with the replica it carries. A lower ceiling alone would stop the first sync of every replica larger than it.
 
-**Example:** Bob's phone b1 (read grant on Alice's store) in a session with her laptop a1; a frame is a 4-byte big-endian length prefix, then the body.
+**Example:** Bob's phone b1, a member of "Family", in a session with Alice's laptop a1 on the pod's record store; a frame is a 4-byte big-endian length prefix, then the body.
 
 | frame | length prefix | a1 |
 |---|---|---|
@@ -50,7 +50,7 @@ Three conditions change the outcome of any option. Several identities on one nod
 ## Out of Scope
 
 - What a connection costs before the node has classified its caller: the number of connections a node holds and the bytes the transport buffers for each. That is the subject of the unclassified-connection-bounds change.
-- The ceiling on the first message and the bound on key length. Both are in place, in the [node assembly](../../specs/components/mee-pdn/data-layer/node-assembly/spec.md) and [capability-gated ingest](../../specs/components/mee-pdn/data-layer/capability-gated-ingest/spec.md) specs.
+- The ceiling on the first message and the bound on key length. Both are in place, in the [node assembly](../../specs/components/mee-pdn/data-layer/node-assembly/spec.md) and [reconciliation sessions](../../specs/components/mee-pdn/data-layer/reconciliation-sessions/spec.md) specs.
 - The storage a peer the node syncs with makes it spend by publishing entries. Those are the peer's own writes, replicated by design, and a pod trusts every member with the storage it fills.
 
 ## Capabilities
