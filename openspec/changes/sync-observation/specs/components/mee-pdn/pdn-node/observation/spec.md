@@ -162,7 +162,7 @@ When a store's subscription ends while the runtime runs — the record store for
 
 ### Requirement: The record listing reports every entry of the record store with its verdict and starts no session
 
-The runtime SHALL, behind the test-only feature, list one hosted identity's record store of one pod as the record view holds it: one item per entry, never merged by key, each with its key, its author, its content hash, its length, whether its payload is present, the payload when it is, and its verdict — `counted`, `not_yet`, `for_nothing` or `outside_layout` — with the reason the record view names for any verdict other than `counted`. The hash and the length SHALL be reported whether or not the payload has arrived. The listing SHALL start no session. It SHALL be refused when the identity is not hosted here or holds no record store of the pod, a tombstone included.
+The runtime SHALL, behind the test-only feature, list one hosted identity's record store of one pod as the record view holds it: one item per entry, never merged by key, each with its key, its author, its content hash, its length, whether its payload is present, the payload when it is and the caller asks for payloads, and its verdict — `counted`, `not_yet`, `for_nothing` or `outside_layout` — with the reason the record view names for any verdict other than `counted`. The hash and the length SHALL be reported whether or not the payload has arrived. A listing asked for without payloads SHALL read no payload and report everything else unchanged, so a reader of large records — a phone — lists its pod without holding every payload in memory at once. The listing SHALL start no session. It SHALL be refused when the identity is not hosted here or holds no record store of the pod, a tombstone included.
 
 **Example:** the phone's listing after w3 placed 2 immutable-documents, one payload still on its way, and a forger wrote at the first one's key with an author no statement of w3 lists.
 
@@ -176,6 +176,10 @@ The runtime SHALL, behind the test-only feature, list one hosted identity's reco
 
 - **WHEN** a member places a record and a forged entry is written at the same key under an author no statement of that member lists, and both reach a reader
 - **THEN** the reader's listing holds both entries, the member's `counted` with its payload and the forged one `for_nothing`
+
+#### Scenario: A listing without payloads reads none
+- **WHEN** a reader that holds a placed record asks for the listing without payloads
+- **THEN** the listing holds the record `counted` and present, with its hash and length and no payload
 
 #### Scenario: An identity without the record store is refused the listing
 

@@ -142,19 +142,15 @@ So a teardown split — one side ok, the other `close` — shows its counts on b
 
 ### D5. One subscription per member and pod, numbered once by the runtime for every hop
 
-`pdn-node` opens, for one hosted identity and one pod it holds, an ordered subscription on each of the pod's stores and yields their events as one stream of records in the shape `plan.md` fixes. Each record names its store (`membership` or `records`). Within a store the stream keeps the store's order (D1); between the two stores it keeps the order the runtime takes them in, and the tests compare events of different stores by their times on the node's clock. The runtime numbers the records: `sub` is a random 64-bit value, in lowercase hexadecimal, new for every subscription; `seq` counts from 0 by 1; `t` is the runtime's clock when it takes the event off the store's subscription, in microseconds since the Unix epoch, as are `entry_ts`, `started` and `finished`. A task of the runtime's own, spawned with the subscription, takes the events off both stores' subscriptions as they arrive, stamps and numbers them and turns them into records, and never waits on the consumer, so `t` is when the event reached the runtime whatever the consumer's pace. The records wait for the consumer in a buffer of at most 262,144, a queue that takes memory only for the records in it, and a consumer's read takes the oldest. Past that bound the records that do not fit are dropped unnumbered, and once the buffer has room a `lagged` record names each store that lost some. 262,144 holds the at most 200,002 events of a 100,000-record catch-up's first session, and the membership store's beside them, which wait while the observed join runs and its consumer cannot read yet (D12). The task ends when the consumer drops the subscription. Neighbour events are dropped before numbering, so they leave no gap. A store's `Lagged` becomes a `lagged` record naming that store. When a store's subscription ends while the runtime runs — the record store dropped by `forget_pod` on a removal the member folds or on a leave — the stream yields `closed` for that store and goes on with the other; a subscription opened on a tombstone yields `closed` for the record store as its first record. When the runtime stops, the stream ends with no further record. The record is one serde type in `pdn-node`, and both hosts write its JSON form, so the laptop host and the phone emit the same bytes for the same event. Every hop after the runtime — an HTTP response, the facade, the agent's forwarding — reads the runtime's buffer and passes records through unnumbered, and a loss on any of them shows as a gap in `seq`. A co-located identity that holds no store of the pod is refused, whoever else on the node holds it.
+`pdn-node` opens, for one hosted identity and one pod it holds, an ordered subscription on each of the pod's stores and yields their events as one stream of records in the shape `plan.md` fixes. Each record names its store (`membership` or `records`). Within a store the stream keeps the store's order (D1); between the two stores it keeps the order the runtime takes them in, and the tests compare events of different stores by their times on the node's clock. The runtime numbers the records: `sub` is a random 64-bit value, in lowercase hexadecimal, new for every subscription; `seq` counts from 0 by 1; `t` is the runtime's clock when it takes the event off the store's subscription, in microseconds since the Unix epoch, as are `entry_ts`, `started` and `finished`. A task of the runtime's own, spawned with the subscription, takes the events off both stores' subscriptions as they arrive, stamps and numbers them and turns them into records, and never waits on the consumer, so `t` is when the event reached the runtime whatever the consumer's pace. The records wait for the consumer in a buffer of at most 262,144, a queue that takes memory only for the records in it, and a consumer's read takes the oldest. Past that bound the records that do not fit are dropped unnumbered, and once the buffer has room a `lagged` record names each store that lost some. 262,144 holds the at most 200,002 events of a 100,000-record catch-up's first session, and the membership store's beside them, which wait while the observed join runs and its consumer cannot read yet (D12). The task ends when the consumer drops the subscription. Neighbour events are dropped before numbering, so they leave no gap. A store's `Lagged` becomes a `lagged` record naming that store. When a store's subscription ends while the runtime runs — the record store dropped by `forget_pod` on a removal the member folds or on a leave — the stream yields `closed` for that store and goes on with the other; a subscription opened on a tombstone yields `closed` for the record store as its first record. When the runtime stops, the stream ends with no further record. The record is one serde type in `pdn-node`, and both hosts write its JSON form, so the laptop host and the phone emit the same bytes for the same event. Every hop after the runtime — the HTTP response of either host — reads the runtime's buffer and passes records through unnumbered, and a loss on any of them shows as a gap in `seq`. A co-located identity that holds no store of the pod is refused, whoever else on the node holds it.
 
-**Example:** the removaled control member `k`'s stream around the removal, then the phone's records on the way to the coordinator with 2 of them lost.
+**Example:** the removaled control member `k`'s stream around the removal.
 
 ```
 k:                  {"sub":"5e0d…","seq":310,"store":"membership","kind":"insert_remote","key":"member/<k>/3/removed/<w1>/2",…}
                     {"sub":"5e0d…","seq":311,"store":"records","kind":"closed",…}
                     {"sub":"5e0d…","seq":312,"store":"membership","kind":"sync_finished",…}
-agent journal:      {"sub":"c41e0a9d7f22b813","seq":8210,…} {"seq":8211,…} {"seq":8212,…} {"seq":8213,…}
-coordinator copy:   {"sub":"c41e0a9d7f22b813","seq":8210,…} {"seq":8213,…}
 ```
-
-The coordinator's copy has a gap at 8,211 and 8,212, and the journal pulled over the cable fills it; a gap in both is a loss before the agent, counted as undetermined.
 
 **Rejected alternatives:**
 
@@ -164,11 +160,11 @@ The coordinator's copy has a gap at 8,211 and 8,212, and the journal pulled over
 - A subscription per store, opened by the consumer
   - **Cons:** two streams, two numberings and two HTTP responses per node for what every consumer reads together.
 - A numbering per hop
-  - **Cons:** a record renumbered by the agent hides a loss between the runtime and the agent; one numbering at the source exposes a loss on every hop after it.
+  - **Cons:** a record renumbered by a host hides a loss between the runtime and that host; one numbering at the source exposes a loss on every hop after it.
 - `t` taken in the live actor when the event is produced
   - **Cons:** a timestamp field on every event of the store's; `plan.md` fixes `t` as when the host observed the event. The runtime's task takes each event within a scheduling delay of the live actor, which is what the latency computed from `content_ready`'s `t` adds.
 - Stamping and numbering when the consumer reads
-  - **Cons:** a consumer that reads late — the agent's JavaScript loop, a response behind a slow coordinator — moves `t` to the read, and the load test's latencies then measure the consumer.
+  - **Cons:** a consumer that reads late — a response behind a slow coordinator — moves `t` to the read, and the load test's latencies then measure the consumer.
 - The buffer as a bounded channel
   - **Cons:** its slots are allocated when it is created, so every subscription holds the memory of a 100,000-record catch-up from its first record.
 
@@ -224,7 +220,7 @@ Each node of either test is observed by one stream per pod it holds; a coordinat
 
 ### D8. `PDN_POD_RECONCILE_INTERVAL_SECS` sets the pod interval, in every build
 
-The host reads `PDN_POD_RECONCILE_INTERVAL_SECS` at start, as it reads its other settings, and passes it to the spawn's `pod_reconcile_interval`. Unset keeps the runtime's default of 300 seconds; a positive whole number of seconds sets it; anything else stops the start with an error naming the variable, before any directory is touched. It is a host setting like `PDN_CONNECTIVITY`, so it is not behind the feature. The ordinary reconcile interval keeps the runtime's default of 10 seconds with no setting: it does not reach pod stores, and the phone's agent brings its node up at the same 10 seconds, so the passes over the other stores cost the same on both sides of the load comparison. The container stand's rule that nothing shortens the cadence names this setting.
+The host reads `PDN_POD_RECONCILE_INTERVAL_SECS` at start, as it reads its other settings, and passes it to the spawn's `pod_reconcile_interval`. Unset keeps the runtime's default of 300 seconds; a positive whole number of seconds sets it; anything else stops the start with an error naming the variable, before any directory is touched. It is a host setting like `PDN_CONNECTIVITY`, so it is not behind the feature. The ordinary reconcile interval keeps the runtime's default of 10 seconds with no setting: it does not reach pod stores, and the phone's reset brings its node up at the same 10 seconds, so the passes over the other stores cost the same on both sides of the load comparison. The container stand's rule that nothing shortens the cadence names this setting.
 
 **Example:**
 
@@ -240,7 +236,7 @@ The host reads `PDN_POD_RECONCILE_INTERVAL_SECS` at start, as it reads its other
 - Behind the `observation` feature
   - **Cons:** the interval is what a host chooses for its own reasons; a laptop node standing in for a phone needs it with or without observation.
 - `PDN_RECONCILE_INTERVAL_SECS` beside it
-  - **Cons:** the ordinary pass skips pod stores, so nothing either test measures depends on it, and the agent matches the laptop's default instead.
+  - **Cons:** the ordinary pass skips pod stores, so nothing either test measures depends on it, and the phone's reset matches the laptop's default instead.
 
 ### D9. The observation build is a release build, and every host says which build it is
 
@@ -266,67 +262,76 @@ The coordinator refuses to measure a node whose status says `profile debug` or `
 - The build profile in a route of its own
   - **Cons:** a second probe for what the one human-readable probe already exists to answer.
 
-### D10. The facade's test build exports the calls and passes records as JSON, and every build names the node's threads
+### D10. The facade's test build serves the laptop host's surface on the phone's loopback, and every build names the node's threads
 
-`pdn-mobile` gains a feature `observation = ["pdn-node/test-util"]`. With it the facade exports `observe_pod(identity, pod)`, returning a subscription object whose asynchronous `next()` takes the next record from the runtime's buffer (D5) as one line of JSON, or nothing once the subscription has ended; `join_pod_observed(identity, code)`, the observed join (D12) on the invite code `join_pod` takes, refused as `join_pod` is refused and answering the same subscription object, whose `pod()` names the pod joined; `pod_record_listing(identity, pod)`, answering the listing as JSON; `bring_up_with_pod_interval(storage_dir, reconcile_interval_secs, pod_reconcile_interval_secs)`, the bring-up with the pod interval named; and `build_profile()`, answering `release` or `debug`. Refusals map through the facade's own table. The JSON is the runtime's own form (D5, D6): the agent journals and forwards each line unread, as a ceremony payload crosses the facade unread, so no second schema is written in TypeScript. `pdn-sdk` builds a test artifact with the feature on request, in the release configuration a release is built in; it is named as a test build and never published as a release.
+`pdn-mobile` gains a feature `observation = ["pdn-node/test-util", "pdn-node-http/observation"]`. With it the facade exports 2 calls. `serve_test_surface(storage_dir, port)` starts, on the facade's runtime, an HTTP server bound to `127.0.0.1` at that port and answers it with the laptop host's debug router (`router` in `crates/pdn-node-http`: the debug routes a coordinator drives a laptop node with, and the 3 observation routes of D7) against the node that is up, beside 3 routes of the phone's own: a reset, which stops the node, deletes `storage_dir`, brings a node up on it at a reconcile interval of 10 seconds and the pod interval and the connectivity the request names (`direct`, `relays` or `product`, as `PDN_CONNECTIVITY` names them), creates one identity, and answers the identity, the node id and the build profile; the device samples (D11), answered from a sequence number on, a read from a sequence number releasing the samples up to it; and the clock, answering the device's wall clock in microseconds. The server outlives a reset, and while no node is up a route that needs one answers `503`. `report_device_sample(json)` hands the server one sample of the native module's (D11), which the samples route answers unread. A record reaches the coordinator as the laptop host writes it — the same router, the same serde type, the same bytes — so the observation path on the phone is the laptop's, and no record crosses into JavaScript. Refusals answer the laptop host's error table. `pdn-sdk` builds a test artifact with the feature on request, in the release configuration a release is built in; it is named as a test build and never published as a release. Only that artifact links `pdn-node-http`; what ships keeps its host dependency pointing toward the runtime alone.
 
-In every build, the test build and what ships alike, `PdnNode::new` names the threads of its asynchronous runtime with the prefix `pdn-node` (`thread_name` on the runtime's builder, which names the worker threads and the blocking threads both), so the agent's sampler tells the node's threads from the application's (D11). A name changes nothing the runtime does, and one runtime in every build keeps the load test measuring the threads a device runs.
+In every build, the test build and what ships alike, `PdnNode::new` names the threads of its asynchronous runtime with the prefix `pdn-node` (`thread_name` on the runtime's builder, which names the worker threads and the blocking threads both), so the native module's sampler tells the node's threads from the application's (D11). A name changes nothing the runtime does, and one runtime in every build keeps the load test measuring the threads a device runs.
 
-**Example:** the agent's loop over one pod.
+**Example:** the phone's surface brought up and driven over the cable; route names are illustrative, as the host spec leaves them unpinned.
 
 ```
-await node.bringUpWithPodInterval(dir, 10, 300)
-sub = await node.joinPodObserved(me, code)      // or observePod(me, pod) for a pod already held
-report({ pod: sub.pod() })
-while ((line = await sub.next()) !== null) { journal.append(line); forward(line) }
+phone, native module at launch:  serveTestSurface(dir, 3011)          127.0.0.1:3011 on the phone
+laptop:                          iproxy -u <udid> 3311:3011           the laptop's 127.0.0.1:3311 → the phone's 127.0.0.1:3011 over usbmux
+coordinator → 127.0.0.1:3311:    POST /debug/agent/reset {"pod_interval_secs":300,"connectivity":"direct"}
+                                   ← {"identity":"…","node":"…","profile":"release"}
+                                 POST /debug/identities/{me}/pods/join-observed   (w1's invite)
+                                   ← 200, the pod id in a header, a line per record from seq 0
+                                 GET  /debug/agent/samples?after=41   ← the samples from 42 on
+                                 GET  /debug/agent/clock              ← {"t":1790000044051200}
 ```
 
 **Rejected alternatives:**
 
-- A record type exported through uniffi
-  - **Cons:** a Swift, a Kotlin and a TypeScript copy of a shape the test reads only as JSON.
-- A callback interface pushing records into JavaScript
-  - **Cons:** the runtime then waits on the JavaScript thread, which the application's screens also use; a pull leaves the waiting to the agent.
-- The pod interval as a parameter of the shipped `bring_up`
-  - **Cons:** changes the product's surface, which `mobile-host-surface` has not archived, for a value the product keeps at the runtime's default.
+- The 3 observation calls exported through uniffi, read by an agent in JavaScript
+  - **Cons:** every record crosses into JavaScript on the cores the node runs on, and the phone's observation path is then not the laptop's, so the load comparison measures the path beside the device.
+- A surface of the phone's own, written beside the laptop host's
+  - **Cons:** a second implementation of the routes the coordinator reads, and the 2 drift apart.
+- The pod interval and the connectivity as parameters of the shipped `bring_up`
+  - **Cons:** changes the product's surface, which `mobile-host-surface` has not archived, for values the product keeps at the runtime's default and at its own connectivity.
 - Naming the threads in the test build only
   - **Cons:** a runtime built one way for the tests and another for devices, for a name that changes nothing else.
 
-### D11. The application's test build carries the agent, in the release configuration, and the release build nothing of it
+### D11. The application's test build serves the test surface over the cable, in the release configuration, and the release build nothing of it
 
-`pdn-app` gains a build variant of its own for the tests, built in the release configuration. It links the facade's test artifact, compiles the agent, and declares App Transport Security's exception for the local network (`NSAllowsLocalNetworking`), so plain HTTP to the coordinator's address is not refused on that ground; the release variant links a release of `pdn-sdk` and contains no agent code. The agent is a screen showing the run id, the coordinator's address and the agent's state, and nothing else, and it stays still so the screens add no CPU of their own. While a session with the coordinator is open the agent sets `isIdleTimerDisabled`, so the device neither locks nor dims during a run, and enables the idle timer again when the run ends. A native module hands the launch environment (the coordinator's address and the run id, set by `xcrun devicectl device process launch`) to JavaScript, deletes the node's directory on reset, and samples the process once a second: the user and system CPU time of the whole process from `getrusage(RUSAGE_SELF)`; the user and system CPU time of the node's threads, listed with `task_threads` and read with `thread_info` per thread, a thread counting as the node's when its name starts with the facade's prefix `pdn-node` (D10) or is the store's `sync-actor`; `ProcessInfo.thermalState`; and the application's state. The agent adds each node thread's change since the previous sample to a running total, so a thread that exits between samples takes at most its last second with it. The process total less the node's share is the agent's own work — the records' crossing into JavaScript, the journal, the forwarding — and any thread no one named, and the load test reports it as the observation's cost. Every change of the application's state (`active`, `inactive`, `background`) is reported as it happens; a sample window in which the application was not `active` throughout is invalid for measurement, and the coordinator marks the cell it falls in. The agent is the client of the coordinator: it asks for its next command, performs it through the facade, and reports the result. Each record is appended to a journal file in the application's container before it is forwarded, so what the coordinator lacks the journal holds, and the coordinator pulls the journal over the cable at the end. CPU samples, application state changes and journal failures are reported like results.
+`pdn-app` gains a build variant of its own for the tests, built in the release configuration. It links the facade's test artifact and holds the agent; the release variant links a release of `pdn-sdk` and contains no agent code. The agent is a screen showing the run id, the surface's port and the agent's state, and nothing else, and it stays still so the screens add no CPU of their own. A native module reads the launch environment — the run id and the port, set by `xcrun devicectl device process launch` — and, with both present, starts the facade's test surface (D10) on the application's node directory and that port; a launch without them starts nothing. The coordinator reaches the surface over the device's cable: `iproxy` forwards a port of the laptop through usbmux to the phone's loopback, so nothing on the phone listens on the local network, the records and the samples never cross the Wi-Fi the measured sync uses, and the coordinator keeps control of the phone while its Wi-Fi path is cut. While the launch lasts the native module sets `isIdleTimerDisabled`, so the device neither locks nor dims during a run. Once a second the native module samples the process and hands the sample to the facade (D10): the user and system CPU time of the whole process from `getrusage(RUSAGE_SELF)`; the user and system CPU time of the node's threads, listed with `task_threads` and read with `thread_info` per thread, a thread counting as the node's when its name starts with the facade's prefix `pdn-node` or is the store's `sync-actor`, each thread's change since the previous sample added to a running total so a thread that exits between samples takes at most its last second with it; the process's resident memory (`phys_footprint` from `task_info`); `ProcessInfo.thermalState`; whether Low Power Mode is on (`isLowPowerModeEnabled`); the battery's state and level (`UIDevice.batteryState`, `batteryLevel`); and the application's state. Every change of the application's state (`active`, `inactive`, `background`) is handed over as it happens, as a sample of its own. The test surface's server runs on the facade's runtime, so its work counts in the node's share, as the laptop host's server counts in a laptop node's process; the process total less the node's share is the application's own work — the screen and the sampler — and any thread no one named, and the observation's cost is measured on the phone as on the laptop, with an open stream and without one (`load.md`). A sample window in which the application was not `active` throughout is invalid for measurement, and the coordinator marks the cell it falls in. The coordinator drives the phone's node through the surface's routes as it drives a laptop node's, and reads the clock route over the cable for the phone's clock offset.
 
-**Example:** the commands.
+**Example:** the coordinator's requests through the tunnel in one catch-up cell, and a sample.
 
-| command | what the agent does |
+| request | what the phone does |
 |---|---|
-| `reset` | stops the node, deletes its directory, brings it up at reconcile interval 10 and the given pod interval, creates one identity, reports the identity, the node id and the build profile |
-| `join_pod` | the facade's observed join on the code the coordinator sends; the pod reported, the subscription's records journaled and forwarded from `seq` 0 |
-| `observe` | opens the subscription to one pod and journals and forwards its records |
-| `put_record` | the facade's record placement, for the warm-up record |
-| `listing` | the facade's record listing, uploaded |
-| `ping` | answers at once with its clock |
+| the act route, `leave` | leaves the pod, so no identity whose node is reset stays a member |
+| reset, pod interval 300, `direct` | stops the node, deletes its directory, brings a node up, creates one identity; answers the identity, the node id and `release` |
+| the observed join route, on w1's invite | joins through the observed join (D12) and streams the records from `seq` 0 |
+| the listing route | answers the record listing |
+| the samples route, after the last sample read | answers the samples taken since |
+| the clock route | answers the device's clock at once |
 
-A CPU sample, reported unasked once a second: `{"kind":"cpu","t":1790000044051000,"cpu_user_us":81234000,"cpu_sys_us":10422000,"node_cpu_user_us":70110000,"node_cpu_sys_us":9802000,"thermal":"nominal","app_state":"active"}`.
+`{"seq":42,"sample":{"kind":"cpu","t":1790000044051000,"cpu_user_us":81234000,"cpu_sys_us":10422000,"node_cpu_user_us":70110000,"node_cpu_sys_us":9802000,"resident_bytes":182452224,"thermal":"nominal","low_power":false,"battery":"charging","battery_level":0.81,"app_state":"active"}}`
 
 **Rejected alternatives:**
 
-- The agent as an HTTP server the coordinator calls
-  - **Cons:** a server in the application's process, listening on the local network; the client needs only `fetch`.
+- The agent as the coordinator's HTTP client over the local network, forwarding the records it reads
+  - **Cons:** the records cross the Wi-Fi the measured sync uses — a 100,000-record catch-up forwards an `insert_remote` of about 500 bytes and a `content_ready` of about 240 for each record, some 70 MB beside its 26 MB of payloads — and each record crosses into JavaScript on the cores the node runs on.
+- The surface listening on the local network
+  - **Cons:** any device on the network reaches a server that resets the node, and its traffic shares the measured Wi-Fi.
+- The server on a runtime of its own, apart from the node's threads
+  - **Pros:** the node's share would hold the node's work alone.
+  - **Cons:** the laptop node's process holds its server's work, so the two sides of the load comparison would count different things.
 - A runtime switch in the release build
-  - **Cons:** the agent's code, the plain-HTTP exception and the test-only facade would ship to every device, off only by a value.
+  - **Cons:** the agent's code and the test-only facade would ship to every device, off only by a value.
 - The test build in the debug configuration
   - **Cons:** the store's debug build is several times slower, so every number the load test compares would describe a build no device runs.
 - The whole process's CPU alone, less the idle workload's per cell
-  - **Cons:** the agent's work grows with the records it forwards, so the idle workload's share does not cancel it, and the observation's cost is then counted as the node's.
+  - **Cons:** the application's own work and the threads no one named then count as the node's, and on the laptop no such work shares the node's process.
 - The node's threads alone
-  - **Cons:** the observation's cost is then unreported, and a phone whose agent outgrows the node cannot be told from one whose node is slow.
+  - **Cons:** the application's own work is then unreported, and a phone whose application outgrows the node cannot be told from one whose node is slow.
 - The store's actor thread renamed to the facade's prefix
   - **Cons:** a divergence in `pdn-store` for a name the sampler can list beside the prefix.
 
 ### D12. An observed join opens the subscription between the import and the start of sync
 
-`pdn-node` gains, behind `test-util`, `Runtime::join_pod_observed_for_test(identity, invite)`. It runs the join dialogue as `join` does, imports both stores, opens the subscription of that identity to the pod (D5) before either store's sync starts, then starts both stores' sync and waits as `join` does, and answers the pod together with the open subscription. In `data-layer` an observed variant of `import_pod` registers and tracks both stores as `import_pod` does and starts each store with its ordered subscription attached to the start (D1), returning both subscriptions beside the catch-up; on a pod already held, or on a tombstone's record store, a store whose sync already runs gets the ordered subscription a caller takes alone. A catch-up that outlasts the join's wait leaves the pod recorded, as `join` does, and the call answers the pod and the subscription with it, the catch-up going on in the stream; a join refused or failed before the import answers as `join` answers and opens nothing. The join's acts and their order are `join`'s, so the observed join arranges nothing the product's join does not: only the moment the observation starts moves. The laptop host serves it as a route (D7), the facade as a call (D10), and the agent's `join_pod` command uses it (D11). The load test's catch-up workload reads the catch-up from the joiner's records, from its first insert to the last `content_ready`.
+`pdn-node` gains, behind `test-util`, `Runtime::join_pod_observed_for_test(identity, invite)`. It runs the join dialogue as `join` does, imports both stores, opens the subscription of that identity to the pod (D5) before either store's sync starts, then starts both stores' sync and waits as `join` does, and answers the pod together with the open subscription. In `data-layer` an observed variant of `import_pod` registers and tracks both stores as `import_pod` does and starts each store with its ordered subscription attached to the start (D1), returning both subscriptions beside the catch-up; on a pod already held, or on a tombstone's record store, a store whose sync already runs gets the ordered subscription a caller takes alone. A catch-up that outlasts the join's wait leaves the pod recorded, as `join` does, and the call answers the pod and the subscription with it, the catch-up going on in the stream; a join refused or failed before the import answers as `join` answers and opens nothing. The join's acts and their order are `join`'s, so the observed join arranges nothing the product's join does not: only the moment the observation starts moves. The laptop host serves it as a route (D7), and the phone's test surface serves the same route (D10). The load test's catch-up workload reads the catch-up from the joiner's records, from its first insert to the last `content_ready`.
 
 **Example:** a catch-up at V = 10,000 whose first record-store session carries 6,000 records before the join returns at 9 seconds, and the rest by 15 seconds.
 
@@ -351,12 +356,12 @@ Whether a joiner's first session is reported is no access matter: no party gains
 
 - **Several identities on one node — changes the outcome, bounded.** A subscription addresses one hosted identity's stores of one pod, and each identity has its own engine, so records never mix identities; an identity that holds no store of the pod is refused (scenario). A session event names the counterpart node, not its member, which is a stated limit: 2 members on one writer node are one `peer`. A session between 2 members of one node runs in process, carries no session id and names the node itself as `peer` on both sides (scenario); it is no network session, and the reliability test does not pair it.
 - **One device or several; a device linking before, during or after — does not change the outcome.** A sibling's session appears with the sibling's node as its `peer`, and an entry that arrived from a sibling names it in `from`; the records report both as they are.
-- **The connection is unstable — changes the outcome.** A dropped event stream loses the records until the coordinator subscribes again with a new `sub`, and the tests count the gap. A dropped observed join loses the catch-up's records the same way, and a new subscription cannot recover the joiner's first session; the cell then lacks its catch-up from the stream and the record listing still says what the joiner holds. A lost HTTP report from the agent leaves a `seq` gap that the journal fills.
-- **The disk fills — changes the outcome on the phone.** A journal append that fails is reported to the coordinator, and the run cannot be judged from an incomplete journal (scenario). The node's own failure to store is what the tests measure, not a property of the observation.
-- **The process ends without warning; the device restarts — changes the outcome.** A subscription does not survive the process: the agent subscribes again with a new `sub` after a relaunch, and records produced between the kill and the new subscription are not reported; the journal keeps what was appended before the kill, and a torn last line is discarded by its reader (scenarios).
+- **The connection is unstable — changes the outcome.** A dropped event stream loses the records until the coordinator subscribes again with a new `sub`, and the tests count the gap. A dropped observed join loses the catch-up's records the same way, and a new subscription cannot recover the joiner's first session; the cell then lacks its catch-up from the stream and the record listing still says what the joiner holds. On the phone the stream runs through the cable's tunnel; a dropped tunnel ends the stream as a dropped connection ends a laptop node's, and the coordinator subscribes again.
+- **The disk fills — does not change the observation's outcome.** The observation writes nothing on either host; the node's own failure to store is what the tests measure.
+- **The process ends without warning; the device restarts — changes the outcome.** A subscription does not survive the process: the coordinator relaunches the application over the cable, opens its tunnel again and subscribes anew with a new `sub`, and records produced between the kill and the new subscription are not reported (scenario).
 - **A member is removed or leaves — changes the outcome.** The record store is dropped, its stream yields `closed`, and the membership store's stream goes on (scenario). A pod joined again is observed by a new subscription.
-- **The application leaves the active state — changes the outcome on the phone.** The agent keeps the idle timer off while a run is open, so the device does not lock on its own; any window in which the application was not `active` is invalid for measurement, told by the state on every sample and every reported change (scenarios).
-- **A write to several places is not atomic — does not apply.** The journal is one append-only file; the observation writes nothing else.
+- **The application leaves the active state — changes the outcome on the phone.** The native module keeps the idle timer off while the launch lasts, so the device does not lock on its own; any window in which the application was not `active` is invalid for measurement, told by the state on every sample and every reported change (scenarios).
+- **A write to several places is not atomic — does not apply.** The observation writes nothing.
 - **Clocks disagree — does not change the outcome.** Every time in a record is on the clock of the node that produced it; the reliability test's classification compares no 2 devices' clocks, and both tests use cross-device offsets for latency only.
 - **Capabilities move — does not apply.** A pod's stores are held whole by every member, with no grant to narrow or widen; the change of membership that matters is the removal above.
 
@@ -364,13 +369,15 @@ Whether a joiner's first session is reported is no access matter: no party gains
 
 - [The ordered subscription diverges from upstream iroh-docs] → recorded in the store crate's `CLAUDE.md` and `UPSTREAM.md`; an upstream patch touching `live::Event` or the live actor's replica-event handling is adapted.
 - [The live actor clones each insert for ordered subscribers] → only for a namespace that has one, which no product build opens.
-- [The runtime's buffer holds a slow consumer's records in the node's memory] → a record is a few hundred bytes, so a buffer near its bound of 262,144 holds tens of megabytes of the phone's memory, and only while the consumer is behind; the agent reads the subscription in its own loop, apart from forwarding, so a slow upload does not slow the reading, and a consumer that keeps pace on average empties the buffer before the end of a workload, when the load test reads the resident size.
+- [The runtime's buffer holds a slow consumer's records in the node's memory] → a record is a few hundred bytes, so a buffer near its bound of 262,144 holds tens of megabytes of the phone's memory, and only while the consumer is behind; the coordinator reads each stream as it arrives, over loopback from a laptop node and over the cable from the phone, and a consumer that keeps pace on average empties the buffer before the end of a workload, when the load test reads the resident size.
 - [A 100,000-record catch-up outruns the buffer behind a consumer that never catches up] → the loss is a counted `lagged`, and the record listing at the end still states what the joiner holds.
 - [The session id relies on iroh exporting keying material] → iroh 1.x exposes it on `Connection`; if an upgrade drops it, the event carries no id and the test falls back to pairing in order, with the 2 cases D3 lists against it undetermined.
 - [`t` includes the wait between the live actor and the runtime's task] → a scheduling delay, since the task drains the store's channel as it fills; the consumer's pace does not reach `t`.
 - [The phone's node CPU leaves out a thread no one named] → a thread a library starts without the facade's prefix counts in the remainder, so the observation's reported cost is an upper bound; the node's own runtime, its blocking threads and the store's actor are all named.
 - [The runtime's numbering task counts as the node's CPU] → it runs on the facade's runtime, so its work per record is in the node's share on the phone, as it is in the laptop node's process; it is the same work on both sides of the comparison.
-- [A test build of the application that leaks] → it accepts commands from the address it is launched with, resets its node on command, and speaks plain HTTP; it is built on request, installed on named devices, and published nowhere.
+- [A test build of the application that leaks] → its surface listens on the phone's loopback alone, reached over a cable from the machine the phone is attached to, and resets its node on request; it is built on request, installed on named devices, and published nowhere.
+- [usbmux reaching a socket bound to the phone's loopback is unproven here] → the network spike (task 3.1) opens the tunnel to a test server on the phone before the rest of group 3 is built on it.
+- [The test artifact links the laptop host's router] → only the test artifact does; what ships keeps its host dependency toward the runtime alone, as the laptop host's spec states.
 
 ## Open Questions
 

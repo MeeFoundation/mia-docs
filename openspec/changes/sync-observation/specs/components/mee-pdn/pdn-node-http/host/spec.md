@@ -53,7 +53,7 @@ Debug endpoints are demo scaffolding, not platform API. The host SHALL NOT serve
 ### Requirement: The surface offers no path the runtime's own callers lack
 The surface SHALL NOT expose namespace ticket handover, forced reconciliation, state reset, or direct store access, and SHALL NOT return a namespace ticket when reading a grant.
 
-A host built with the observation feature SHALL add exactly 3 observation routes, each delegating to one of the runtime's test-only observation calls: a subscription to one hosted identity's stores of one pod, the observed join of one hosted identity on an invite, and the record listing of that identity's record store ([observation](../../pdn-node/observation/spec.md)). The observed join takes the invite the product's join route takes and runs the product's join dialogue. None of the 3 forces a reconciliation, hands over or accepts a namespace ticket, resets state, or reaches a store other than through its call.
+A host built with the observation feature SHALL add exactly 3 observation routes, each delegating to one of the runtime's test-only observation calls: a subscription to one hosted identity's stores of one pod, the observed join of one hosted identity on an invite, and the record listing of that identity's record store ([observation](../../pdn-node/observation/spec.md)), with its payloads unless the request asks for none. The observed join takes the invite the product's join route takes and runs the product's join dialogue. None of the 3 forces a reconciliation, hands over or accepts a namespace ticket, resets state, or reaches a store other than through its call.
 
 **Example:** what waiting for a record placed elsewhere can use.
 
