@@ -12,7 +12,7 @@
 
 ## 3. Settle how many connections a node holds before classification
 
-- [ ] 3.1 Derive the floor: the sync connections an honest node holds before their first message arrives, at the burst when every device and counterparty of every hosted identity redials together after a change of network, each first message stretched by a slow link; and, for a limit on established connections, every connection it holds across every hosted identity and every device of every counterparty
+- [ ] 3.1 Derive the floor: the sync connections an honest node holds before their first message arrives, at the burst when every device of every hosted identity and of every member of its pods redials together after a change of network, each first message stretched by a slow link; and, for a limit on established connections, every connection it holds across every hosted identity and every device of every member of its pods
 - [ ] 3.2 Take the decision, and rewrite the open question in `design.md` as a decision with its `**Rejected alternatives:**` block
 - [ ] 3.3 If the decision is to leave the count to the transport, amend `specs/code-practices/defect-reachability.md` with the argument
 

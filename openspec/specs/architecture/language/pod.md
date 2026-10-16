@@ -2,7 +2,7 @@
 
 ## Overview
 
-A pod is a private space shared by its members, each a [Mee Identity](mee-identity.md): every member reads everything placed in it, its content stays with every member whether or not its author is online, and the relationship between two people is a pod of two members. A newcomer joins on one member's invitation and sees every member; no [connection](connection.md) between members is needed, and none is created.
+A pod is a private space shared by its members, each a [Mee Identity](mee-identity.md): every member reads everything placed in it, its content stays with every member whether or not its author is online, and the relationship between two people is a pod of two members. A newcomer joins on one member's invitation and sees every member.
 
 A pod is identified by its pod id, 16 bytes derived from its creator's [identity key](identity-key.md) and a random nonce. The id carries no key material, and a pod signs nothing: every act inside a pod is the signed act of one of its members.
 

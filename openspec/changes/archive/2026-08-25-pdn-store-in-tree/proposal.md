@@ -22,7 +22,7 @@ The store's own checks run nowhere. Its pipeline names self-hosted runners this 
 - **The workspace's lint set.** The store keeps its own `[lints]` table; the workspace's pedantic set would raise hundreds of warnings in upstream code, and a triage of them is not a move.
 - **Tracking upstream through git.** The copy carries no history: the store's commits stay in the archived repository, and a change from upstream arrives as a patch. Adding the tree as a subtree instead, which would let `git subtree pull` merge upstream, was offered and declined.
 - **The failing test.** `sync_full_basic` fails on every run, under the workspace and from the checkout alike — 3 of 3 each, on the same assertion, with a lock file identical across the iroh stack — so it is a property of the store, not of the move. It stays marked flaky and runs nightly, where it is red until a change of the store's code addresses it; this change makes none.
-- **The spec tree's records.** ADR-0008 names the store by its repository address as the place its facts were verified; a record stays as written.
+- **The spec tree's records.** An ADR that named the store by its repository address, as the place its facts were verified, stays as written, or obsolete with its text in git history.
 
 ## Capabilities
 

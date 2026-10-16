@@ -1,0 +1,158 @@
+## MODIFIED Requirements
+
+### Requirement: The assembly accepts a supplied protocol handler
+`SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today device linking ([ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md)) and a pod's join ([ADR-0015](../../../../architecture/adr/0015-pod-join-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
+
+**Example:** the ALPNs of a node pdn-node's `Runtime` spawns, and what a connection accepted under each reaches.
+
+| ALPN | reaches |
+|---|---|
+| `/iroh-bytes/4` | built in: blob transfer |
+| `/iroh-gossip/1` | built in: gossip |
+| `/iroh-sync/1` | built in: `DocsDispatch` reads the `Init` and hands the session to the identity it names |
+| `/pdn/linking/0` | supplied: `LinkingHandler`, given the raw bidirectional connection |
+| `/pdn/pod-join/0` | supplied: `JoinHandler`, given the raw bidirectional connection |
+| any other | the dial fails, and no handler runs |
+
+#### Scenario: An extra protocol answers on its ALPN
+- **WHEN** node A spawns with a test echo handler under a test ALPN and node B dials A's address under that ALPN and sends bytes
+- **THEN** the bytes return over the same raw bidirectional connection, with no document-sync session involved
+
+#### Scenario: The built-in stack is unaffected by extras
+- **WHEN** node A spawns with an extra protocol and node B imports a replica from A's ticket
+- **THEN** the replica converges between A and B exactly as it does between nodes spawned without extras
+
+#### Scenario: A node that did not register the ALPN refuses it
+- **WHEN** node B dials node A under an ALPN that A did not register
+- **THEN** the dial fails, no connection is established, and no handler runs on A
+
+#### Scenario: Two supplied handlers serve side by side
+- **WHEN** a node spawns with two supplied handlers under distinct ALPNs and each is dialed in turn
+- **THEN** each dial reaches its own handler, and neither handler observes the other's connections
+
+### Requirement: ALPN registrations are unique
+The ALPNs of supplied protocols SHALL be distinct from the built-in protocols' ALPNs and from each other. A spawn presenting a collision SHALL fail with no node started and nothing bound — a supplied protocol silently replacing the sync stack must be impossible.
+
+**Example:** the supplied protocols handed to `SyncNode::spawn_with`, and its answer; a refusal comes before the storage directory is touched or a socket bound.
+
+| supplied ALPNs | answer |
+|---|---|
+| `/pdn/linking/0`, `/pdn/pod-join/0` | a node serving both beside the three built-in ALPNs |
+| `/iroh-sync/1` | `Err(AlpnTaken)`: "protocol ALPN already taken: /iroh-sync/1" |
+| `/pdn/linking/0`, `/pdn/linking/0` | `Err(AlpnTaken)`: "protocol ALPN already taken: /pdn/linking/0" |
+
+#### Scenario: A built-in ALPN is refused at spawn
+- **WHEN** a node spawns with a supplied protocol claiming the document-sync ALPN
+- **THEN** the spawn fails and no node starts
+
+#### Scenario: A duplicate supplied ALPN is refused at spawn
+- **WHEN** a node spawns with two supplied protocols claiming the same ALPN
+- **THEN** the spawn fails and no node starts
+
+### Requirement: One connection carries a gossip stream for each of up to 4,096 stores two nodes share
+
+The endpoint SHALL let a peer hold up to 4,096 unidirectional streams open on one connection. Gossip holds one such stream for every [swarm](../../../../architecture/language/swarm.md) topic two nodes share, for as long as they share it, and a sender past the count sends that peer nothing on any topic, and once its queue for that peer fills, nothing to any peer; a [pod](../../../../architecture/language/pod.md)'s two stores are two topics, so the count SHALL NOT stop live delivery between two nodes until the stores they share exceed 4,096, about 2,000 pods. One connection SHALL buffer no more than 248,750,000 bytes across all its streams, the product of the 199 streams and the 1,250,000-byte stream window the transport's defaults allowed, so that the larger count gives a caller more streams and no more memory.
+
+**Example:** Alice's phone a1 and Bob's phone b1 share 60 pods, 120 swarm topics; Bob places a claim in the first of them.
+
+| unidirectional streams per connection | Bob's claim on a1 |
+|---|---|
+| 100, the transport's default | arrives only with the pod stores' pass, up to 5 minutes later, and after a burst of Bob's writes b1 stops answering |
+| 4,096 | arrives over the swarm at once |
+
+#### Scenario: Two nodes sharing more stores than the transport's default stream count keep live delivery
+
+- **WHEN** two members on two nodes share 60 pods, the pod stores' passes out of reach, and each places a claim in the first and in the last of them
+- **THEN** each claim reaches the other node over the swarm, and after a burst of writes the writer's node still creates a pod
+
+### Requirement: Shutdown stops every protocol side by side, and a late call fails
+The node's shutdown SHALL stop a supplied handler beside the built-in stack rather than before it: the router shuts every protocol down at once, the blob store and gossip among them. A supplied handler whose work in flight writes through the node's stores therefore SHALL be let finish by its owner before the node's shutdown is called — a wait inside the handler's own shutdown runs against stores already going away. A call into a replica store that reaches it after its shutdown began, including one already queued behind the shutdown, SHALL fail rather than wait: its caller would otherwise wait for as long as any handle to the store lives.
+
+**Example:** `Runtime::shutdown` in pdn-node, whose linking and join handlers write through the node's stores.
+
+| step | the stores |
+|---|---|
+| 1 serving halves of both ceremonies finish, up to `SHUTDOWN_SERVING_BUDGET` (10 s); one arriving later refuses | open |
+| 2 cleanup tasks finish, up to 10 s | open |
+| 3 `SyncNode::shutdown`: the reconcile pass stops, then the router shuts down every protocol at once, the blob store and gossip among them | going away |
+| 4 each identity's engine shuts down, and the storage lock is released | closed: a call queued behind a store's shutdown fails at once |
+
+#### Scenario: A request queued behind the store's shutdown fails
+- **WHEN** a request to a replica store is queued behind that store's shutdown
+- **THEN** the shutdown completes and the request's caller receives an error rather than waiting
+
+### Requirement: An accepted sync connection is dispatched to the hosted identity it names
+
+The node SHALL read the [identity](../../../../architecture/language/mee-identity.md) an accepted sync connection names before the session reaches any replica, and SHALL hand the session to that hosted identity alone. A connection naming an identity the node does not host SHALL be refused indistinguishably from the replica not being hosted, and no hosted identity SHALL observe a session addressed to another.
+
+What the node reads before it knows whom a connection addresses SHALL be bounded. The first message names the namespace, the two identities and a first range whose two boundaries carry one key each, so the largest one an honest node sends is fixed by the longest key a replica holds, 8,192 bytes, and comes to about 16 KiB. A first message whose length prefix announces more than 32 KiB SHALL be refused on the prefix alone, before its body is read, so a caller that holds no ticket and is no member makes the node hold no more than that per connection. The session a classified caller goes on to run reads its later messages under the session's own ceiling, since one message of a first sync often carries a replica's whole content.
+
+**Example:** a session's first frame: a `u32` big-endian length prefix, then `Message::Init { namespace, identity, caller, message }` in postcard.
+
+| length prefix | the accepting node |
+|---|---|
+| about 16 KiB | the largest an honest node sends: its first range's two boundaries carry one 8,192-byte key each |
+| 32,768 (`MAX_OPENING_FRAME`) | reads the body, then dispatches to the identity the `Init` names |
+| 32,769 | refuses on the prefix, "received message that is too large: 32769"; no body read, no replica touched |
+| after the `Init` | frames up to 1,073,741,824 bytes (`MAX_MESSAGE_SIZE`, 1 GiB) |
+
+#### Scenario: A session reaches the hosted identity it names
+
+- **WHEN** a peer syncs a namespace two identities of one node hold, naming one of them
+- **THEN** the entries it delivers land in the named identity's replica, and the other hosted identity's replica is unchanged by that session
+
+#### Scenario: An oversized first message is refused before its body
+
+- **WHEN** a peer opens a sync connection whose first message announces more than 32 KiB, and holds the stream open without sending the body
+- **THEN** the node refuses the connection on the announced length, without waiting for the body, and no replica is touched
+
+#### Scenario: The largest honest first message opens a session
+
+- **WHEN** a replica whose first key is 8,192 bytes long opens a session with its first message
+- **THEN** the message is read and the session proceeds
+
+#### Scenario: A session past its first message reads larger messages
+
+- **WHEN** a session opened with an ordinary first message goes on to carry a message larger than 32 KiB
+- **THEN** that message is read, and a replica it carries whole reaches the other side whole
+
+#### Scenario: An unknown identity is refused
+
+- **WHEN** a session names an identity the node does not hold
+- **THEN** it is refused indistinguishably from the replica not being hosted, and no replica is touched
+
+### Requirement: The node removes the payloads no replica it holds references
+
+The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A payload an identity writes, or fetches for an entry it received, SHALL stay through every run whose read of the replicas predates that entry, so that a run already under way when the entry lands SHALL NOT remove its payload. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
+
+**Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; the pod's record store held Bob's lease scan and a photo whose bytes Carol also placed in a pod of her own, "Carol".
+
+| payload | referenced after the record store is forgotten by | on c1 after the next run |
+|---|---|---|
+| Bob's lease scan | nothing | removed |
+| the photo | the record store of "Carol" | kept |
+
+#### Scenario: A payload no replica references is removed
+
+- **WHEN** a node forgets the only replica whose entries reference a payload, and a collection run passes
+- **THEN** the blob store no longer holds the payload
+
+#### Scenario: A restart removes nothing before its identities are hosted again
+
+- **WHEN** a node on a storage directory restarts, and collection intervals pass before its host has hosted its identities again
+- **THEN** the blob store still holds every payload those identities' replicas reference, and collection runs from the host's start on
+
+#### Scenario: A payload a co-located identity references stays
+
+- **WHEN** two identities hosted on one node hold replicas referencing one payload, one of them forgets its replica, and a collection run passes
+- **THEN** the blob store still holds the payload, and the other identity reads it
+
+#### Scenario: A payload written while a collection run is under way stays
+
+- **WHEN** an identity writes an entry after a collection run has read the replicas and before that run removes anything
+- **THEN** the blob store still holds the entry's payload after the run, and the entry reads
+
+#### Scenario: A payload fetched while a collection run is under way stays
+
+- **WHEN** an entry arrives from a peer after a collection run has read the replicas, and its payload is fetched before that run removes anything
+- **THEN** the blob store still holds the payload after the run, and the entry reads

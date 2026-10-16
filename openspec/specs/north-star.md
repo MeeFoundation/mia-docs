@@ -28,9 +28,9 @@ Meet people where they are and lead them to a better future.
 
 MIA is a software application that runs on your devices, with minimal use of cloud-based servers. It has the following components:
 
-* A UI that allows the user to (i) view, update, organize their personal information held in a local datastore and/or in other PDN nodes, (ii) create *connections* and (iii) manage *integrations*.
+* A UI that allows the user to (i) view, update, organize their personal information held in a local datastore and/or in other PDN nodes, (ii) share with others in *pods* and (iii) manage *integrations*.
 * The user's data is stored in a personal datastore within the application. It adheres to the Persona ontology.
-* A *connection* is an internet communications channel between nodes on the Personal Data Network (PDN). Each Mia is a PDN node. Service providers can integrate as nodes on the PDN.
+* A *pod* is a private space its members share across their nodes on the Personal Data Network (PDN). Each Mia is a PDN node. Service providers can integrate as nodes on the PDN.
 * An *integration* is implemented as a connector between the personal datastore and some external OS service or local application.
 * A bundled browser extension to implement Global Privacy Control (GPC) and MySignals
 
@@ -40,7 +40,7 @@ Over time we will add features to the agent. We need to sort them into the [road
 
 | **Feature** | **Description** |
 |---------|-------------|
-| Contact sharing | Invite another Mia user to create a bidirectional data sharing connection, sharing contact information (think vcard initially).  |
+| Contact sharing | Invite another Mia user into a pod of two, sharing contact information (think vcard initially).  |
 | Document sharing | Share documents between two Mia users, including the ability to delegate access |
 | Global Privacy Control | Send GPC signal to websites you visit |
 | Text messaging | Server-less text messaging between two Mia users |

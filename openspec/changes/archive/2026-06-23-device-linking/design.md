@@ -20,17 +20,17 @@
 
 ### D1. The seed is the private-metadata-store ticket (the QR payload)
 
-Linking transmits exactly one ticket out of band — the private metadata store's. Everything else (connections, later data) is discovered from inside it. So a QR carries one bearer ticket; the PMS expands it.
+Linking transmits exactly one ticket out of band — the private metadata store's. Everything else is discovered from inside it. So a QR carries one bearer ticket; the PMS expands it.
 
-*QR direction (bearer model):* the existing device displays the seed, the new device scans it — the holder of the PMS hands access to the newcomer. Under identity-bound access (UWill) this inverts: the new device presents its identity and the existing device authorizes it, with no bearer secret on screen.
+*QR direction (bearer model):* the existing device displays the seed, the new device scans it — the holder of the PMS hands access to the newcomer. Under identity-bound access this inverts: the new device presents its identity and the existing device authorizes it, with no bearer secret on screen.
 
 ### D2. Staged bootstrap, PMS-first
 
 `link_device(node, identity, seed, timeout)`:
 1. Import the private metadata store from `seed`.
 2. Register this device — `add_device(node.node_id())`.
-3. Wait (up to `timeout`) for the `connections` ticket to appear in the PMS, then import the connections store.
-4. Return `LinkedStores { private_metadata, connections }`. Further stores extend step 3.
+3. Wait (up to `timeout`) for the tickets of the identity's other stores to appear in the PMS, then import them.
+4. Return the imported stores.
 
 Ordering is intrinsic: a store can only be imported once its ticket has synced into the PMS, so the PMS necessarily comes first. The procedure returns once stores are imported; convergence on their *contents* is ongoing sync the caller observes.
 
@@ -44,6 +44,6 @@ Because the PMS replicates between the identity's devices and both run Invariant
 
 ## Risks / Trade-offs
 
-- **[Blocking wait shape]** `link_device` blocks until the connections ticket is discoverable → bounded by the caller's `timeout`; a stalled PMS surfaces as a timeout, not a hang. Progress events are future work.
-- **[Bearer seed in the QR]** a photographed QR grants access; identity-bound linking is the fix, deferred to UWill.
+- **[Blocking wait shape]** `link_device` blocks until the next store's ticket is discoverable → bounded by the caller's `timeout`; a stalled PMS surfaces as a timeout, not a hang. Progress events are future work.
+- **[Bearer seed in the QR]** a photographed QR grants access; identity-bound linking is the fix, deferred.
 - **[Online-window overlap]** linking needs both devices reachable while the PMS and stores sync; relay stores nothing. Out of scope here.
