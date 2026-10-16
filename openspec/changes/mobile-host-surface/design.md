@@ -14,9 +14,8 @@ Three properties of the runtime bound everything below, and none is a choice mad
 
 **Non-Goals**
 
-- The application, the screens, the shells, and the demonstration. All of that is `mobile-demo-app`, which depends on this change.
-- The own-grant read itself, which is `own-grant-read` and lands first. This change exports it.
-- Persistence, key-backed identity, retraction verdicts across the boundary, a relay. Each is in the proposal's deferred list with its reason.
+- The application, the screens, the shells, and the demonstration. All of that is `pdn-app`'s, which consumes this change through a release of `pdn-sdk`.
+- Key-backed identity and a relay. Each is in the proposal's deferred list with its reason.
 - A platform API. This surface is a host for one application, on the same footing as the debug surface's unpinned routes.
 
 ## Decisions
@@ -33,9 +32,9 @@ The constraint is on the handle, not on the operating-system process. A test bin
 
 This is the one decision the spike can overturn. If a platform suspension kills a bound endpoint irrecoverably, a host needs an act that brings the node back up, which this decision currently refuses — so 1.4 is a question about the specification and not only about the schedule.
 
-### D3. Both grant reads hand back the capability alone
+### D3. No ticket crosses the facade
 
-The runtime's read of a peer's grant returns the capability next to the replica's ticket; the read of an identity's own published grants returns the capability alone, because the caller issues the namespace the record addresses. The facade drops the one ticket there is and exports capabilities, as the HTTP host does. Nothing above the facade holds a ticket, and no exported call accepts one: the sanctioned way a granted namespace arrives is that the runtime binds what the grant names.
+A pod's store tickets cross only inside the join dialogue, between the runtime on either side. Nothing above the facade holds a ticket, and no exported call hands one over or accepts one: the sanctioned way a pod's stores arrive is the join, once the dialogue's one-time secret matches.
 
 ### D4. The facade's error table is written out, not inherited by reference
 
@@ -43,13 +42,13 @@ The HTTP host's closed table folds an unreachable counterparty and every ceremon
 
 The table is this change's own, stated in its spec, and its divergence from the HTTP host's is written down rather than discovered later. Whether the two converge is a question for `pdn-node-http`'s own change; reaching into another component's spec from here would be the wrong place to settle it.
 
-Two limits the table respects. Where the runtime does not separate two outcomes — a linking dialogue whose bound expires while the dial is still in flight reports the dialogue's timeout, not an unreachable counterparty — the table follows the runtime instead of promising a distinction that does not exist. And the checks that are not in the runtime's error surface at all (an empty entry payload, a malformed path, a grant naming no claim) sit above the service call, so they are the host's to write and to name as the host's; the mechanism is often the same shared validation both hosts call, and what differs is only where the call sits.
+Two limits the table respects. Where the runtime does not separate two outcomes — a linking dialogue whose bound expires while the dial is still in flight reports the dialogue's timeout, not an unreachable counterparty — the table follows the runtime instead of promising a distinction that does not exist. And the checks that are not in the runtime's error surface at all (an empty record payload, one above the ceiling) sit above the service call, so they are the host's to write and to name as the host's; the mechanism is often the same shared validation both hosts call, and what differs is only where the call sits.
 
 ### D5. The reconcile cadence is a host decision, stated as such
 
 The host brings the runtime up with an explicitly configured reconcile interval rather than accepting the default of 10 seconds. A short interval costs radio wakeups and battery, so the number belongs to a host that knows what it is running, and it is written down so nobody reads the resulting speed as a property of the network.
 
-What the interval actually governs: the periodic pass drives every replica the node tracks, under either synchronization strategy, so it bounds a published grant record reaching the peer's copy of the pair, a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It does not bound the grantee's read of a granted claim, which nudges its own filtered reconciliation, so repeating that read converges largely independently of the interval. Gossip is what a swarm-strategy replica gets in addition, not instead.
+What the interval actually governs: the periodic pass drives every replica the node tracks outside a pod, so it bounds a write reaching another device of the same identity and a linking catch-up, whose re-dial cadence is that pass. A pod's stores run a pass of their own.
 
 The container stand requires that no route, environment variable, or harness call shorten the runtime's cadence ([container-stand](../../specs/components/mee-pdn/pdn-node-http/container-stand/spec.md)). That is about a test making convergence look faster than it is; a host configuring its own spawn is neither a route nor a harness, and its reason is the opposite one — a person watching, in a host that says what number it chose.
 
@@ -67,15 +66,9 @@ Without a relay, an endpoint publishes only the addresses it observes about itse
 
 An iOS simulator is a different case and the same sentence would be false about it: it runs as a process on the host machine's own network stack, so 2 of them reach each other and pairing works.
 
-### D8. The claim derivation is stated on the surface, in both directions
+### D9. A single record payload is bounded, because a phone is killed for memory
 
-A grant names claim identities derived from the issuer and an entry path, and the derivation is one-way. So publication takes paths and derives, a grant read reports derived identities, and a caller that wants to display a path derives the identities of paths it knows or has listed and compares. The facade exports the derivation for exactly that join.
-
-This is the one place the surface breaks its own "one exported call, one service call" rule, and it is stated rather than hidden: publication derives before it delegates. The alternative — exporting paths and pretending the grant carries them — would put the derivation somewhere invisible and make a grant read undisplayable.
-
-### D9. A single entry payload is bounded, because a phone is killed for memory
-
-A write buffers the whole payload across the binding boundary before the runtime sees it. On a container an unbounded entry payload is a large allocation; on a phone it is the end of the process. The facade therefore bounds one payload by a stated ceiling and refuses above it before calling the runtime, as the HTTP host bounds its own. Memory pressure is the one operating condition a phone adds that a container never had.
+A write buffers the whole payload across the binding boundary before the runtime sees it. On a container an unbounded payload is a large allocation; on a phone it is the end of the process. The facade therefore bounds one payload by a stated ceiling and refuses above it before calling the runtime, as the HTTP host bounds its own. Memory pressure is the one operating condition a phone adds that a container never had.
 
 The other half of that pressure is the replica stores' own caches, and the spawn now names it: a node states the memory its replica stores may hold together, and one identity's store bounds its cache at that memory divided by the identities the storage directory holds when the store opens (identity-scoped-replicas D14). The count is the node's to read, not the facade's to state, so a mobile host states one number and a facade that names none still runs on the default. The figure to state it from is measured: a store of 100,000 entries holds 36 MiB resident, about half of its 64 MiB file, and a share below that costs evictions rather than correctness (identity-scoped-replicas, Measurement).
 
@@ -90,13 +83,13 @@ What the split can break is stated here rather than met on a phone. A release na
 Walked per [operating-conditions](../../specs/code-practices/operating-conditions.md), for the facade rather than for the demonstration.
 
 - **Several identities on one node** — unchanged by this surface: every call names the identity it acts for, and the runtime keeps them disjoint.
-- **One device or several** — the facade exports the own-grant read, whose observation contract exists because a sibling device reads a grant only after it replicates.
+- **One device or several** — a device linked to an identity reads the pods the identity holds once its PMS replicates; the facade passes the read through and waits inside nothing.
 - **A device restarts** — the node comes back on the directory named at bring-up as the same node hosting what it hosted, and what does not come back is work in flight. Cited from the runtime's own specs rather than restated as this surface's claim.
 - **A platform suspension** — the condition a phone adds to the restart case, and the one that can amend D2. The spike answers it.
 - **Memory pressure** — the second condition a phone adds; D9 bounds the input the host controls. What an unbounded inbound replica does is not bounded here and is named as out of scope.
 - **An unstable connection** — the ceremony bounds and the repeated read are the whole answer; nothing here retries on a caller's behalf.
 - **A disk that fills** — the node writes to the directory named at bring-up, and a storage failure is reported rather than swallowed ([durable storage](../../specs/components/data-layer/durable-storage.md)). The facade adds nothing to that.
-- **Capabilities granted, narrowed, revoked, granted again** — the facade passes them through and holds no state of its own about them, so a re-grant after a withdrawal needs nothing from it. Verified at the runtime level, not here.
+- **Capabilities granted, narrowed, revoked, granted again** — in a pod these are promote, demote, remove and a rejoin, all the runtime's acts; the facade passes them through and holds no state of its own about them. Verified at the runtime level, not here.
 
 ## Risks / Trade-offs
 

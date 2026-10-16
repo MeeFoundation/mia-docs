@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The pods service of the runtime: creating a [pod](../../../../architecture/language/pod.md) for a hosted identity, inviting and joining, ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the pod, and recovering hosted pods across a restart. The two stores underneath — the membership store and the record store — are the data layer's [pod stores](../../data-layer/pod-store/spec.md); this spec covers the runtime surface and the ceremonies. A pod has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the pod itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
+The pods service of the runtime: creating a [pod](../../../../architecture/language/pod.md) for a hosted identity, inviting and joining over the join dialogue ([ADR-0015](../../../../architecture/adr/0015-pod-join-over-raw-iroh.md)), ownership, reaching a member's other devices, removing and leaving, writing records — claims, mergeable-documents and immutable-documents — into the pod, and recovering hosted pods across a restart. The two stores underneath — the membership store and the record store — are the data layer's [pod stores](../../data-layer/pod-store/spec.md); this spec covers the runtime surface and the ceremonies. A pod has two roles, owner and member — the creator the first owner. Who may do what by role is in the tables below: on the pod itself, then on each kind of record, where "own" is a record under one's own name — a record is created under one's own name only.
 
 **Pod**
 
@@ -67,7 +67,7 @@ trait PodsService {
     /// Mints a one-time invite: the inviting device's address, the secret, the pod id. Any member. Writes nothing to the pod:
     /// the invite act is written by the inviting device once a newcomer presents the secret.
     async fn invite(&self, identity: PdnId, pod: PodId, lifetime: Option<Duration>) -> Result<PodInvite>;
-    /// Joins through the invite's dialogue and returns once both stores have caught up and its replica folds the identity as a member; the identity joins as a plain member.
+    /// Joins through the invite's dialogue and returns once both stores have caught up and its membership view lists the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: PodInvite) -> Result<PodId>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences.
     /// `Remove` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the pod's tombstone.
@@ -98,7 +98,7 @@ enum RecordKind { Claim, MergeableDocument, ImmutableDocument }
 
 ### Requirement: The pods service creates a pod for a hosted identity
 
-The pods service SHALL create a pod for a hosted identity: it draws a random nonce, derives the pod id from the identity's `PdnId`, its announcement key and the nonce, creates the membership store and the record store, writes the created event signed by the announcement key — the creating identity the first member — and answers the pod id, the one address of the pod. Creating a pod for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
+The pods service SHALL create a pod for a hosted identity: it draws a random nonce, derives the pod id from the identity's `PdnId`, its [identity key](../../../../architecture/language/identity-key.md) and the nonce, creates the membership store and the record store, writes the created event signed by the identity key — the creating identity the first member — and answers the pod id, the one address of the pod. A create SHALL run to its end once called, whatever its caller does, its commit point the pod's entry in the identity's private metadata store (PMS): a create its caller drops leaves the pod whole — listed, both stores held, the creator its one owner — or nothing, and one that fails before its commit point leaves no store of the pod. Creating a pod for an identity the runtime does not host SHALL be refused with an unknown-identity error and no state created.
 
 **Example:** `create` calls on Alice's phone a1, which hosts Alice and not Erin; the nonces a1 draws are 16 bytes of `5a`, then 16 bytes of `a5`.
 
@@ -106,6 +106,7 @@ The pods service SHALL create a pod for a hosted identity: it draws a random non
 |---|---|
 | `create(Alice)` | `ad58a3faa04cdc5576c8dc5823a347c6`; `members` answers Alice alone, an owner |
 | `create(Alice)` again | `920657b318e1bb314e4cb2cf2174451a`: another nonce, another id; `list` answers both pods |
+| `create(Alice)`, its caller dropped while the pod's PMS entry is written | the create runs on: a third pod, listed, Alice its one owner |
 | `create(Erin)` | the unknown-identity error, and no store exists for Erin |
 
 #### Scenario: A created pod is listed with its creator as member
@@ -118,6 +119,11 @@ The pods service SHALL create a pod for a hosted identity: it draws a random non
 - **WHEN** a hosted identity creates two pods
 - **THEN** both are listed, with different pod ids, and each is addressed by its own id
 
+#### Scenario: A create its caller drops leaves the pod whole or nothing
+
+- **WHEN** a hosted identity's create is dropped by its caller at any point
+- **THEN** the identity either lists the pod, holding both its stores with itself the one owner, or holds nothing of it: no store, and no pod listed whose members cannot be read
+
 #### Scenario: Creating for an unhosted identity is refused
 
 - **WHEN** a pod is requested for an identity the runtime neither created nor linked
@@ -125,20 +131,26 @@ The pods service SHALL create a pod for a hosted identity: it draws a random non
 
 ### Requirement: Any member invites; a newcomer joins after a one-time secret is verified and burned
 
-Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the pod id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter, reporting beside it the highest sequence of its own chain its replica holds, a tombstone's included; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes — past the newcomer's chain as the inviter's replica holds it and past the run the newcomer reports, so a departure that has reached the newcomer's devices and not yet the inviter's is not left standing — and the version and device list its device statement extends — the identity's own, when the pod has listed it before — write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores. The dialogue SHALL carry, beside the newcomer's join statement, signed over that sequence by the joining steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, its first device statement, which the inviter writes beside the invite act into the replica of the identity the secret was minted for, so the inviter serves the newcomer's first session. The inviter SHALL write the invite act before it hands over the tickets, and the newcomer's device SHALL record both tickets and the pod's private metadata store (PMS) entry before it catches up, so the armer's sweep finishes a catch-up that a dropped connection, a dropped `join` future or a restart interrupts. A secret presented by an identity the pod already lists as a member SHALL write no joined event: the inviter hands over both tickets again, and writes the device statement the dialogue carries when the member's device list does not name that device. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
+Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secret pending on the inviting runtime, and a self-contained payload carrying a format version, the inviting device's node address, the secret and the pod id — no ticket and no identity proof; minting SHALL write nothing to either store. A newcomer SHALL join by presenting the secret in a dialogue with the inviter, reporting beside it the highest sequence of its own chain that its replica holds or its PMS records the pod at, a tombstone's included, since a departure can reach a device through the PMS alone; the inviter SHALL verify and burn the secret atomically before any state change, then name the sequence the newcomer's joined event takes — past the newcomer's chain as the inviter's replica holds it and past the run the newcomer reports, so a departure that has reached the newcomer's devices and not yet the inviter's is not left standing — and send the pod's created event, write the invite act, which records the newcomer as a member — a plain member, no owner — and hand it the write tickets of both stores, each naming the inviting device and every other device of the inviter the inviting device knows an address of, so a newcomer whose inviting device goes away can reach the inviter's others where no address lookup resolves a node id. The newcomer SHALL refuse an offer whose created event does not derive the invited pod id or does not verify, or whose sequence lies more than one past its own history, the run it reported, and SHALL refuse tickets to any stores but the two that created event names, and tickets to a store it holds in another role, so it signs nothing over a sequence it has not reached and records no store under a pod id the inviter misnames, nor a pod its import would refuse. The dialogue SHALL carry the newcomer's join statement, signed over that sequence and the joining device by the joining steps of the [pod stores](../../data-layer/pod-store/spec.md) spec, which the inviter writes as the invite act into the replica of the identity the secret was minted for; the device it names is the newcomer's from then on, so the inviter serves the newcomer's first session. The inviter SHALL write the invite act before it hands over the tickets, and the newcomer's device SHALL record both tickets and the pod's PMS entry before it imports the pod's stores, so the armer's sweep finishes a join that a dropped connection, a dropped `join` future or a restart interrupts anywhere past the dialogue. A secret presented by an identity the pod already lists as a member SHALL write no joined event: the inviter hands over both tickets again, and the dialogue carries instead the member's statement at version 0 naming the presenting device alone, which the inviter writes when the member's device list does not name that device, since member devices serve no device the member's statements do not list. Between two identities of one node the dialogue SHALL run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), the secret verified and burned as between two nodes. A refused presentation — wrong, expired or already burned — SHALL leave no observable state and SHALL NOT burn a live pending invite, and refusals SHALL be uniform. A failure of the inviter's own storage once the secret burned SHALL reach a newcomer on another node as that same uniform refusal, and SHALL be logged on the inviter with the identity, the pod and the step it cut short; between two identities of one node it SHALL reach the joining caller as the storage failure itself, since nothing there is hidden from anyone. After joining, the newcomer's device holds the store, catches up on its existing content, and every member's devices list the newcomer.
 
 **Example:** Bob's phone b1 mints an invite to "Family" as Bob — a format version, b1's node address, the secret and `ad58a3faa04cdc5576c8dc5823a347c6`, no ticket — and Bob hands it to Carol; three presentations follow.
 
 | presented to b1 | b1 |
 |---|---|
 | a secret b1 never minted | refuses; nothing is written, and the pending invite stays live |
-| the invite's secret, by Carol's phone c1 | burns it, then writes into Bob's replica Carol's joined event, a plain member, and her device statement, and hands c1 both stores' write tickets; `join` on c1 returns caught up |
+| the invite's secret, by Carol's phone c1 | burns it, then writes into Bob's replica Carol's joined event, a plain member, its join statement naming c1, and hands c1 both stores' write tickets, each naming b1 and Bob's laptop b2, whose address b1 knows; `join` on c1 returns caught up |
+| had b1 been modified, offering Carol sequence 3, or Wedding's created event, or Wedding's tickets | c1 refuses: it signs nothing past its own history, records nothing, and `join` fails with a refusal |
 | the same secret again | refuses, as it refused the never-minted one |
 
 #### Scenario: A newcomer joins and catches up
 
 - **WHEN** a member invites and a hosted identity on another runtime joins with the invite
 - **THEN** the newcomer reads the entries written before it joined, and the inviter's and the newcomer's devices both list the newcomer among the members
+
+#### Scenario: A newcomer reaches the inviter's other device once the inviting device is gone
+
+- **WHEN** a newcomer joined through one device of the inviter, that device stops, and another device of the inviter places a record
+- **THEN** the newcomer reads it: the tickets the join handed over name that other device with its address
 
 #### Scenario: An invited member invites in turn
 
@@ -160,15 +172,45 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 - **WHEN** C leaves the pod, and a member's device whose replica does not yet hold C's left event invites C again
 - **THEN** the inviter names a sequence past C's left event and writes C's joined event there, and C's join returns caught up with C a plain member
 
+#### Scenario: A former member whose departure reached the device through its PMS alone joins again
+
+- **WHEN** C leaves the pod on one device, which stops before its left event reaches C's other device or any member's, C's PMS carries the departure to the other device, and a member invites C there
+- **THEN** the inviter writes C's joined event past the departure the PMS records, and C's other device lists the pod and holds its record store
+
 #### Scenario: A catch-up the join lost is finished by the armer
 
-- **WHEN** a newcomer's device has received both tickets in the join dialogue, and its connection drops during the catch-up, or its caller drops the `join` future then, or its runtime restarts then
+- **WHEN** a newcomer's device has received both tickets in the join dialogue, and its connection drops, its caller drops the `join` future or its runtime restarts, before it has imported the pod's stores or during their catch-up
 - **THEN** the device holds both tickets and the pod's PMS entry, and the armer's next sweep opens the pod and catches it up with no second invite
 
 #### Scenario: A member whose join lost the reply joins through a second invite
 
 - **WHEN** the connection drops after the inviter wrote newcomer C's joined event and before its reply reached C, and C then presents a second invite
 - **THEN** the second dialogue writes no joined event and hands C both tickets, C catches up, and every member device lists C by the one joined event
+
+#### Scenario: A storage failure after the burn reaches the caller on the inviter's node
+
+- **WHEN** the inviter's write of the joined event fails once the secret burned, first for an identity of the inviter's own node joining and then for a newcomer on another node
+- **THEN** the identity on the inviter's node is answered with the storage failure, the newcomer on the other node with the uniform refusal, and a later invite joins the first
+
+#### Scenario: An offer past the joiner's history is refused
+
+- **WHEN** an inviting device offers newcomer C a sequence more than one past C's own history
+- **THEN** C's join is refused, C signs and records nothing, and no joined event of C's reaches the inviter's replica
+
+#### Scenario: An offer naming another pod's created event is refused
+
+- **WHEN** an inviting device offers newcomer C the created event of another pod than the one the invite names
+- **THEN** C's join is refused before C signs anything, and C records nothing
+
+#### Scenario: Tickets to stores the created event does not name are refused
+
+- **WHEN** an inviting device hands newcomer C tickets to stores other than the two the pod's created event names
+- **THEN** C imports and records nothing and holds no store under the pod's id, and a later honest invite brings C the pod
+
+#### Scenario: A member reaches the pod from an unlisted device through an invite
+
+- **WHEN** member B's one listed device never received the pod, and B presents an invite from another device no statement of B's lists
+- **THEN** the dialogue writes B's statement at version 0 naming that device, and the device catches up and reads the pod
 
 #### Scenario: A wrong secret burns nothing
 
@@ -182,7 +224,7 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 
 ### Requirement: A pod reaches a member's other devices
 
-A pod created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's PMS carries what its other devices need to open both stores — the announcement key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the pod from its PMS registers itself: once its replica of the membership store folds the member, and at every later change to that store and every run of the pod stores' pass, it SHALL check that the member's device list, as the [pod stores](../../data-layer/pod-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store. An identity that is no member SHALL NOT reach the pod, a co-located one on a member's node included: it lists no such pod, and its calls on the pod fail with the unknown-pod error.
+A pod created or joined on one device of an identity SHALL become reachable from that identity's other devices without a second join: the identity's PMS carries what its other devices need to open both stores — the identity key pair beside their tickets, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays them out — and a device that opens the pod from its PMS registers itself: once the membership view of its replica lists the member, and at every later change to that store and every run of the pod stores' pass, it SHALL check that the member's device list, as the [pod stores](../../data-layer/pod-store/spec.md) resolve it, names it with the author its identity writes with there, and when it does not SHALL write the next version — that list with itself added — into the membership store, and SHALL reconcile the membership store with the other members' devices at once, since its siblings can be gone before any of them took the statement; a device whose replica two runs in a row of the pod stores' pass find holding nothing SHALL write version 1 naming itself alone, which counts beside every other statement of the member, and reach the devices its tickets name with it. An identity that is no member SHALL NOT reach the pod, a co-located one on a member's node included: it lists no such pod, and its calls on the pod fail with the unknown-pod error.
 
 **Example:** Alice-leisure's PMS once she has created "Family" on her phone a1, and what Alice's tablet a3, linked into Alice-leisure and hosting Alice-work too, does with it, Alice-work being no member of "Family"; `<alice-leisure>`: 64 lowercase hex chars of Alice-leisure's `PdnId`.
 
@@ -190,16 +232,21 @@ A pod created or joined on one device of an identity SHALL become reachable from
 pods/ad58a3faa04cdc5576c8dc5823a347c6/1                       the pod's record at the created event, Alice-leisure's sequence 1
 tickets/pod/ad58a3faa04cdc5576c8dc5823a347c6/membership       the membership store's write ticket
 tickets/pod/ad58a3faa04cdc5576c8dc5823a347c6/records          the record store's write ticket
-announcement-key                                              Alice-leisure's announcement key pair, minted with her
+identity-key                                                  Alice-leisure's identity key pair, minted with her
 
 a3 opens both stores from these tickets and writes member/<alice-leisure>/devices/2 — a1 and a3 — into the membership store
-Alice-work's PMS holds no pods/ entry and no tickets/pod/ kind for Family, and an announcement-key of her own: list answers no such pod for Alice-work, and her read of Family fails with the unknown-pod error
+Alice-work's PMS holds no pods/ entry and no tickets/pod/ kind for Family, and an identity-key of her own: list answers no such pod for Alice-work, and her read of Family fails with the unknown-pod error
 ```
 
 #### Scenario: A linked device reaches the pod
 
 - **WHEN** identity B joins a pod on its phone while B's laptop is linked into B
 - **THEN** the laptop eventually lists the pod, reads its entries, and its own device is served by the other members
+
+#### Scenario: A linked device whose sibling is gone reaches the pod
+
+- **WHEN** member C's new device takes the pod from C's other device, which stops before the new device's statement reaches any member's device, and a member device stays reachable
+- **THEN** the new device writes its statement, the member device takes it from the new device's own dial, and the new device reads what members place afterwards
 
 #### Scenario: A device a later version missed stays listed
 
@@ -256,6 +303,11 @@ A created pod SHALL record its creating identity as the pod's first owner. An ow
 - **WHEN** owners A and B both own the pod and A attempts to demote itself
 - **THEN** the attempt is refused with a typed error and every member still lists A among the owners
 
+#### Scenario: A removed member joins again through a member whose chain ran on
+
+- **WHEN** member C is removed, member B is promoted afterwards, and B invites C again
+- **THEN** C's device takes its new joined event and the point of B's chain it names, joins, every member lists C as a plain member, and C reads the record placed while it was out
+
 #### Scenario: A former owner joins again as a plain member
 
 - **WHEN** owner B is removed, a member invites B again and B joins, and B then attempts to promote a member
@@ -263,7 +315,7 @@ A created pod SHALL record its creating identity as the pod's first owner. An ow
 
 ### Requirement: Only an owner removes a member, and only another member; leaving is forgetting
 
-Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a removal by a member that is no owner, and a removal of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a pod that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a pod leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the pod then has no owner. A removed event replicates like every pod entry; the remaining members' devices refuse the removed member's devices the record store from the next session and serve them the membership store up to the removal, per the pod stores' rules; a device of the removed member that learns of the removal SHALL tombstone the pod's record in its PMS at the removed event's sequence, forget the record store and keep the membership store as the pod's tombstone. A member that leaves SHALL tombstone the pod's record in its PMS at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the pod's tombstone, so the pod is no longer listed there, while the remaining members, a co-located member of the same pod among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the pod. Before it writes its left event, the leaving device SHALL reconcile both stores with devices of the pod's other members and wait up to 10 seconds for a session with one of them, begun after the flush started, to go through on each store, since nothing outside the departure's past leaves the device once it departs; a leave that reaches no member's device in that time SHALL proceed all the same, and what no member's device held by then is lost.
+Removing a member — an owner or a plain member alike — SHALL be available only to an owner's device and only on another member: a removal by a member that is no owner, and a removal of oneself, SHALL be refused with a typed error and change no state — a member's own way out is leaving. A leave by the one owner of a pod that has other members SHALL be refused with a typed error and change no state until another member is an owner; the one member of a pod leaves as any member does. The refusal runs on the writing device, so two leaves the last two owners write while disconnected from each other both stand, and the pod then has no owner; so do removals that owners disconnected from one another write of one another, two of them each the other or any number in a circle, since a removal of an owner is refused only by the role of its actor. A removed event replicates like every pod entry; the remaining members' devices refuse the removed member's devices the record store from the next session and serve them the membership store up to the removal, per the pod stores' rules; a device of the removed member that learns of the removal SHALL tombstone the pod's record in its PMS at the removed event's sequence, forget the record store and keep the membership store as the pod's tombstone. Whether a device holds a pod's record store SHALL follow the highest record of the pod its identity's PMS holds while the device's replica of the membership store holds the identity's chain short of that record's sequence, and the membership view from there on: a device whose membership view shows its member's departure reversed by a later event SHALL hold the record store again, from the tickets its PMS keeps, without a new invite, and a device holding the record store whose membership view shows the departure SHALL forget it. `list` SHALL answer the pods whose record store the device holds for the identity and those its PMS holds that the device has not opened. A member that leaves SHALL tombstone the pod's record in its PMS at the sequence of its left event, as the [private metadata store](../../data-layer/private-metadata-store/spec.md) lays the records out, and forget the record store on its own devices, keeping the membership store as the pod's tombstone, so the pod is no longer listed there, while the remaining members, a co-located member of the same pod among them, are unaffected and everything the member wrote — its records, its operations on other members' mergeable-documents — stays in the pod. Before it writes its left event, the leaving device SHALL reconcile both stores with devices of the pod's other members and wait up to 10 seconds for a session with one of them, begun after the flush started, to go through on each store, and then for the device whose session ended the last store to hold every payload the entries of the member's devices reference, as long beyond those 10 seconds as the bytes that device lacks take at 1 Mbit/s, since nothing outside the departure's past leaves the device once it departs; a leave that reaches no member's device in that time SHALL proceed all the same, and what no member's device held by then is lost. Once its left event is written, a leaving device whose flush reached a member SHALL reconcile the tombstone with devices of the other members and wait for that session the same way before the leave returns, so that a device that stops at once is not listed as a member.
 
 **Example:** removals and a leave in "Wedding", in this order: Erin is an owner, Bob, Dave, Alice-leisure and Alice-work plain members, and Alice's tablet a3 hosts Alice-leisure and Alice-work; `Wedding` stands for its pod id.
 
@@ -273,6 +325,7 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 | `act(Erin, Wedding, Remove(Erin))` | a typed error, nothing written |
 | `act(Erin, Wedding, Remove(Dave))` | written: Dave's devices are refused the record store from their next session with each member device the removed event has reached, and learn of the removal from the membership store |
 | `act(Erin, Wedding, Leave)` | a typed error, nothing written: Erin is the one owner, and the pod has other members |
+| `put_record(Bob, Wedding, ImmutableDocument, scan)` of 12,000,000 bytes on a 1 Mbit/s link, then `act(Bob, Wedding, Leave)` | the leave returns once a device of another member holds the scan, up to 96 s after its sessions, and once that device has taken Bob's left event |
 | `act(Alice-work, Wedding, Leave)` on a3 | her left event written at her sequence 2 and `pods/f942dfc21acd0218d48f61f714ddfff3/2` tombstoned in her PMS; the record store forgotten for Alice-work on a3, and on each of her other devices once her PMS syncs there, the membership store kept as the pod's tombstone, while Alice-leisure's replicas on a3 go on; her records and operations stay in the pod |
 
 #### Scenario: An owner removes a member
@@ -284,6 +337,11 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 
 - **WHEN** owner A promotes B, B removes C, A demotes B, B attempts to remove D, A promotes B again, and B removes D
 - **THEN** B's first and last removals are written, the attempt between them is refused with a typed error, and every remaining member lists A and B as owners and neither C nor D as a member
+
+#### Scenario: A member whose removal stops counting holds the pod again
+
+- **WHEN** owner B, promoted by owner A, removes member D, D's device learns of the removal and keeps the pod's tombstone, and owner C's removal of B, written concurrently with B's promotion, then reaches the pod
+- **THEN** every member lists D as a plain member, D's device lists the pod again with no new invite, reads the records placed meanwhile and places one every member reads, and B's devices list no such pod
 
 #### Scenario: A plain member removes nobody
 
@@ -310,6 +368,11 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 - **WHEN** A and C, a pod's only owners, leave while disconnected from each other, and plain member B's device then reconciles with both
 - **THEN** B's device lists no owner, B reads and appends to the pod's mergeable-documents, and B's removal of a member and promotion of itself are refused with a typed error
 
+#### Scenario: The last two owners removing each other leave the pod without an owner
+
+- **WHEN** A and C, a pod's only owners, remove each other while disconnected from each other, and plain member B's device then reconciles with both
+- **THEN** B's device lists neither A nor C as a member and no owner, and B's removal of a member and promotion of itself are refused with a typed error
+
 #### Scenario: A member leaves
 
 - **WHEN** C leaves the pod from one of its devices
@@ -324,6 +387,11 @@ Removing a member — an owner or a plain member alike — SHALL be available on
 
 - **WHEN** member C places a claim, appends an operation to A's mergeable-document and leaves at once, a device of A being reachable
 - **THEN** every remaining member reads C's claim and C's operation
+
+#### Scenario: What a member wrote just before its leave reaches the pod though its device stops at once
+
+- **WHEN** member C places a claim whose payload takes longer to fetch than the leave's sessions, leaves, and C's device stops as soon as the leave returns, a device of A being reachable
+- **THEN** A reads C's claim and lists C as no member
 
 #### Scenario: A promotion just before the one owner's leave reaches the pod
 
@@ -370,7 +438,7 @@ The pods service SHALL place a record as one of three kinds — claim, mergeable
 
 ### Requirement: Hosted pods survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every pod its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's pods end with the process. The hosted pods SHALL be re-derived from each hosted identity's PMS, as its connections are: every pod whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the pod's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no pod.
+A directory-configured runtime SHALL host again, after a restart, every pod its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's pods end with the process. The hosted pods SHALL be re-derived from each hosted identity's PMS: every pod whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the pod's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no pod.
 
 **Example:** Alice's tablet a3 runs on a storage directory and hosts Alice-leisure and Alice-work, both members of "Wedding"; Alice-work left a second pod, `684aad236ce530cd7b5dedb6ab6b755a`, before a3 stops.
 

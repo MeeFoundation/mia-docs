@@ -46,7 +46,7 @@ Formatting is the workspace's: `cargo fmt --all` under `rustfmt.toml`, verified 
 
 `just check` lints the workspace under default features, which is the store's default feature set too; `just test` runs its tests under those features as it runs every crate's. What neither compiles — every feature, no feature, the wasm32 target — is the store's own concern and gets its own recipes: `check-store` (clippy on the two other sets with warnings denied, rustdoc with warnings denied, the featureless build for `wasm32-unknown-unknown` with `getrandom_backend="wasm_js"` named through `RUSTFLAGS`, where it is unavoidable), and `test-store` (nextest on the two other sets, then the doctests under every feature). Both join `precommit-check` and `fix`, and the pipeline runs them in a `store` job beside the workspace's job rather than inside it, so the two extra builds of the iroh stack run in parallel with the workspace's instead of after it.
 
-Alternative considered: folding both into `just check` and `just test`. It would keep two recipes fewer at the price of three more builds of the iroh stack on every inner-loop run, for configurations only the store has.
+Alternative considered: merging both into `just check` and `just test`. It would keep two recipes fewer at the price of three more builds of the iroh stack on every inner-loop run, for configurations only the store has.
 
 `cargo docs-rs` on nightly is not carried. The crate denies `missing_docs` and `rustdoc::broken_intra_doc_links` at its root, and `cargo doc` on stable with `RUSTDOCFLAGS=-Dwarnings` catches the rest of what the nightly run caught — an intra-doc link to a private item among them.
 
@@ -72,7 +72,7 @@ Not carried from the pipeline: cross and android builds, semver checks and the M
 
 ### Operating conditions
 
-None of the conditions in [operating-conditions](../../specs/code-practices/operating-conditions.md) change the outcome of this change: no behaviour of the runtime, the data layer, or the store moves. Several identities, several devices, linking, an unstable connection, a full disk, a restart, capabilities granted and revoked — each is handled by code this change copies byte for byte and builds from a different path. The tests that back them are the same tests, run by the same runner under the same feature set, plus the configurations the store's pipeline was meant to run.
+None of the conditions in [operating-conditions](../../specs/code-practices/operating-conditions.md) change the outcome of this change: no behaviour of the runtime, the data layer, or the store moves. Several identities, several devices, linking, an unstable connection, a full disk, a restart, a membership that moves — each is handled by code this change copies byte for byte and builds from a different path. The tests that back them are the same tests, run by the same runner under the same feature set, plus the configurations the store's pipeline was meant to run.
 
 ## Risks / Trade-offs
 
@@ -81,7 +81,7 @@ None of the conditions in [operating-conditions](../../specs/code-practices/oper
 - [The lock file grows by about 60 packages, the store's development dependencies among them `iroh`'s test utilities] → Development profile only: the image's dependency stage cooks normal dependencies, and a product build resolves none of them.
 - [The store's tests bind every interface, where the workspace's bind loopback through `PDN_BIND_ADDR`] → The store's tests are kept as they are; the variable is the data layer's. On a development machine the per-process startup cost the workspace's tests avoid applies to the store's, which the measured figures include.
 - [Upstream tracking becomes a manual patch] → Accepted with D1; the alternative was offered.
-- [Records and notes that name the store's repository] → ADR-0008 stays as written, a record of where its facts were verified. The active change `mobile-demo-app` is swept. Private notes are outside the tree.
+- [Records and notes that name the store's repository] → the ADR that named it as the place its facts were verified is obsolete, its text in git history. Private notes are outside the tree.
 
 ## Migration Plan
 

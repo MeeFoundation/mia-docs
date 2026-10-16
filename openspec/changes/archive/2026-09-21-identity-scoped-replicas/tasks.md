@@ -4,7 +4,7 @@ Scope: a hosted identity owns its own replicas, author and sessions over the nod
 
 ## 1. Vocabulary and decision record
 
-- [x] 1.1 The vocabulary of the wire value — the 32 opaque bytes pdn-store compares to tell whose replica a session addresses and whom its caller acts for, filled with a hosted identity's `PdnId` — stated where it is used, in the identity-scoped replicas spec. A glossary entry of its own carried a word the code has since dropped and was folded back in
+- [x] 1.1 The vocabulary of the wire value — the 32 opaque bytes pdn-store compares to tell whose replica a session addresses and whom its caller acts for, filled with a hosted identity's `PdnId` — stated where it is used, in the identity-scoped replicas spec. A glossary entry of its own carried a word the code has since dropped and was merged back in
 - [x] 1.2 ADR-0013 stands as the decision record for the level of isolation; verified by the proposal, the design and the new capability spec citing it and by no other ADR contradicting it after the sweep in 8.3
 
 ## 2. pdn-store: the protocol boundary

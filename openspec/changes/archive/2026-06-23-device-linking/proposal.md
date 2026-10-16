@@ -7,7 +7,7 @@ The private metadata store is the bootstrap **private metadata store (PMS)** for
 ## What Changes
 
 - **`SyncNode::node_id()`** — expose a node's on-the-wire identifier (its iroh endpoint id) as a `pdn_types::NodeId`, so a device can register itself.
-- **`link_device(node, identity, seed, timeout) -> LinkedStores`** — a procedure that imports the private metadata store from `seed`, registers this device in it, then discovers the connections-store ticket from the PMS and imports the connections store. Extensible to the remaining stores; returns the imported stores as a bundle.
+- **`link_device(node, identity, seed, timeout) -> LinkedStores`** — a procedure that imports the private metadata store from `seed`, registers this device in it, then discovers the tickets of the identity's other stores from the PMS and imports them; returns the imported stores as a bundle.
 - **Device self-registration** — a linking device adds its own `node_id` to the PMS; the device set is therefore bidirectional (the existing device sees the new one).
 - **Rewrite the two-device test** to drive `link_device` from a single seed and assert the bidirectional device set (both devices appear, on both sides) plus convergence on a discovered store's data.
 

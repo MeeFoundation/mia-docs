@@ -381,4 +381,4 @@ Whether a joiner's first session is reported is no access matter: no party gains
 
 ## Open Questions
 
-- How the contradiction with `mobile-host-surface` and `mobile-demo-app` is written down: a qualifier added in those changes before they archive, or MODIFIED deltas here after they have. Either keeps what ships unchanged; the person approving this change chooses.
+- How the contradiction with `mobile-host-surface` is written down: a qualifier added in that change before it archives, or MODIFIED deltas here after it has. Either keeps what ships unchanged; the person approving this change chooses.

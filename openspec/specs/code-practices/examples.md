@@ -14,7 +14,7 @@ An example that would be contrived is left out: a ranking of values, a checklist
 
 ## What makes it an example
 
-One case, a few rows, the outcome stated. Real values as the code has them — `grants/<issuer-hex>`, 8,192 bytes, HTTP 409 — and people with their roles, Alice (issuer) and Bob (read grant); never `id1` or `foo`. Checked against the code as a scenario is, because the example is the part that gets read.
+One case, a few rows, the outcome stated. Real values as the code has them — `member/<carol>/1/joined/<bob>/2`, 8,192 bytes, HTTP 409 — and people with their roles, Alice (owner) and Bob (plain member); never `id1` or `foo`. Checked against the code as a scenario is, because the example is the part that gets read.
 
 In a document an example opens with `**Example:**` and the case in one sentence, so a reader skimming and an agent parsing both tell it from the rule beside it. A table is a markdown table, with identifiers, keys and anything holding `<`, `>`, `*` or `_` in backticks and every `|` in a pod escaped; any other shape is a fenced block.
 
@@ -22,12 +22,13 @@ The shape is whatever puts this case in front of the reader fastest, chosen fres
 
 Three of them, for the level of detail:
 
-**Example:** who may read and write Alice's namespace.
+**Example:** who may do what in Alice's pod "Family".
 
-| operation | Alice (issuer) | Bob (read grant) | Dave (ticket, no capability) | Carol (outsider) |
+| operation | Alice (owner) | Bob (plain member) | Dave (tickets, removed) | Carol (outsider) |
 |---|---|---|---|---|
-| read | allowed | allowed | denied | denied |
-| write | allowed | denied | denied | denied |
+| read a record | allowed | allowed | denied | denied |
+| place a claim under one's own name | allowed | allowed | denied | denied |
+| remove a member | allowed | denied | denied | denied |
 
 **Example:** the frame b1 sends when it declines a session over a namespace it already syncs.
 
@@ -37,11 +38,11 @@ encoded as:    00 00 00 02 02 01
 encodes:       frame length 2 (u32 big-endian), Message variant 2 = Abort, AbortReason variant 1 = AlreadySyncing
 ```
 
-**Example:** Bob narrows Alice's grant from the claims `contact/email` and `contact/phone` to `contact/email` while a session is under way.
+**Example:** Alice removes Bob from "Family" while a session on its record store is under way.
 
-| t | Bob (issuer) | session S1, b1 → a1 | session S2, b1 → a1 |
+| t | Alice (owner) | session S1, a1 → b1 | session S2, a1 → b1 |
 |---|---|---|---|
-| t0 | | set up: Alice reads email and phone | |
-| t1 | narrows Alice's grant to email | still serves email and phone | |
-| t2 | | ends; a1 keeps phone | |
-| t3 | | | set up: email only |
+| t0 | | set up: Bob's phone reads the record store | |
+| t1 | removes Bob | still serves the record store | |
+| t2 | | ends; b1 keeps what it received | |
+| t3 | | | refused |

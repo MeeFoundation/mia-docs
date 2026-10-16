@@ -28,25 +28,19 @@ The constraint that shapes this design: the harness is a test, and a test is wor
 
 ### D1. Routes are identity-first, and their names are the host's own business
 
-Every runtime operation but node status is scoped by a hosted identity or a data issuer, so the identity rides in the path: `/debug/identities`, `/debug/identities/{identity}/invite`, `/debug/identities/{identity}/connections`, `/debug/identities/{identity}/grants/{peer}`, `/debug/data/{issuer}/{path}`. `PdnId` is hex `Display` and `FromStr` already, so the path segment parses without a helper.
+Every runtime operation but node status is scoped by a hosted identity, so the identity rides in the path: `/debug/identities`, `/debug/identities/{identity}/linking-invite`, `/debug/identities/{identity}/pods`, `/debug/identities/{identity}/pods/{pod}/records`. `PdnId` is hex `Display` and `FromStr` already, so the path segment parses without a helper.
 
 Alternative — identity in the request body for every call — was rejected because it hides the most common denial: an operation addressing an identity this runtime does not host. In the path it is one uniform parse-then-refuse for every route; in the body it is a field each handler must remember to read.
 
-### D2. Structured values travel as JSON; entry payloads travel as raw bodies
+### D2. Structured values travel as JSON; record payloads travel as raw bodies
 
-A write puts the request body's bytes into the entry; a read returns the entry's bytes as the response body. No base64, no JSON string escaping, no encoding to agree on. Alternative — base64 inside a JSON envelope, uniform with everything else — was rejected because it inserts a transformation between the bytes written and the bytes read, and a replication test that fails then fails ambiguously: the transform is as likely a suspect as the sync.
+A placement puts the request body's bytes into the record; a read returns the record's bytes as the response body. No base64, no JSON string escaping, no encoding to agree on. Alternative — base64 inside a JSON envelope, uniform with everything else — was rejected because it inserts a transformation between the bytes written and the bytes read, and a replication test that fails then fails ambiguously: the transform is as likely a suspect as the sync.
 
-Listings, grants, and the identity list are JSON, built from types that already derive serde (`EntryInfo`, `GrantedClaim`, `ReadGrant`); the ceremony payloads are JSON too, but pass through as opaque values (D3).
+Listings and the identity list are JSON, built from types that already derive serde (`RecordRef`, the pod's members); the ceremony payloads are JSON too, but pass through as opaque values (D3).
 
 ### D3. Ceremony payloads cross the surface as opaque tokens
 
-`invite` returns the payload and `establish` takes it back, but the host does not read inside it: the payload is serialized once by the runtime's own serde form and travels as a value the host passes through untouched. The product form is a QR the human moves from one screen to the other, and this is that move — the harness copies a token between containers exactly as a person copies the code, and neither the host nor the test comes to depend on which fields the payload has. Alternative — a typed body mirroring `InvitePayload` field by field — was rejected for pinning an internal shape into a test's arrange step, where a later field change would break the harness for no reason the harness cares about.
-
-### D4. A grant read returns the capability, and no ticket crosses the surface at all
-
-`read_grants` yields the capability and the replica's ticket together. The surface returns the capability — issuer, claims, commands — and drops the ticket, and the out-of-band `share` and `import` stay off the surface entirely (proposal, out of scope).
-
-The reason is not primarily that a ticket is bearer material, though it is. It is that the runtime binds a granted namespace by itself as the grant record replicates — the core spec's requirement that grants bind and unbind with their record — so a harness never needs a ticket to make a grant work. Offering one anyway would let the harness arrange the granted namespace by importing it, and a scenario arranged that way keeps passing after the binder breaks: the read returns the right value, obtained by a path the product does not use. Withholding the ticket is what makes the container scenario a test of the grant path rather than of the import route.
+`linking-invite` returns the payload and `link` takes it back, as a pod's `invites` and `join` do, but the host does not read inside it: the payload is serialized once by the runtime's own serde form and travels as a value the host passes through untouched. The product form is a QR the human moves from one screen to the other, and this is that move — the harness copies a token between containers exactly as a person copies the code, and neither the host nor the test comes to depend on which fields the payload has. Alternative — a typed body mirroring `LinkingPayload` field by field — was rejected for pinning an internal shape into a test's arrange step, where a later field change would break the harness for no reason the harness cares about.
 
 ### D5. The surface has no convenience the product lacks
 
@@ -56,17 +50,17 @@ What remains for waiting is repeating the read, which is honest: it is what an a
 
 ### D6. Refusal legibility is inherited, not built here
 
-The error table below rests on two typed markers — `EstablishmentRefused` and `LinkingRefused` — that `product-path-gaps` adds to `pdn-node`. Before them, a refused ceremony and an unreachable peer arrive as the same untyped error, and neither mapping choice is acceptable: map every ceremony error to a client error and a dead peer container reads as a refusal, so the deny test passes for the wrong reason; map them all to a server error and the deny test cannot assert anything at all.
+The error table below rests on typed refusal markers — `LinkingRefused`, and `JoinRefused` beside it — in `pdn-node`. Before them, a refused ceremony and an unreachable peer arrive as the same untyped error, and neither mapping choice is acceptable: map every ceremony error to a client error and a dead peer container reads as a refusal, so the deny test passes for the wrong reason; map them all to a server error and the deny test cannot assert anything at all.
 
-Their contract, which this design relies on and does not restate: reasonless, downcastable from the service call's `anyhow::Error`, meaning "the dialogue reached the point of the answer and none came". What they deliberately do not separate — a genuine refusal from a connection that died mid-dialogue — is argued in that change; here it matters only that the deny tests' negative case is a deliberate replay against a live peer, which lands squarely on the refusal.
+Their contract, which this design relies on and does not restate: reasonless, downcastable from the service call's `anyhow::Error`, meaning "the dialogue reached the point of the answer and none came". What they deliberately do not separate is a genuine refusal from a connection that died mid-dialogue; here it matters only that the deny tests' negative case is a deliberate replay against a live peer, which lands squarely on the refusal.
 
 ### D7. Ceremony calls block their request; `link`'s wait is a query parameter
 
-`establish` and `link` run a network dialogue that takes seconds, and `link` additionally waits for catch-up under a caller-supplied timeout. The handlers await them and answer when they are done; `link` takes the timeout as a query parameter with a default. Alternative — accept, return 202, poll a job id — was rejected: it invents host state and a job lifecycle for a stand whose callers are a test and a shell script, both of which are happy to wait.
+`link` and `join` run a network dialogue that takes seconds, and `link` additionally waits for catch-up under a caller-supplied timeout. The handlers await them and answer when they are done; `link` takes the timeout as a query parameter with a default. Alternative — accept, return 202, poll a job id — was rejected: it invents host state and a job lifecycle for a stand whose callers are a test and a shell script, both of which are happy to wait.
 
 ### D8. Nothing waits for replication on the server side
 
-Reading a peer's grants or a replicated entry can legitimately return "not yet": the record is there and the payload is still arriving, or the reconciliation has not run. The surface reports what the runtime reports right now — empty list, or 404 for an absent entry — and the caller polls. Long-polling would mean the host inventing a waiting semantic the runtime does not have, and would hide the difference between "slow" and "never" precisely where the harness needs to see it.
+Reading a replicated record can legitimately return "not yet": the entry is there and the payload is still arriving, or the reconciliation has not run. The surface reports what the runtime reports right now — empty list, or 404 for an absent record — and the caller polls. Long-polling would mean the host inventing a waiting semantic the runtime does not have, and would hide the difference between "slow" and "never" precisely where the harness needs to see it.
 
 ### D9. The error table is closed and its default is 500
 
@@ -74,16 +68,16 @@ Handlers downcast the `anyhow::Error` against a fixed list and map each to a sta
 
 | Error                                                                       | Status | Reading                                          |
 | --------------------------------------------------------------------------- | ------ | ------------------------------------------------ |
-| `EstablishmentRefused`, `LinkingRefused`, `WriteNotGranted`, `DelegationUnsupported` | 403    | the runtime's rules said no                      |
-| `UnknownIdentity`, `data_layer::UnknownIssuer`                              | 409    | the runtime does not host what you addressed     |
-| `UnsupportedInviteVersion`, `UnsupportedLinkingVersion`, a malformed body or path | 400    | the request itself is wrong                      |
-| an unknown query parameter, an empty entry payload                          | 400    | the request itself is wrong, decided by the host |
-| an absent entry                                                             | 404    | nothing is there                                 |
+| `LinkingRefused`, `JoinRefused`, `ActRefused`, `RecordPlacedOnce`           | 403    | the runtime's rules said no                      |
+| `UnknownIdentity`, `UnknownPod`                                             | 409    | the runtime does not host what you addressed     |
+| `UnsupportedLinkingVersion`, `UnsupportedPodInviteVersion`, a malformed body or path | 400    | the request itself is wrong                      |
+| an unknown query parameter, an empty record payload                         | 400    | the request itself is wrong, decided by the host |
+| an absent record                                                            | 404    | nothing is there                                 |
 | anything unrecognized                                                       | 500    | the host does not know what happened             |
 
 An unhosted identity is 409 rather than the more natural 404 for one reason: route names are unpinned, so a test asserting 404 for an unhosted identity would keep passing after a route was renamed out from under it. Separating "the runtime refused you" from "this host serves no such route" costs one status code and buys a deny test that cannot pass by accident.
 
-Two statuses the host decides without a downcast are worth naming, because both would otherwise land on the 500 default and read as a host bug. An empty entry payload is one: the engine keeps no zero-length entry, so the write fails with an error the table cannot name, and the request that caused it is simply wrong. An unknown query parameter is the other, and it is refused rather than ignored for the reason the bind resolution fails on an unparseable value — a mistyped `lifetime_secs` that fell back to the default would mint an invite with a lifetime nobody asked for, and a mistyped listing prefix would widen a listing back to the whole namespace, with nothing in either answer saying so.
+Two statuses the host decides without a downcast are worth naming, because both would otherwise land on the 500 default and read as a host bug. An empty record payload is one: the engine keeps no zero-length entry, so the placement fails with an error the table cannot name, and the request that caused it is simply wrong. An unknown query parameter is the other, and it is refused rather than ignored for the reason the bind resolution fails on an unparseable value — a mistyped `lifetime_secs` that fell back to the default would mint an invite with a lifetime nobody asked for,, with nothing in the answer saying so.
 
 The 500 default is deliberately the pessimistic one: an unmapped error is a host that does not understand what happened, and reporting that as a clean refusal is the laundering this whole design exists to prevent. The unreachable-peer case rides that default — it needs no type of its own, because 500 against 403 is already the distinction the deny test rests on.
 
@@ -121,8 +115,6 @@ The router limits entry bodies to 16 MiB and admits at most 16 concurrent debug 
 - **The harness depends on unpinned route names** → the harness lives in this repo and moves with the routes; nothing outside the repo may depend on them, which the spec says in as many words.
 - **A closed error table drifts as the runtime grows new typed errors** → the drift is visible: a new typed refusal that nobody mapped shows up as 500 in a deny test, which fails loudly rather than passing quietly.
 - **Blocking handlers hold a connection for the length of a dialogue** → acceptable at stand scale; `link`'s timeout bounds the longest of them, and the runtime lock is never held across a network round trip, so a slow dialogue does not freeze the other routes.
-- **Removing `share` and `import` from the surface may block a fixture nobody has written yet** — the scale measurements will want to plant a large namespace cheaply → they are absent, not deleted: the service keeps them, and a fixture that needs them argues for its route then, on its own terms.
-- **Multiple identities co-hosted on one node, including an issuer and its own grant audience, is a supported configuration** — reachable only via a connection made while apart, then a link that brings one of them onto the other's node → the grant-courtesy check and the revoke path both exempt a hosted identity's own namespace unconditionally: a hosted issuer's writes are never judged by a grant it made, and withdrawing a grant toward a co-hosted audience never forgets the issuer's own namespace. The container harness reaches this configuration whenever it links a device onto a node that already hosts a grant's audience, which is the cheaper way to assemble a two-identity stand.
 
 ## Migration Plan
 
@@ -130,5 +122,4 @@ The HTTP routes remain additive and gated by `PDN_DEBUG=1`. Review remediation a
 
 ## Open Questions
 
-- **Retraction verdicts over HTTP** — server-sent events, or polling with a cursor and a bounded buffer? Deferred with the subscription itself; the write-retraction scenarios stay in-process until then.
 - **Whether the harness wants a status route richer than `/debug/status`** — node id and hosted identities are enough to tell containers apart, and anything more (per-replica sync state, peer lists) is introspection nobody has needed yet. Left out until a failing container run asks for it by name.

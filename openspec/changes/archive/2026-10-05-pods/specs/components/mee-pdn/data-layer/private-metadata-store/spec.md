@@ -4,7 +4,7 @@
 
 ### Requirement: Typed tickets, kind in the key
 
-The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names. `data` is the kind under which the identity's own data-namespace ticket is published at creation — the durable record of the flat bootstrap model; the linking dialogue hands the bootstrap tickets over directly, so nothing in the linking critical path reads this entry (see [device-linking](../../pdn-node/device-linking/spec.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand. A [pod](../../../../architecture/language/pod.md)'s two stores are published under per-pod kinds keyed by the pod id (32 lowercase hex chars): the write ticket to its membership store at kind `pod/<pod-id-hex>/membership`, and the write ticket to its record store at kind `pod/<pod-id-hex>/records` — this is how a pod created or joined on one device reaches the identity's other devices, which open both stores from these tickets on demand. Each of the two tickets SHALL name the device that recorded it, as the identity's own. At a join, the tickets the inviting device handed over SHALL be published beside them, unchanged, at kinds `pod/<pod-id-hex>/inviter/membership` and `pod/<pod-id-hex>/inviter/records`, naming the inviting device as the identity it holds the stores for: a ticket names all its nodes as the one identity that minted it, so a device named in another identity's ticket would be dialed as an identity it does not hold. A device opening the pod from them — another device of the identity, or the recording device after a restart — dials the nodes of both, each as its own ticket names it, so it has a member's device to dial without address lookup before its replica folds anyone.
+The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with the serialized ticket as the payload. Kinds are an open set of names. `data` is the kind under which the identity's own data-namespace ticket is published at creation — the durable record of the flat bootstrap model; the linking dialogue hands the bootstrap tickets over directly, so nothing in the linking critical path reads this entry (see [device-linking](../../pdn-node/device-linking/spec.md)). A connection's metadata pair is published under per-connection kinds keyed by the counterparty's `PdnId` (64 lowercase hex chars): the write ticket to the identity's own store toward peer `P` at kind `connection-metadata/<P-hex>/own`, and the received read ticket to the counterpart's store at kind `connection-metadata/<P-hex>/peer` — this is how establishment performed on one device reaches the identity's other devices, which open the pair from these tickets on demand. A [pod](../../../../architecture/language/pod.md)'s two stores are published under per-pod kinds keyed by the pod id (32 lowercase hex chars): the write ticket to its membership store at kind `pod/<pod-id-hex>/membership`, and the write ticket to its record store at kind `pod/<pod-id-hex>/records` — this is how a pod created or joined on one device reaches the identity's other devices, which open both stores from these tickets on demand. Each of the two tickets SHALL name the device that recorded it, as the identity's own. At a join, the tickets the inviting device handed over SHALL be published beside them, unchanged, at kinds `pod/<pod-id-hex>/inviter/membership` and `pod/<pod-id-hex>/inviter/records`, naming the inviting device as the identity it holds the stores for: a ticket names all its nodes as the one identity that minted it, so a device named in another identity's ticket would be dialed as an identity it does not hold. A device opening the pod from them — another device of the identity, or the recording device after a restart — dials the nodes of both, each as its own ticket names it, so it has a member's device to dial without address lookup before its membership view lists anyone.
 
 **Example:** the ticket entries in Bob's PMS once he holds a connection to Alice and has joined "Family" from his phone b1 on the invitation of Alice's phone a1; `<alice-hex>`: 64 lowercase hex chars of Alice's `PdnId`.
 
@@ -40,7 +40,7 @@ The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with t
 
 ### Requirement: The PMS routes; grants live in connection metadata stores
 
-The PMS carries the identity's own device-internal state — its device set, its connections records, its pod records, its announcement key pair, and the tickets to its own stores, to its connections' metadata pairs and to the stores of the pods it is a member of. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](../connection-metadata-store/spec.md), where the granting side can withdraw them, so no copy in a PMS outlives the grant.
+The PMS carries the identity's own device-internal state — its device set, its connections records, its pod records, its identity key pair, and the tickets to its own stores, to its connections' metadata pairs and to the stores of the pods it is a member of. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](../connection-metadata-store/spec.md), where the granting side can withdraw them, so no copy in a PMS outlives the grant.
 
 **Example:** what Bob's PMS holds once he holds a connection to Alice, a grant from her, and a membership of "Family"; Bob's devices are his phone b1 and his laptop b2; `<b1-hex>`, `<b2-hex>`, `<alice-hex>`: 64 lowercase hex chars of each `NodeId` and of Alice's `PdnId`.
 
@@ -49,7 +49,7 @@ The PMS carries the identity's own device-internal state — its device set, its
 | `devices/<b1-hex>`, `devices/<b2-hex>` | yes |
 | `connections/<alice-hex>` | yes |
 | `pods/ad58a3faa04cdc5576c8dc5823a347c6/1` | yes |
-| `announcement-key` | yes |
+| `identity-key` | yes |
 | the tickets to Bob's own stores, to the connection's metadata pair and to both stores of "Family" | yes |
 | the ticket to Alice's data namespace, which her grant carries | no: it sits in the connection metadata store Alice writes toward Bob |
 
@@ -60,28 +60,28 @@ The PMS carries the identity's own device-internal state — its device set, its
 
 ## ADDED Requirements
 
-### Requirement: One announcement key pair per identity, at a fixed path
+### Requirement: One identity key pair per identity, at a fixed path
 
-An identity's device-announcement key pair (pods D16) SHALL be minted when the identity is created and stored in its PMS at path `announcement-key`, the serialized key pair as the payload, written once and never rewritten. It replicates to the identity's other devices like every PMS entry, so every device of the identity holds the same key pair, and reading it SHALL return it only once its payload bytes have arrived. The key pair is one per identity and serves every pod the identity is a member of; no pod kind carries a copy.
+The identity key pair (pods D16) SHALL be minted when an identity is created and stored in its PMS at path `identity-key`, the serialized key pair as the payload, written once and never rewritten. It replicates to the identity's other devices like every PMS entry, so every device of the identity holds the same key pair, and reading it SHALL return it only once its payload bytes have arrived. The key pair is one per identity and serves every pod the identity is a member of; no pod kind carries a copy.
 
-**Example:** Alice is created on her phone a1 and her laptop a2 is linked into her; her announcement key pair is the one whose secret is 32 bytes of `33`.
+**Example:** Alice is created on her phone a1 and her laptop a2 is linked into her; her identity key pair is the one whose secret is 32 bytes of `33`.
 
-| state | the entry at `announcement-key` on a2 | a read of the key pair on a2 |
+| state | the entry at `identity-key` on a2 | a read of the key pair on a2 |
 |---|---|---|
 | a1 has created Alice | absent | nothing yet |
 | a2 linked, the entry's record arrived, its payload bytes not | present | nothing yet |
 | the payload bytes arrived | present | the pair whose public key is `17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce`, the one a1 holds |
-| On Alice's tablet a3, which hosts both of her identities — Alice-leisure, the one above, and Alice-work — each PMS holds a pair of its own at `announcement-key`: Alice-leisure's with the public key `17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce`, Alice-work's with `d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48`. | | |
+| On Alice's tablet a3, which hosts both of her identities — Alice-leisure, the one above, and Alice-work — each PMS holds a pair of its own at `identity-key`: Alice-leisure's with the public key `17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce`, Alice-work's with `d759793bbc13a2819a827c76adb6fba8a49aee007f49f2d0992d99b825ad2c48`. | | |
 
-#### Scenario: The announcement key reaches a linked device
+#### Scenario: The identity key reaches a linked device
 
 - **WHEN** an identity is created on the phone and a laptop is linked into it
-- **THEN** the laptop reads from its PMS replica, once the payload arrives, the same announcement key pair the phone holds
+- **THEN** the laptop reads from its PMS replica, once the payload arrives, the same identity key pair the phone holds
 
-#### Scenario: Co-hosted identities hold their own announcement keys
+#### Scenario: Co-hosted identities hold their own identity keys
 
 - **WHEN** a node hosts identities A and B
-- **THEN** each PMS holds its own announcement key pair and the two differ; denied: a device of B only, requesting a session for A's PMS, obtains no session and no entry of it
+- **THEN** each PMS holds its own identity key pair and the two differ; denied: a device of B only, requesting a session for A's PMS, obtains no session and no entry of it
 
 ### Requirement: One entry per membership event of the identity, pod id and sequence in the key
 

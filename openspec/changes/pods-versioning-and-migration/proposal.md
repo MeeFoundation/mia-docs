@@ -2,7 +2,7 @@
 
 ## Why
 
-Every device reads every entry of a pod by the one set of rules its build holds: nothing in either store, nor the fold over the membership store, names a version ([pod stores](../../specs/components/mee-pdn/data-layer/pod-store/spec.md)). A build that reads entries otherwise — a new event kind, a new record kind, a fold that resolves differently — reads the pods it finds by its own rules too, and an entry an older build does not understand is kept and used by nothing, as every entry outside the key layout is. Devices of one pod on two such builds then reach two memberships and two sets of readable records from the same entries: one serves a member the other refuses, one reads a record the other hides, and neither can tell. While pods run inside the company alone, a pod that splits is recreated and its content lost; this change lands before a pod carries data people outside the company depend on.
+Every device reads every entry of a pod by the one set of rules its build holds: nothing in either store, nor the membership view, names a version ([pod stores](../../specs/components/mee-pdn/data-layer/pod-store/spec.md)). A build that reads entries otherwise — a new event kind, a new record kind, a membership view that resolves differently — reads the pods it finds by its own rules too, and an entry an older build does not understand is kept and used by nothing, as every entry outside the key layout is. Devices of one pod on two such builds then reach two memberships and two sets of readable records from the same entries: one serves a member the other refuses, one reads a record the other hides, and neither can tell. While pods run inside the company alone, a pod that splits is recreated and its content lost; this change lands before a pod carries data people outside the company depend on.
 
 **Example:** Alice's phone a1 runs a later build than Carol's phone c1, and writes two entries into "Family" that the later build adds; `<alice>`, `<bob>`: 64 lowercase hex chars of each `PdnId`; `<lease>`: the id of Bob's lease scan.
 
@@ -13,15 +13,15 @@ Every device reads every entry of a pod by the one set of rules its build holds:
 
 ## What Changes
 
-Nothing is decided. The change settles how a pod's entries and the fold over them evolve from one build to the next, what an older build does with what a newer one writes, and how the pods created before it move over, then specifies and builds the answers. The questions stand under Open Questions, strongest option first.
+Nothing is decided. The change settles how a pod's entries and the membership view over them evolve from one build to the next, what an older build does with what a newer one writes, and how the pods created before it move over, then specifies and builds the answers. The questions stand under Open Questions, strongest option first.
 
 ## Open Questions
 
 ### What carries a version
 
-- Each entry, in its key: the version of the rules it was written under. A build reads each entry by its own version's rules, and a later version adds kinds and rules for them while never changing what an entry of an earlier version means, so one set of entries stays the only source of truth: an older build's answers are the newer one's with some of them unknown, never different ones. A build carries the fold of every version it has shipped.
+- Each entry, in its key: the version of the rules it was written under. A build reads each entry by its own version's rules, and a later version adds kinds and rules for them while never changing what an entry of an earlier version means, so one set of entries stays the only source of truth: an older build's answers are the newer one's with some of them unknown, never different ones. A build carries the membership view of every version it has shipped.
 - Each pod, in its created event, as a Matrix room fixes its room version in the event that creates it. Every entry of the pod reads by that version's rules, and a new version is a new pod — in Matrix, a new room, with a tombstone event in the old one naming its successor; a build that lacks a pod's version takes no part in it.
-- The folded membership alone, compared between devices: a split is detected, and prevented nowhere.
+- The membership view alone, compared between devices: a split is detected, and prevented nowhere.
 
 **Example:** the suspension of Why under each option.
 
@@ -29,7 +29,7 @@ Nothing is decided. The change settles how a pod's entries and the fold over the
 |---|---|---|
 | each entry | `member/<bob>/3/suspended.2/<alice>/1`: version 2 | a1 counts none of Bob's operations naming his sequence 3; c1 answers unknown for them |
 | each pod | the created event of "Family", naming version 1 | a1 writes no suspension into "Family": a suspension takes a new pod of version 2 |
-| the folded membership | the digest two devices compare | the digests differ, and each device goes on reading its own |
+| the membership view | the digest two devices compare | the digests differ, and each device goes on reading its own |
 
 ### What an older build does with what it cannot read
 
@@ -49,7 +49,7 @@ Nothing is decided. The change settles how a pod's entries and the fold over the
 
 Some rules read more than one chain, and an entry a build cannot read reaches everything those rules read. The guard over demotions reads every chain, so an unreadable entry that can touch the set of owners leaves the owners unknown for every act that needs one; a device statement in a form a build cannot read leaves every author it lists unresolved, and with them every entry those authors wrote.
 
-- A later version may not change what the earlier rules read across chains: no new kind touches the set of owners or the device lists, which keep their first form, and a new kind reaches its subject's chain alone. The rule is one more property the folds are tested against.
+- A later version may not change what the earlier rules read across chains: no new kind touches the set of owners or the device lists, which keep their first form, and a new kind reaches its subject's chain alone. The rule is one more property the membership views are tested against.
 - Unknown spreads as far as the rules reach, and an older build knows little of a pod once a newer one changes its owners or its device lists.
 
 **Example:** a later version adds an act by which an owner hands its ownership to another member, and Alice, an owner of "Family", hands hers to Bob.
@@ -71,14 +71,14 @@ Some rules read more than one chain, and an entry a build cannot read reaches ev
 | refused | refuses b1, as for a store it does not host |
 | served by its last known state | serves b1 the record store whole |
 
-### How each version's fold is held to one meaning
+### How each version's membership view is held to one meaning
 
-The fold of each shipped version stays in the code as it shipped, and the next is written beside it. Each is held to every earlier one by properties over the answers the platform asks of a fold — whether an identity is a member at a sequence, an owner, which devices it has, whether an act counts, whether a record reads — since a later fold's state holds what an earlier one lacks: on a set of entries of versions up to k alone, every later fold answers every question as the fold of k does; on any set, whatever the fold of k answers yes or no, every later fold answers the same; and every fold answers the same whatever order the entries arrived in. Property tests run these over sets of entries from a generator that plays devices acting on partial views — disconnected from each other, acting at one point together, leaving and returning, forging entries — with seeds fixed in `just test`, a wide sweep in the nightly workflow, and each counterexample kept as a case test, since tests are deterministic. A shipped fold that answers wrong cannot be corrected in place, since correcting it changes an answer on a set of its own version; the correction goes the way the question on changing a meaning settles. What stays open is how a shipped fold is kept unchanged.
+The membership view of each shipped version stays in the code as it shipped, and the next is written beside it. Each is held to every earlier one by properties over the answers the platform asks of a membership view — whether an identity is a member at a sequence, an owner, which devices it has, whether an act counts, whether a record reads — since a later membership view's state holds what an earlier one lacks: on a set of entries of versions up to k alone, every later membership view answers every question as the one of version k does; on any set, whatever the one of version k answers yes or no, every later one answers the same; and every membership view answers the same whatever order the entries arrived in. Property tests run these over sets of entries from a generator that plays devices acting on partial views — disconnected from each other, acting at one point together, leaving and returning, forging entries — with seeds fixed in `just test`, a wide sweep in the nightly workflow, and each counterexample kept as a case test, since tests are deterministic. A shipped membership view that answers wrong cannot be corrected in place, since correcting it changes an answer on a set of its own version; the correction goes the way the question on changing a meaning settles. What stays open is how a shipped membership view is kept unchanged.
 
-- A golden corpus: sets of entries with the answers the shipped fold gave them; a changed answer fails it, and a refactoring passes.
-- A digest of the fold's source, recorded and compared by `just check`: any edit fails, a refactoring among them.
+- A golden corpus: sets of entries with the answers the shipped membership view gave them; a changed answer fails it, and a refactoring passes.
+- A digest of the membership view's source, recorded and compared by `just check`: any edit fails, a refactoring among them.
 
-**Example:** a refactoring of the first fold, and a change to its precedence between events at one point, under each option.
+**Example:** a refactoring of the first membership view, and a change to its precedence between events at one point, under each option.
 
 | option | the refactoring, every answer unchanged | the change to the precedence |
 |---|---|---|
@@ -87,7 +87,7 @@ The fold of each shipped version stays in the code as it shipped, and the next i
 
 ### When a build starts writing a newer version's entries
 
-Reading by a newer fold is safe at once, since it answers whatever the older one answered; writing a newer kind puts unknown answers on every older device.
+Reading by a newer membership view is safe at once, since it answers whatever the older one answered; writing a newer kind puts unknown answers on every older device.
 
 - Once every device of every current member lists support for it: each device statement names the highest version its device reads — a field the first build that reads versions writes — and nothing unknown reaches a current member's device; one device never updated holds the pod back.
 - Once an owner switches the pod over, seeing which devices lag.
@@ -103,7 +103,7 @@ Reading by a newer fold is safe at once, since it answers whatever the older one
 
 ### How a meaning changes
 
-Some changes cannot keep what an earlier entry means: a shipped fold that answers wrong, and a rule that from some point on every act anchors in its author's key event log.
+Some changes cannot keep what an earlier entry means: a shipped membership view that answers wrong, and a rule that from some point on every act anchors in its author's key event log.
 
 - A switch inside the pod: an owner's act names, for every member's chain, the point after which the new rules apply. Within one chain "after" is exact, so the entries stay one source of truth. The switch touches every chain, so a build has to know its kind from the first build that reads versions on, and to take it as the point where its own answers end.
 - A new generation of the pod, as Matrix upgrades a room: the members join a new pod created under the new rules, and the old one ends with an entry naming its successor. Records are copied across or read from the old pod, and a link to an old record resolves through it.
@@ -127,20 +127,20 @@ Some changes cannot keep what an earlier entry means: a shipped fold that answer
 | read as the first version | carries on, its 1,000 records read as before |
 | dropped | recreated empty, the 1,000 records placed again by hand or lost |
 
-### A digest of the fold between the two stores' sessions
+### A digest of the membership view between the two stores' sessions
 
-A session reconciles the membership store before the record store, and between the two the devices can compare a digest of their folded membership, each at the highest version both read. Once the store has converged, equal folds of one version give equal digests, so a difference shows a split or a fold that is not a function of its entries — an iteration order, a difference between platforms.
+A session reconciles the membership store before the record store, and between the two the devices can compare a digest of their membership view, each at the highest version both read. Once the store has converged, equal membership views of one version give equal digests, so a difference shows a split or a membership view that is not a function of its entries — an iteration order, a difference between platforms.
 
-- A signal: the difference counted, the full folded membership shown on the debug surface, asserted in tests; the record store's session goes on, since a write between the two sessions makes the digests differ harmlessly.
+- A signal: the difference counted, the full membership view shown on the debug surface, asserted in tests; the record store's session goes on, since a write between the two sessions makes the digests differ harmlessly.
 - A gate: the record store's session waits until the digests agree, and a write in between or a lagging device stalls it.
 - None.
 
-**Example:** Alice's phone a1 and Carol's phone c1 both read version 2, and c1's fold, built for another platform, orders two events at one point otherwise.
+**Example:** Alice's phone a1 and Carol's phone c1 both read version 2, and c1's build, made for another platform, orders two events at one point otherwise in its membership view.
 
 | option | the session between a1 and c1 |
 |---|---|
 | a signal | the record store reconciled; the difference counted and shown on both debug surfaces |
-| a gate | the record store not reconciled until the fold is fixed |
+| a gate | the record store not reconciled until the membership view is fixed |
 | none | the record store reconciled; the split unseen |
 
 ## Operating conditions
@@ -158,7 +158,7 @@ None is settled. Every option touches `components/mee-pdn/data-layer/pod-store` 
 
 ## Impact
 
-- **`crates/data-layer`**: a fold per version, the unknown answers, the gate's reading of versions, the digest between the two sessions.
+- **`crates/data-layer`**: a membership view per version, the unknown answers, the gate's reading of versions, the digest between the two sessions.
 - **`crates/pdn-node`**: when a build writes a newer version's entries, and the switch or the new generation of a pod.
 - **`crates/pdn-store`**: the digest in the opening of the record store's session.
-- **Tests**: property tests holding each fold to the earlier ones over a generator of entry sets, and the corpus or check that keeps a shipped fold unchanged.
+- **Tests**: property tests holding each membership view to the earlier ones over a generator of entry sets, and the corpus or check that keeps a shipped membership view unchanged.

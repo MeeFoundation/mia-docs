@@ -2,12 +2,12 @@
 
 ## Purpose
 
-The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by application-layer protocol negotiation (ALPN) identifier: document sync, gossip, and blob transfer built in. ADR-0011 puts pairing — the raw dialogue that establishes a connection between two identities — on that same endpoint, and ADR-0012 puts device linking beside it; this capability is what lets them: a spawn-time registration point for the supplied handlers, a panic guard around each, and a dial handle onto the endpoint for the initiators' side. This registration point is protocol-agnostic (the handlers are opaque here) only because the ceremonies' semantics belong above in pdn-node, not because the assembly is a general protocol-extension facility. The stores and flows riding the assembly stay specified in the other `data-layer` specs; this capability covers the assembly itself.
+The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by application-layer protocol negotiation (ALPN) identifier: document sync, gossip, and blob transfer built in. ADR-0012 puts device linking on that same endpoint, and ADR-0015 puts a pod's join beside it; this capability is what lets them: a spawn-time registration point for the supplied handlers, a panic guard around each, and a dial handle onto the endpoint for the initiators' side. This registration point is protocol-agnostic (the handlers are opaque here) only because the ceremonies' semantics belong above in pdn-node, not because the assembly is a general protocol-extension facility. The stores and flows riding the assembly stay specified in the other `data-layer` specs; this capability covers the assembly itself.
 
 ## Requirements
 
 ### Requirement: The assembly accepts a supplied protocol handler
-`SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today pairing ([ADR-0011](../../../../architecture/adr/0011-pairing-over-raw-iroh.md)) and device linking ([ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
+`SyncNode` SHALL accept, at spawn, zero or more externally supplied protocol handlers — today device linking ([ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md)) and a pod's join ([ADR-0015](../../../../architecture/adr/0015-pod-join-over-raw-iroh.md)) — each keyed by an ALPN identifier, and SHALL serve them on its protocol router alongside the built-in protocols (document sync, gossip, blob transfer). A connection arriving under a registered supplied ALPN SHALL be dispatched to that handler as a raw bidirectional connection, not a document-sync session. Spawning with no supplied handler SHALL preserve the assembly exactly as it is without this surface.
 
 **Example:** the ALPNs of a node pdn-node's `Runtime` spawns, and what a connection accepted under each reaches.
 
@@ -16,8 +16,8 @@ The assembled node (`SyncNode`) runs its protocols on one endpoint, keyed by app
 | `/iroh-bytes/4` | built in: blob transfer |
 | `/iroh-gossip/1` | built in: gossip |
 | `/iroh-sync/1` | built in: `DocsDispatch` reads the `Init` and hands the session to the identity it names |
-| `/pdn/pairing/0` | supplied: `PairingHandler`, given the raw bidirectional connection |
 | `/pdn/linking/0` | supplied: `LinkingHandler`, given the raw bidirectional connection |
+| `/pdn/pod-join/0` | supplied: `JoinHandler`, given the raw bidirectional connection |
 | any other | the dial fails, and no handler runs |
 
 #### Scenario: An extra protocol answers on its ALPN
@@ -43,9 +43,9 @@ The ALPNs of supplied protocols SHALL be distinct from the built-in protocols' A
 
 | supplied ALPNs | answer |
 |---|---|
-| `/pdn/pairing/0`, `/pdn/linking/0` | a node serving both beside the three built-in ALPNs |
+| `/pdn/linking/0`, `/pdn/pod-join/0` | a node serving both beside the three built-in ALPNs |
 | `/iroh-sync/1` | `Err(AlpnTaken)`: "protocol ALPN already taken: /iroh-sync/1" |
-| `/pdn/pairing/0`, `/pdn/pairing/0` | `Err(AlpnTaken)`: "protocol ALPN already taken: /pdn/pairing/0" |
+| `/pdn/linking/0`, `/pdn/linking/0` | `Err(AlpnTaken)`: "protocol ALPN already taken: /pdn/linking/0" |
 
 #### Scenario: A built-in ALPN is refused at spawn
 - **WHEN** a node spawns with a supplied protocol claiming the document-sync ALPN
@@ -66,6 +66,22 @@ All protocols — the built-in stack and every supplied handler — SHALL share 
 - **WHEN** node B dials node A's supplied protocol through B's dial handle
 - **THEN** the connection A's handler observes carries B's node id as the remote identity
 
+### Requirement: One connection carries a gossip stream for each of up to 4,096 stores two nodes share
+
+The endpoint SHALL let a peer hold up to 4,096 unidirectional streams open on one connection. Gossip holds one such stream for every [swarm](../../../../architecture/language/swarm.md) topic two nodes share, for as long as they share it, and a sender past the count sends that peer nothing on any topic, and once its queue for that peer fills, nothing to any peer; a [pod](../../../../architecture/language/pod.md)'s two stores are two topics, so the count SHALL NOT stop live delivery between two nodes until the stores they share exceed 4,096, about 2,000 pods. One connection SHALL buffer no more than 248,750,000 bytes across all its streams, the product of the 199 streams and the 1,250,000-byte stream window the transport's defaults allowed, so that the larger count gives a caller more streams and no more memory.
+
+**Example:** Alice's phone a1 and Bob's phone b1 share 60 pods, 120 swarm topics; Bob places a claim in the first of them.
+
+| unidirectional streams per connection | Bob's claim on a1 |
+|---|---|
+| 100, the transport's default | arrives only with the pod stores' pass, up to 5 minutes later, and after a burst of Bob's writes b1 stops answering |
+| 4,096 | arrives over the swarm at once |
+
+#### Scenario: Two nodes sharing more stores than the transport's default stream count keep live delivery
+
+- **WHEN** two members on two nodes share 60 pods, the pod stores' passes out of reach, and each places a claim in the first and in the last of them
+- **THEN** each claim reaches the other node over the swarm, and after a burst of writes the writer's node still creates a pod
+
 ### Requirement: A supplied handler's panic is contained
 A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHALL be caught, failing only that one connection, while the built-in protocols keep serving. (Under a `panic = "abort"` build no catch is possible; the spawn form's contract asks handlers not to panic.)
 
@@ -83,7 +99,7 @@ A panic in a supplied handler's accept path SHALL NOT tear down the node. It SHA
 ### Requirement: Shutdown stops every protocol side by side, and a late call fails
 The node's shutdown SHALL stop a supplied handler beside the built-in stack rather than before it: the router shuts every protocol down at once, the blob store and gossip among them. A supplied handler whose work in flight writes through the node's stores therefore SHALL be let finish by its owner before the node's shutdown is called — a wait inside the handler's own shutdown runs against stores already going away. A call into a replica store that reaches it after its shutdown began, including one already queued behind the shutdown, SHALL fail rather than wait: its caller would otherwise wait for as long as any handle to the store lives.
 
-**Example:** `Runtime::shutdown` in pdn-node, whose pairing and linking handlers write through the node's stores.
+**Example:** `Runtime::shutdown` in pdn-node, whose linking and join handlers write through the node's stores.
 
 | step | the stores |
 |---|---|
@@ -100,7 +116,7 @@ The node's shutdown SHALL stop a supplied handler beside the built-in stack rath
 
 The node SHALL read the [identity](../../../../architecture/language/mee-identity.md) an accepted sync connection names before the session reaches any replica, and SHALL hand the session to that hosted identity alone. A connection naming an identity the node does not host SHALL be refused indistinguishably from the replica not being hosted, and no hosted identity SHALL observe a session addressed to another.
 
-What the node reads before it knows whom a connection addresses SHALL be bounded. The first message names the namespace, the two identities and a first range whose two boundaries carry one key each, so the largest one an honest node sends is fixed by the longest key a replica holds, 8,192 bytes, and comes to about 16 KiB. A first message whose length prefix announces more than 32 KiB SHALL be refused on the prefix alone, before its body is read, so a caller that holds no ticket and no grant makes the node hold no more than that per connection. The session a classified caller goes on to run reads its later messages under the session's own ceiling, since one message of a first sync often carries a replica's whole content.
+What the node reads before it knows whom a connection addresses SHALL be bounded. The first message names the namespace, the two identities and a first range whose two boundaries carry one key each, so the largest one an honest node sends is fixed by the longest key a replica holds, 8,192 bytes, and comes to about 16 KiB. A first message whose length prefix announces more than 32 KiB SHALL be refused on the prefix alone, before its body is read, so a caller that holds no ticket and is no member makes the node hold no more than that per connection. The session a classified caller goes on to run reads its later messages under the session's own ceiling, since one message of a first sync often carries a replica's whole content.
 
 **Example:** a session's first frame: a `u32` big-endian length prefix, then `Message::Init { namespace, identity, caller, message }` in postcard.
 
@@ -138,14 +154,14 @@ What the node reads before it knows whom a connection addresses SHALL be bounded
 
 ### Requirement: The node removes the payloads no replica it holds references
 
-The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store, a data replica, the replica of a withdrawn grant — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
+The node SHALL run blob collection over its one blob store at an interval `SpawnOptions` sets, with a single protect callback that answers with the union of the payloads every hosted identity's replicas reference, so that a payload SHALL stay while any replica of any identity the node hosts references it and SHALL leave the blob store at the first run after none does. A payload an identity writes, or fetches for an entry it received, SHALL stay through every run whose read of the replicas predates that entry, so that a run already under way when the entry lands SHALL NOT remove its payload. A forgotten replica — a [pod](../../../../architecture/language/pod.md)'s record store — SHALL free its payloads with no removal of its own. On a node with a storage directory, collection SHALL start only once its host has hosted again the identities it means to, so that a start removes nothing of an identity recovery has yet to reach; a node in memory collects from its spawn.
 
-**Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; the pod's record store held Bob's lease scan and a photo whose bytes Carol also keeps in her own data namespace.
+**Example:** Carol leaves "Family" on her phone c1, which hosts Carol alone; the pod's record store held Bob's lease scan and a photo whose bytes Carol also placed in a pod of her own, "Carol".
 
 | payload | referenced after the record store is forgotten by | on c1 after the next run |
 |---|---|---|
 | Bob's lease scan | nothing | removed |
-| the photo | Carol's data namespace | kept |
+| the photo | the record store of "Carol" | kept |
 
 #### Scenario: A payload no replica references is removed
 
@@ -162,10 +178,20 @@ The node SHALL run blob collection over its one blob store at an interval `Spawn
 - **WHEN** two identities hosted on one node hold replicas referencing one payload, one of them forgets its replica, and a collection run passes
 - **THEN** the blob store still holds the payload, and the other identity reads it
 
+#### Scenario: A payload written while a collection run is under way stays
+
+- **WHEN** an identity writes an entry after a collection run has read the replicas and before that run removes anything
+- **THEN** the blob store still holds the entry's payload after the run, and the entry reads
+
+#### Scenario: A payload fetched while a collection run is under way stays
+
+- **WHEN** an entry arrives from a peer after a collection run has read the replicas, and its payload is fetched before that run removes anything
+- **THEN** the blob store still holds the payload after the run, and the entry reads
+
 ### Requirement: Every replica the node holds open joins a periodic reconcile pass, at a cadence the spawn names
 `SyncNode` SHALL run a periodic pass that re-requests a sync for every document it holds open, whichever synchronization strategy that document follows, and the interval SHALL be named at the spawn with a default of 10 seconds.
 
-The interval is what bounds every convergence no read of its own nudges: a grant record reaching the peer's copy of a connection's metadata pair, a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It is written down here because a host that configures its own value — a phone trading battery against how long a person waits — needs somewhere to configure it *from*, and because the resulting speed is otherwise read as a property of the network rather than of a number somebody chose.
+The interval is what bounds every convergence no read of its own nudges: a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It is written down here because a host that configures its own value — a phone trading battery against how long a person waits — needs somewhere to configure it *from*, and because the resulting speed is otherwise read as a property of the network rather than of a number somebody chose.
 
 #### Scenario: A spawn that names no interval gets the default
 - **WHEN** a node is spawned without naming a reconcile interval

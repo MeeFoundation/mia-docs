@@ -6,19 +6,17 @@ The layers exist but nothing glues them: `data-layer` provides the store set, li
 
 ## What Changes
 
-- **New crate `pdn-node` — the embeddable runtime core.** A library gluing the existing `data-layer` primitives into a service surface; each embedded runtime is one running node (a host embeds one, in-process tests embed several to stand up several nodes): **identity** (create an identity on its first device via `provision_identity`; add a device via `link_device` with the identity's seed), **connections** (record and list an identity's connections over `ConnectionsStore`), **data** (write, read, and list entries in an identity's data namespace over `SyncNode`), **sync** (report the node id and which identities the runtime hosts). One runtime hosts any number of identities (per `data-layer` multi-identity), each added by an explicit act.
-- **No new sync or authorization mechanics.** The core is glue: every operation delegates to a `data-layer` primitive, and access to a replica remains bounded by possession of its ticket — the interim posture of ADR-0008, unchanged by this change.
+- **New crate `pdn-node` — the embeddable runtime core.** A library gluing the existing `data-layer` primitives into a service surface; each embedded runtime is one running node (a host embeds one, in-process tests embed several to stand up several nodes): **identity** (create an identity on its first device via `provision_identity`; add a device via `link_device` with the identity's seed) and **sync** (report the node id and which identities the runtime hosts). One runtime hosts any number of identities (per `data-layer` multi-identity), each added by an explicit act.
+- **No new sync or authorization mechanics.** The core is glue: every operation delegates to a `data-layer` primitive, and access to a replica remains bounded by possession of its ticket, unchanged by this change.
 - **New crate `pdn-node-http` — a thin HTTP host for the demo stand.** It embeds the core and exposes `/live` (health, always on). Debug endpoints are demo scaffolding behind an environment flag: not part of the spec, free to change or disappear without a spec change.
 - **Library-first form ("not always a server").** The core has no host or HTTP dependencies; hosts depend on `pdn-node` directly (no separate api-trait crate). Service interfaces are traits where a second implementation is plausible (a future KERI-backed identity service; test mocks for sync/data) — see design.md.
-- **The node assembly must not preclude an additional protocol handler.** Pairing (ADR-0011) will need to register its own ALPN handler on the same endpoint; this change keeps the runtime's assembly shape compatible with that, while the registration point itself lands with the pairing change.
+- **The node assembly must not preclude an additional protocol handler.** A ceremony will need to register its own ALPN handler on the same endpoint; this change keeps the runtime's assembly shape compatible with that, while the registration point itself lands with the first ceremony.
 
 ## Out of Scope (deferred)
 
-- **Connection establishment** — the pairing dialogue over its own ALPN, `ConnectionMetadataStore`, ticket exchange, invite/connect flows (ADR-0011). The connections service here only records and lists what the establishment procedure will later produce.
 - **On-disk persistence** — the current `SyncNode` is in-memory; the redb + fs-blob variant and the "where does data live" config are a separate change.
-- **The `DataLayer` trait contract** — the runtime drives `SyncNode` directly; implementing the entries-only `DataLayer` trait (typed errors) and switching the runtime onto it is its own change. Entry listing is not deferred with it: `SyncNode` gains a `list` in this change, shaped after the trait's `list_entries` so the later switch stays mechanical.
 - **Mobile / wasm hosts** — no uniffi/jni/wasm now; the embeddable core form is what keeps them possible.
-- **Sync introspection beyond node id + hosted identities** — transfer progress, per-replica status, and live events come later (with reconcile triggering and subset-rbsr work).
+- **Sync introspection beyond node id + hosted identities** — transfer progress, per-replica status, and live events come later.
 
 ## Capabilities
 

@@ -55,5 +55,5 @@ Scope: the observation surface the sync tests read — the store's ordered subsc
 
 ## 6. Close
 
-- [ ] 6.1 Resolve the contradiction with `mobile-host-surface` ("The exported surface is exactly this set", "The facade offers no convenience the product lacks", "A release is built in the configuration a device installs") and with `mobile-demo-app` ("5 screens … and no sixth", "no ticket, no import and no reset") as the person approving this change chose
-- [ ] 6.2 Archive after `mobile-host-surface` and `mobile-demo-app`; the new capabilities get the tree's titles (`# Observation`, `# Sync test agent`) and their `## Purpose`; `openspec validate --all --strict`
+- [ ] 6.1 Resolve the contradiction with `mobile-host-surface` ("The exported surface is exactly this set", "The facade offers no convenience the product lacks", "A release is built in the configuration a device installs") as the person approving this change chose
+- [ ] 6.2 Archive after `mobile-host-surface`; the new capabilities get the tree's titles (`# Observation`, `# Sync test agent`) and their `## Purpose`; `openspec validate --all --strict`

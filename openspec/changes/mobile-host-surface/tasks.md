@@ -144,3 +144,9 @@ The generation and the packaging live in `pdn-sdk`, the crate and its target bui
   - 50 iterations green (`just stress -p pdn-mobile --stress-count 50 --test-threads 3`, 25 minutes), and 20 more after the review's 2 handle-state fixes landed with the scenario that covers them.
   - The first attempt, at the runner's default width, failed on iteration 2 with the establishment reporting the dialogue's own timeout. That was starvation and is diagnosed as such rather than dismissed: this machine has 12 cores and 9 GB of memory, each surface scenario spawns 3 nodes, and the default width put roughly 36 nodes in flight — under which tests that take a third of a second took 34, and the runtime's own dialogue bound is what expired first. Narrowing the width restored the per-test times to their ordinary ones and 50 iterations passed. The sizing belongs with the suite: a stress pass on scenarios that spawn 3 nodes each names its own thread count.
 - [ ] 7.3 `openspec validate --all --strict` before archiving. Both deltas' relative links are written for their archive destinations, not for their own directories, and `sdk-artifacts` links nothing that a later change adds
+
+## 8. The surface over a runtime of pods
+
+- [x] 8.1 The facade covers what the runtime offers once its connections, grants and data namespaces are gone: identities, linking, pods and their records. The calls for invites, connections, grants and entries, the claim derivation, and the error kinds only they produced leave the facade, its types and its table; the record payload keeps the entry payload's ceiling.
+- [x] 8.2 The surface tests stand on pods: the payload interop, the wrong-act refusal and the restart each go through a pod invite and a placed record, and the paired denial is a third handle that never joined the pod.
+- [x] 8.3 The host spec, the proposal and the design describe that surface; D3 is the ticket rule over pods, and D8 describes nothing and is gone.
