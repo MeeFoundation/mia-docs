@@ -50,7 +50,7 @@ A pod of 100 members on 2 devices each is a swarm of 200 nodes, in which an anno
 
 ### What a device downloads
 
-- Records everywhere, payloads on demand: a device holds every entry and fetches a payload when it is read, through the fork's download policy. A device's storage follows what its member reads, and a first read of a payload waits for a member device that holds it to be reachable.
+- Records everywhere, payloads on demand: a device holds every entry and fetches a payload when it is read, through a download policy the fork gains, of the kind n0's `iroh-docs` offers. A device's storage follows what its member reads, and a first read of a payload waits for a member device that holds it to be reachable.
 - Records and payloads everywhere, as a pod does today: every read is local, and every device stores every payload of every pod its identities are members of.
 
 **Example:** Carol's phone c1 holds "Family", in which Bob places a 20 MB scan that Carol never opens.
@@ -78,6 +78,6 @@ None is settled. The fingerprint tree touches `components/mee-pdn/pdn-store/crat
 
 ## Impact
 
-- **`crates/pdn-store`**: the cached fingerprint tree; the download policy it already offers.
+- **`crates/pdn-store`**: the cached fingerprint tree; a download policy, if payloads are fetched on demand.
 - **`crates/data-layer`**: the download policy of a pod's record store, quotas, a memo of the membership view.
 - **`crates/pdn-node`**: what the pods service reads when a payload is not local.

@@ -14,7 +14,7 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 | step | a1's store | a1's subscription |
 |---|---|---|
-| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`, and 64 on the RPC stream), drops the rest; the live buffer does not fill, since the 600 records share one payload |
+| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`), drops the rest; the live buffer does not fill, since the 600 records share one payload |
 | a1 records one pod more | the write answers | — |
 | a1 reads the subscription at last | — | the inserts that fitted, then their `Lagged`, with the live events merged in, some of them after it |
 | a1 lists the held pods on the `Lagged` | all 601 records | a drop in either buffer after this read leaves a `Lagged` of that buffer's own |
