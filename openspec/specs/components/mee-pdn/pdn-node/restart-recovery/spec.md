@@ -38,7 +38,7 @@ A provisioning that fails before the record SHALL take back what it provisioned 
 
 No operation ends an identity's hosting: a record, once written, is never removed. Two states would use such an operation — an identity a person no longer wants hosted on this device, and a record whose replica the store no longer holds, which recovery skips on every start — and neither is served today.
 
-A record SHALL become durable only after its identity's replicas are durable, so that the halves cannot disagree in the other direction — a record naming a replica the store has never committed.
+A record SHALL become durable only after its identity's replicas are durable, the payloads they reference in the blob store included, so that the halves cannot disagree in the other direction — a record naming a replica the store has never committed, or an identity key whose payload never reached the disk. The two stores commit apart, each on a timer of its own, so the commit flushes both before it writes the record ([durable storage](../../data-layer/durable-storage/spec.md)), and a commit that fails fails the create or the link.
 
 **Example:** `create()` on a1 (Alice's first device), killed after one of its steps; what the next start finds in `identities/<alice-hex>/`.
 
@@ -46,7 +46,7 @@ A record SHALL become durable only after its identity's replicas are durable, so
 |---|---|---|
 | `provision_identity` | `docs.redb`, `default-author` | hosts nothing from it |
 | any step up to `host_identity`: the PMS with `devices/<a1-node-id>` and `identity-key` | the same, holding the replicas as far as the store committed them | hosts nothing from it, serves nothing |
-| `commit_hosting`: replicas flushed, record renamed in | + `pms`, the replicas committed | hosts Alice |
+| `commit_hosting`: both stores flushed, record renamed in | + `pms`, the replicas and the identity key's payload committed | hosts Alice, with her identity key |
 | a failure rather than a kill before the commit: `CreateRollback` drops Alice's half of the running node; the files stay | | |
 | a failure of `default_author` after the commit: `create()` fails, `CreateRollback` drops Alice's half of the running node, the record stays, and the next start hosts Alice | | |
 
@@ -65,6 +65,10 @@ A record SHALL become durable only after its identity's replicas are durable, so
 #### Scenario: A first start has no record
 - **WHEN** a runtime starts on a directory that holds no hosting record
 - **THEN** it starts hosting nothing, and creating an identity writes that identity's record
+
+#### Scenario: An identity whose create returned is on disk whole
+- **WHEN** an identity's create returns on a runtime with durable storage, and the storage directory is copied at that moment, as a kill would leave it
+- **THEN** a runtime started on the copy hosts the identity and reads its identity key, and a runtime started on an empty directory hosts nothing
 
 ### Requirement: A record whose replica is missing is skipped, not fatal
 A hosting record naming a PMS replica its identity's store does not hold — the store gone from the subdirectory, or holding no such replica — SHALL be skipped: that identity is not hosted, the skip is reported, the record is left as it is, and every other identity recovers as usual. Where the store is gone, the skip SHALL open none in its place. A record whose store is present but does not open, or whose store holds the named replica but cannot open it, SHALL stop the start — a runtime that silently hosted less than its records name would look healthy while refusing everything. A replica that does not open SHALL fail the start with an error naming the identity; a store that does not open fails it first, with the error every failed store open gives, which names the node's storage directory and not the identity. A skip and a stop SHALL be told apart by whether the store is on disk and what it holds, never by the wording of a failure.

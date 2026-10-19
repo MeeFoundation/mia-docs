@@ -141,6 +141,21 @@ A write the storage layer refuses — an exhausted disk above all — SHALL surf
 - **WHEN** a node's directory is on a filesystem with no free space and a record placement is attempted
 - **THEN** the write fails with an error naming the storage failure, and a subsequent read does not report the entry as stored
 
+### Requirement: A write is on disk within the stores' settle window, and at once after a flush
+Each of a node's two stores SHALL commit what it was written on a timer of its own — the replica store within 500 milliseconds of its last write, the blob store's metadata, where a small payload lies inline, within a second — so a write is on disk within that settle window, an entry and its payload apart. The node SHALL offer a flush of an identity's writes (`SyncNode::flush_stores`, over the store's `DocsApi::flush`) after which every write of that identity so far is on disk, the payloads its entries reference included, and which answers the error of a commit that failed, where a commit on the stores' own timer only logs it. A caller SHALL flush before anything durable outside the stores names what it wrote, and before a write that names an earlier one whose payload has to be readable: a hosting record names a PMS and its identity key ([restart recovery](../../pdn-node/restart-recovery/spec.md)), and a pod's record in the PMS names the pod's tickets ([pods](../../pdn-node/pods/spec.md)).
+
+**Example:** the commit point of `create()` on Alice's first device a1, in the order it runs.
+
+| step | replica store | blob store | `identities/<alice-hex>/pms` |
+|---|---|---|---|
+| `put_identity_key` | the entry in the open write batch | the key's 32 bytes inline in the open write batch | absent |
+| `flush_stores(alice)` | committed | committed first | absent |
+| the hosting record written, synced, renamed in | committed | committed | names the PMS |
+
+#### Scenario: A flushed write is on disk at once
+- **WHEN** a write is made, the store is flushed, and the store's directory is copied at that moment, as a kill would leave it
+- **THEN** the copy holds the write's entry and its payload
+
 ### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
 A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory records as hosted — each subdirectory holding a hosting record — with the opening identity counted whether or not its record is written yet. A subdirectory with no record, which is what an unfinished create or link leaves, SHALL take no share. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory records, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
 

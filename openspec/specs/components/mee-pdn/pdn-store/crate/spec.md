@@ -90,11 +90,12 @@ The store SHALL declare no feature and SHALL be built for the targets the worksp
 ### Requirement: The store's public surface is what is named outside its sources
 An item of the store SHALL be public only when something outside the store's sources names it — another crate of the workspace, its tests included, or one of the store's own integration tests — or when the signature of a public item carries it, since the compiler refuses a crate-private type in a public interface. Every other item SHALL be crate-private, so that one nothing calls is a dead-code warning, which `just check` denies.
 
-**Example:** five items of the store after this change.
+**Example:** six items of the store.
 
 | item | named outside the store's sources by | visibility |
 |---|---|---|
 | `Doc::set_bytes` | the data layer's PMS and pod writes | public |
+| `DocsApi::flush` | the data layer's `flush_stores`, which a commit point calls | public |
 | `filter::serve_whole` | the store's own integration tests, through `tests/util/mod.rs` | public |
 | `QueryBuilder` | nothing; `Query::all`, which the data layer calls, returns it | public |
 | `Engine::start_sync_keeping_default` | nothing; `Doc::share` calls it | crate-private |

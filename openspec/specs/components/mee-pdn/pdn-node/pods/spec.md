@@ -438,7 +438,7 @@ The pods service SHALL place a record as one of three kinds — claim, mergeable
 
 ### Requirement: Hosted pods survive a restart
 
-A directory-configured runtime SHALL host again, after a restart, every pod its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's pods end with the process. The hosted pods SHALL be re-derived from each hosted identity's PMS: every pod whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the pod's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no pod.
+A directory-configured runtime SHALL host again, after a restart, every pod its hosted identities are members of, from durable state alone — both stores keep replicating and its members' devices are served — while a memory runtime's pods end with the process. The hosted pods SHALL be re-derived from each hosted identity's PMS: every pod whose record in the [private metadata store](../../data-layer/private-metadata-store/spec.md) is live, both stores opened from the pod's published tickets in the identity's own replica store, and a contact that names this node's own address reached inside the process. The identity's hosting record SHALL name no pod. A pod's record in the PMS SHALL become durable only after the pod's tickets are, their payloads included, so that a restart never meets a pod its record lists and its tickets cannot open: the two stores commit apart, each on a timer of its own, so the record is written once a flush has put the tickets on disk.
 
 **Example:** Alice's tablet a3 runs on a storage directory and hosts Alice-leisure and Alice-work, both members of "Wedding"; Alice-work left a second pod, `684aad236ce530cd7b5dedb6ab6b755a`, before a3 stops.
 
@@ -448,6 +448,11 @@ A directory-configured runtime SHALL host again, after a restart, every pod its 
 | Erin places a claim from her phone e1 meanwhile | — |
 | a3 starts on the same directory | opens Wedding's two stores for Alice-leisure and for Alice-work, each from the tickets in the identity's own PMS, and for `684aad236ce530cd7b5dedb6ab6b755a` Alice-work's tombstone alone, no record store; neither hosting record names a pod |
 | a3's first sessions | Erin's claim arrives, and Alice-leisure's and Alice-work's replicas converge inside the process |
+
+#### Scenario: A pod whose record is on disk opens from it
+
+- **WHEN** an identity creates a pod on a runtime with durable storage, the replica store commits the pod's record while the blob store's write batch is still open, and the storage directory is copied at that moment
+- **THEN** a runtime started on the copy opens the pod and lists the identity as its owner
 
 #### Scenario: A pod is hosted again after a restart
 
