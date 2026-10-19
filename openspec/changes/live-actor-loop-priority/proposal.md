@@ -29,20 +29,22 @@ Nothing is decided. The change first measures the wait of a session's end under 
 
 Every option keeps one order the loop depends on: a session's replica events are handled before its end. When a session's task finishes, every entry it inserted already sits in the live actor's event channel, and `biased` takes those events first, so the end finds that session's content queued for download, and it emits `PendingContentReady` only once those downloads are done. Handled the other way round, the end finds nothing queued and emits `PendingContentReady` before that session's content is even asked for.
 
+Every option also keeps finished downloads first, or says what their wait becomes. Taking them first is a measured fix, decision D15 of the archived pdn-store-trim design: in the load test above, a finished download waited 946 ms on the median and 17.7 s at the 90th percentile below the inbox and 30 ms first, and the content lag on every node fell from 1.0 s to 77 ms on the median and from 17.8 s to 141 ms at the 90th percentile. Three of the options below keep the downloads' branch where it is. The one without `biased` drops that priority, and the load test has not measured what the downloads' wait becomes under it.
+
 - Session ends above the inbox, and the replica events above them: downloads, replica events, dials, accepts, inbox. Nothing a swarm member sends delays a session's end, since replica events come only from sessions the access provider admitted and from the host's own writes. A catch-up of 10,000 entries then holds the inbox — the host's calls, `Shutdown`, every swarm's gossip — for all of its 10,000 events, each with up to two waits on the blob store.
-- No `biased`, with the one dependent order made explicit: a session's end first handles the replica events already queued, through `DrainingSync` in `src/engine/live/draining.rs`. A turn starts its poll at a random branch, so a stream on one branch takes its share of the turns and no more. Interleavings the fixed order makes rare become as likely as any other, and the scenarios of the data layer and pdn-node answer for each of them.
+- No `biased`, with the one dependent order made explicit: a session's end first handles the replica events already queued, through `DrainingSync` in `src/engine/live/draining.rs`. A turn starts its poll at a random branch, so a stream on one branch takes its share of the turns and no more. Interleavings the fixed order makes rare become as likely as any other, and the scenarios of the data layer and pdn-node answer for each of them. Finished downloads lose their place first and take their share of the turns like any other branch, so the load test is run again under this option before it is chosen.
 - A budget of inbox messages: after a fixed number of them in a row, the next turn polls the branches below the inbox first. The wait of a session's end is bounded by that many inbox handlers and the replica events queued; the number is a constant to size.
 - The waits off the loop: `has_news_for_us` runs in a task that reports back, as the content scan does through `ToLiveActor::ContentScanned`, so a report costs the loop no wait. The inbox then empties whenever messages arrive slower than the loop takes them, which covers the honest load; a faster stream still holds the branches below, and the tasks need a bound of their own.
 
-**Example:** two cases on a1 — b1's stream of reports while the session with a2 ends, and a catch-up of 10,000 entries from Alice's tablet a3 while the host calls `Doc::sync_with_peers` on another pod.
+**Example:** three cases on a1 — b1's stream of reports while the session with a2 ends, a catch-up of 10,000 entries from Alice's tablet a3 while the host calls `Doc::sync_with_peers` on another pod, and a download finished while b1 sends.
 
-| option | the end of a2's session | the host's call during a3's catch-up |
-|---|---|---|
-| the order as it stands | handled on the first turn that finds the inbox empty: never, while b1 keeps sending fast enough | handled on the next turn, ahead of the catch-up's events |
-| session ends and replica events above the inbox | handled once the events queued before it are, whatever b1 sends | handled after all 10,000 events |
-| no `biased` | handled within a few turns on average | handled within a few turns on average |
-| a budget of 32 inbox messages | handled after at most 32 of b1's reports | handled on the next turn, as today |
-| the waits off the loop | handled whenever the inbox empties: at once while b1 sends slower than the loop takes a report, never while b1 sends faster | handled on the next turn, as today |
+| option | the end of a2's session | the host's call during a3's catch-up | the finished download |
+|---|---|---|---|
+| the order as it stands | handled on the first turn that finds the inbox empty: never, while b1 keeps sending fast enough | handled on the next turn, ahead of the catch-up's events | handled on the next turn, ahead of everything |
+| session ends and replica events above the inbox | handled once the events queued before it are, whatever b1 sends | handled after all 10,000 events | handled on the next turn, ahead of everything |
+| no `biased` | handled within a few turns on average | handled within a few turns on average | handled within a few turns on average; its wait under load not measured |
+| a budget of 32 inbox messages | handled after at most 32 of b1's reports | handled on the next turn, as today | handled on the next turn, ahead of everything |
+| the waits off the loop | handled whenever the inbox empties: at once while b1 sends slower than the loop takes a report, never while b1 sends faster | handled on the next turn, as today | handled on the next turn, ahead of everything |
 
 ## Operating conditions
 
@@ -50,7 +52,7 @@ Several identities on one node change the reach of a stream: each identity's eng
 
 ## Out of Scope
 
-- Finished downloads, which come first in the loop and which the load test measured there.
+- Where finished downloads sit in the loop: first, by decision D15 of the archived pdn-store-trim design, which the load test measured. An option that moves them states what their wait becomes.
 - What a single gossip message costs before it reaches the inbox, and the transport's stream counts, which the unclassified-connection-bounds change weighs.
 
 ## Capabilities

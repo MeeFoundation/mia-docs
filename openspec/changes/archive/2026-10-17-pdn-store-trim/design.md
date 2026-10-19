@@ -19,7 +19,7 @@ The proposal says why the store is cut down. What shapes how:
 
 **Non-Goals:**
 
-- Reworking what stays: the engine, the live actor, the codec, the ranger and the store keep their behaviour; the work removes what nothing reaches, and the one structural change is the call path of D1.
+- Reworking what stays: the engine, the live actor, the codec, the ranger and the store keep their behaviour, the order of the live actor's loop (D15) aside; the work removes what nothing reaches, and the one structural change is the call path of D1.
 - The workspace's lints for the store, and moving the store's tests into the library.
 - Renaming the crate's types (`Doc`, `DocsApi`, `Docs`) or the sync ALPN.
 
@@ -27,7 +27,7 @@ The proposal says why the store is cut down. What shapes how:
 
 ### D1. `Doc` and `DocsApi` call the engine; `Docs` alone keeps it alive
 
-`DocsApi` and `Doc` hold a weak reference to the engine and call its methods and its sync handle directly, with what each `RpcActor` handler did now in the method body: `Doc::set_bytes` adds the payload to the blob store, inserts the entry, holds the payload's temp tag and reads the entry back. `Docs` holds the one strong reference, so the engine lives as long as some clone of `Docs` does. A call on a handle whose engine is gone fails with an error saying the store has stopped, as a call to the aborted task fails today. Calls from one task run in the order the task makes them; calls from different tasks meet first at the sync actor, which already orders every store operation by arrival. A call now runs in its caller's future, so a caller can drop it between two of its steps, and calls from other tasks can run between them; the two methods for which either changes the outcome keep their steps together. `Doc::set_bytes` hands the payload's temp tag to the engine's held payloads however the call ends, since the store inserts an entry it was sent whether or not its caller still waits. `DocsApi::drop_doc` leaves the replica and deletes it in one step of the live actor, since a start of sync taken between the two reopens the replica and fails the delete. `DocsApi::open` answers `None` for a namespace the store does not hold and an error for one it holds and cannot open, so the data layer opens a replica without walking the store's namespaces. Errors reach the caller as the engine raised them. `irpc` stays a dependency, since iroh-blobs' API answers in its types, but the store no longer defines a protocol of its own.
+`DocsApi` and `Doc` hold a weak reference to the engine and call its methods and its sync handle directly, with what each `RpcActor` handler did now in the method body: `Doc::set_bytes` adds the payload to the blob store, inserts the entry, holds the payload's temp tag and answers the hash it wrote; a read of the entry back would be a second message to the sync actor, and a write, a delete or a drop from another task at the same key could fall between the two and change the answer. `Docs` holds the one strong reference, so the engine lives as long as some clone of `Docs` does. A call on a handle whose engine is gone fails with an error saying the store has stopped, as a call to the aborted task fails today. Calls from one task run in the order the task makes them; calls from different tasks meet first at the sync actor, which already orders every store operation by arrival. A call now runs in its caller's future, so a caller can drop it between two of its steps, and calls from other tasks can run between them; the two methods for which either changes the outcome keep their steps together. `Doc::set_bytes` hands the payload's temp tag to the engine's held payloads however the call ends, since the store inserts an entry it was sent whether or not its caller still waits. `DocsApi::drop_doc` leaves the replica and deletes it in one step of the live actor, since a start of sync taken between the two reopens the replica and fails the delete. `DocsApi::open` answers `None` for a namespace the store does not hold and an error for one it holds and cannot open, so the data layer opens a replica without walking the store's namespaces. Errors reach the caller as the engine raised them. `irpc` stays a dependency, since iroh-blobs' API answers in its types, but the store no longer defines a protocol of its own.
 
 **Example:** the data layer's access provider holds pod "Family"'s membership `Doc` in its registry, and the engine holds the provider.
 
@@ -108,7 +108,7 @@ An item goes when no other crate of the workspace reaches it, directly or throug
 | `DownloadPolicy`, `FilterKind`, the `download_policy` table's reads and writes | store tests | gone; every entry's content is wanted, as the default policy says today |
 | author list, import, export, delete, set default | store tests | gone; create and get default stay |
 | `Doc::import_file`, `export_file`, their progress types | store tests | gone |
-| `Doc::close`, `status`, `set_hash`, `get_exact`, `leave`; `DocsApi::import`, `import_and_subscribe`; `start_sync_scoped` | store tests | gone; `get_exact` stays crate-private behind `set_bytes` |
+| `Doc::close`, `status`, `set_hash`, `get_exact`, `leave`; `DocsApi::import`, `import_and_subscribe`; `start_sync_scoped` | store tests | gone; the sync handle's `get_exact` stays for the store's own tests |
 | `Query` sorting and offset | store tests | gone; the default order stays |
 | migrations 001 to 004, `NAMESPACES_TABLE_V1` | stores older iroh-docs releases wrote | gone; `Store::new_impl` creates every table before them |
 | `ProtectCallbackHandler`, `Builder::protect_handler`, the engine's protect task | store tests | gone; blob collection protects through `Engine::collection_hashes` |
@@ -118,7 +118,7 @@ An item goes when no other crate of the workspace reaches it, directly or throug
 
 What stays though only the store reaches it inside: the ranger's generic store traits and their proptest store, the default author and its file, `DocTicket`, the session hooks and dial controls ADR-0014 lists. The table is the starting point, not a ceiling: once D5 makes the rest crate-private, the compiler names whatever else nothing calls, and it goes by the same rule.
 
-**Example:** `Doc::get_exact` — the data layer reads a single entry with `get_one(Query::key_exact(key).author(author))`, so `Doc::get_exact` goes, while the sync handle's `get_exact` stays: `set_bytes` reads the inserted entry back through it.
+**Example:** `Doc::get_exact` — the data layer reads a single entry with `get_one(Query::key_exact(key).author(author))`, so `Doc::get_exact` goes, while the sync handle's `get_exact` stays behind `cfg(test)`: the codec's tests read what a session delivered through it.
 
 **Rejected alternatives:**
 
@@ -253,18 +253,40 @@ With D11 in place the restarted node's writes reach the other member, but their 
 | key `empty-hash-with-a-length`, the empty hash, length 5 | dropped |
 | key `a-length-of-zero`, the hash of "v", length 0 | dropped |
 
-### D14. A node stops its engines, then its router, then its blob store
+### D14. A node stops its engines, then its router, then its blob protocol's streams, then its blob store
 
-`SyncNode::shutdown` shuts every hosted identity's engine down before the router, and closes the blob store itself once the router's shutdown has returned. The router shuts its protocols down before it cancels their connections, so a store it closed would meet a request a connection's handler had already read; the node mounts the blob protocol with a shutdown that leaves the store open, and the router's shutdown awaits every handler before it returns. Before the engines stop, the store is open too: a running engine starts downloads, each of which reads that store before it fetches, and iroh-blobs answers a read reaching a file store that is shutting down by panicking on its own task. A stopped engine starts none; a download it started before stopping is not awaited, and stops at its next progress report, its writes into a store going away dropped. The store's tests shut their node down engines first. Three tests count the panics of their process and fail on one, so each fails with the order reversed: `content_a_restart_left_missing_is_fetched_from_the_first_sync_peer` in the store, and `a_node_stopped_with_a_fetch_under_way_stops_without_a_panic` in the data layer's `tests/node_shutdown.rs`, whose writer is spawned to serve no payload so that the reader's fetch stays under way until it stops, and `a_node_stopped_while_a_peer_observes_its_payload_stops_without_a_panic` beside it, whose peer asks for one of the node's payloads over and over on a connection opened before the stop; that one fails with the store closed by the router, as it is in iroh's own order.
+`SyncNode::shutdown` and a node's drop share one stop, `stop_node` in `src/node.rs`; a drop runs it in a task of its own. It shuts every hosted identity's engine down first: a running engine starts downloads, each of which reads the blob store before it fetches, and iroh-blobs answers a read reaching a file store that is shutting down by panicking on its own task. A stopped engine starts none; a download it started before stopping is not awaited, and stops at its next progress report, its writes into a store going away dropped. The router shuts its protocols down before it cancels their connections, so the node mounts the blob protocol with a shutdown that leaves the store open. The router's shutdown awaits every connection's handler, but iroh-blobs' handler runs each stream in a task of its own, which the router neither cancels nor awaits, so a request a stream read before the stop reaches the store after the router's shutdown returns. The node therefore serves the blob protocol with a handler of its own, `BlobsServing`, which runs each stream's task on a `TaskTracker`, from `tokio-util`, a dependency the data layer takes for it. Once the router's shutdown has returned, the stop closes the tracker and waits for the streams, then for the store to finish what they handed it, up to 5 seconds (`BLOB_STORE_IDLE_WAIT`): a stream ends at its next read or write on the closed endpoint, and a request at its first answer, which goes to no one, so the wait is short. Only then does it close the store and release the directory lock. The store's tests shut their node down engines first, and `content_a_restart_left_missing_is_fetched_from_the_first_sync_peer` in the store counts the panics of its process and fails on one. In the data layer's `tests/node_shutdown.rs` three tests pin the order, each failing in one run with its half removed: `a_node_stopped_with_a_fetch_under_way_stops_without_a_panic` reads the steps of the node's stop and fails when the engines stop after the blob store closes, and `a_node_stopped_while_a_peer_observes_its_payload_stops_without_a_panic` and `a_node_dropped_while_a_peer_observes_its_payload_stops_without_a_panic` hold one blob stream between the request it read and the store until the router's shutdown has returned, and meet the panic without the wait.
 
 **Example:** the steps of `SyncNode::shutdown`.
 
-| step | before | after |
-|---|---|---|
-| 1 | the reconcile pass stops | the reconcile pass stops |
-| 2 | the router shuts every protocol down, the blob store among them | each identity's engine shuts down and starts no further download |
-| 3 | each identity's engine shuts down | the router shuts every protocol but the blob protocol down, and awaits every connection's handler |
-| 4 | the blob store, the storage lock | the blob store, the storage lock |
+| step | what the stop does |
+|---|---|
+| 1 | the reconcile pass stops |
+| 2 | each identity's engine shuts down and starts no further download |
+| 3 | the router shuts every protocol down, the blob protocol's shutdown leaving the store open, and awaits every connection's handler |
+| 4 | the blob protocol's streams end and the blob store finishes what they handed it, up to 5 s |
+| 5 | the blob store closes, and the storage lock is released |
+
+**Rejected alternatives:**
+
+- iroh-blobs' handler fixed in the fork to track its streams
+  - **Pros:** offered upstream, it would fix every embedder of iroh-blobs
+  - **Cons:** one more divergence of the fork from upstream, for what about 20 lines of the node's own handler do
+- The blob store closed as soon as the router's shutdown returns
+  - **Cons:** a request a stream read before the stop reaches the closed store: `a_node_stopped_while_a_peer_observes_its_payload_stops_without_a_panic`, then repeated ten stops a run, met the panic in 6 of 300 runs on a runner of 4 CPUs
+- A drop that closes the blob store alone, leaving the ordered stop to `shutdown`
+  - **Cons:** a runtime dropped without `shutdown` is a circumstance the public surface has to survive, and its drop then closes the store beneath a stream's read and under a running engine
+
+### D15. The live actor takes a finished download before its inbox
+
+`LiveActor::run_inner` in `src/engine/live.rs` polls its finished downloads first under its `biased` `select!`, above the inbox. A branch is reached only on a turn where nothing above it is ready, and under load the inbox, which carries every gossip op of every swarm the engine joined, holds a message on nearly every turn. A finished download is what makes a payload readable and announces it with `ContentReady`, so its wait is part of the content lag every member of a pod sees. The finished downloads are bounded by the downloads this actor started, so taking them first holds back nothing else for long. A load test with 16 members on one laptop, writing 20 records a second together and 10,000 in all, measured a content lag of 77 ms on the median and 141 ms at the 90th percentile on every node with this order.
+
+**Example:** one payload download of that load test, which took 34 ms on the median: from its end to `on_download_ready`, it waited 30 ms on the median.
+
+**Rejected alternatives:**
+
+- Finished downloads the fifth of six branches, below the inbox and the replica events
+  - **Cons:** under the same load a finished download waited 946 ms on the median and 17.7 s at the 90th percentile, and the content lag on every node was 1.0 s on the median and 17.8 s at the 90th percentile
 
 ## Operating conditions
 
