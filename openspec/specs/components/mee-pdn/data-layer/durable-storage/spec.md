@@ -2,21 +2,22 @@
 
 ## Purpose
 
-What a node keeps on disk, and where. Storage is named at the spawn — memory, or a directory — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([private metadata store](../private-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts and the pods they hold — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
+What a node keeps on disk, and where. Storage is named at the spawn — a directory, or memory in a test build — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([private metadata store](../private-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts and the pods they hold — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
 
 ## Requirements
 
 ### Requirement: Storage is configured at spawn, and neither mode is a default
-A node's storage SHALL be chosen when it is spawned, by name: memory, or a directory. A spawn that names neither SHALL NOT be expressible — no caller wants a default, because the production consumer embeds the runtime and passes a directory inside its own sandbox, and the test suites want memory and say so. The location SHALL NOT be read from the process environment inside the data layer, because several nodes spawn in one process and a directory belongs to one node.
+A node's storage SHALL be chosen when it is spawned, by name: memory, or a directory. A spawn that names neither SHALL NOT be expressible — no caller wants a default, because the production consumer embeds the runtime and passes a directory inside its own sandbox, and the test suites want memory and say so. Memory SHALL exist only behind the data layer's `test-util` feature, so a product build of the runtime has no node that keeps nothing on disk: such a node loses every identity it hosts at its first restart, its node id with them, and none of the runtime's guarantees across a restart holds for it. The location SHALL NOT be read from the process environment inside the data layer, because several nodes spawn in one process and a directory belongs to one node.
 
 **Example:** who names a node's storage, and how.
 
 | caller | spawns with |
 |---|---|
-| the in-process test suites | `SpawnOptions::memory()` |
+| the in-process test suites | `SpawnOptions::memory()`, under `test-util` |
 | pdn-node-http, the container stand | `SpawnOptions::on_directory(dir)`, dir read by the host from `PDN_DATA_DIR` |
 | a host shipped to a device | `SpawnOptions::for_product(dir)`, dir inside its own sandbox |
 | a `SpawnOptions` naming no storage | does not compile: storage is a field with no default, and `SpawnOptions` has no `Default` |
+| a product build naming memory | does not compile: `StorageConfig::Memory` and `SpawnOptions::memory` exist only under `test-util` |
 
 #### Scenario: A node spawned on memory stores in memory
 - **WHEN** a node is spawned with memory named as its storage
@@ -125,7 +126,7 @@ A directory SHALL be used by one running node at a time. A node spawned on a dir
 - **THEN** the spawn fails with an error naming that directory, and the running node is unaffected
 
 ### Requirement: A storage failure is reported, never swallowed
-A write the storage layer refuses — an exhausted disk above all — SHALL surface as a failed operation to the caller that made it. A refused write SHALL NOT be reported as stored, and a replica whose last transaction did not commit SHALL NOT be reported as converged.
+A write the storage layer refuses — an exhausted disk above all — SHALL surface as a failed operation to the caller that made it. A refused write SHALL NOT be reported as stored, and a replica whose last transaction did not commit SHALL NOT be reported as converged. A write that lands in a store's write batch and is refused only at that batch's commit on the store's own timer, after the caller had its answer, SHALL fail the next write or flush on that store, and the node's store check, so the refusal reaches a caller and the host's readiness rather than the log alone.
 
 **Example:** the stand's node with `/var/lib/pdn` on a 16 MiB tmpfs; `<Alice>` is its one identity and `<family>` her pod; each placement a distinct 256 KiB payload.
 
@@ -139,6 +140,29 @@ A write the storage layer refuses — an exhausted disk above all — SHALL surf
 #### Scenario: A write on a full disk fails loudly
 - **WHEN** a node's directory is on a filesystem with no free space and a record placement is attempted
 - **THEN** the write fails with an error naming the storage failure, and a subsequent read does not report the entry as stored
+
+### Requirement: A write is on disk within the stores' settle window, and at once after a flush
+Each of a node's two stores SHALL commit what it was written on a timer of its own — the replica store within 500 milliseconds of its last write, the blob store's metadata, where a small payload lies inline, within a second — so a write is on disk within that settle window, an entry and its payload apart. The node SHALL offer a flush of an identity's writes (`SyncNode::flush_stores`, over the store's `DocsApi::flush`) after which every write of that identity so far is on disk, the payloads its entries reference included, and which answers the error of a commit that failed, where a commit on the stores' own timer only logs it. A caller SHALL flush before anything durable outside the stores names what it wrote, and before a write that names an earlier one whose payload has to be readable: a hosting record names a PMS and its identity key ([restart recovery](../../pdn-node/restart-recovery/spec.md)), and a pod's record in the PMS names the pod's tickets ([pods](../../pdn-node/pods/spec.md)). A write whose payload other entries rest on SHALL be on disk when it returns: a pod's membership store entry is, since the membership view waits on its payload and no other device holds it yet, so a kill within the settle window would leave an event that every device waits on forever. A record store's entry is not flushed: one a kill cuts within the settle window is read as absent, as one whose payload has not arrived from a peer is. A commit the stores' own timer runs and sees fail SHALL reach the next write or flush on that store, and the node's store check, as that call's error. The node SHALL count the entries this device wrote into an identity's PMS and its pods' membership stores whose payload is not on disk, and report them when a pod starts.
+
+**Example:** the commit point of `create()` on Alice's first device a1, in the order it runs.
+
+| step | replica store | blob store | `identities/<alice-hex>/pms` |
+|---|---|---|---|
+| `put_identity_key` | the entry in the open write batch | the key's 32 bytes inline in the open write batch | absent |
+| `flush_stores(alice)` | committed | committed first | absent |
+| the hosting record written, synced, renamed in | committed | committed | names the PMS |
+
+#### Scenario: A flushed write is on disk at once
+- **WHEN** a write is made, the store is flushed, and the store's directory is copied at that moment, as a kill would leave it
+- **THEN** the copy holds the write's entry and its payload
+
+#### Scenario: A membership write is on disk whole when it returns
+- **WHEN** an entry is written into a pod's membership store, a read commits the replica store's write batch while the blob store's is still open, and the node's directory is copied at that moment
+- **THEN** the copy holds the entry's payload
+
+#### Scenario: A commit the stores' own timer saw fail reaches a caller
+- **WHEN** a commit the replica store runs on its own timer fails, as on a full disk
+- **THEN** the store's next write fails with that commit's error, and the write after it goes through
 
 ### Requirement: A replica store's cache is a share of a node budget, cut as the store opens
 A node SHALL be spawned with the memory its replica stores may hold together, and SHALL NOT be spawned with a count of identities to divide it by: the cache one identity's replica store keeps SHALL be bounded at that memory divided by the identities the storage directory records as hosted — each subdirectory holding a hosting record — with the opening identity counted whether or not its record is written yet. A subdirectory with no record, which is what an unfinished create or link leaves, SHALL take no share. The share SHALL be cut as each store opens and SHALL NOT change while that store is open, so a device carrying one identity gives it the whole budget, an identity provisioned while the node runs takes a share cut from the set that now includes it, and no store already open is reopened for it. Every start SHALL therefore cut every share from the whole set the directory records, which is what brings a node that grew while it ran back within its budget. The workspace SHALL state one default in a single place, which the hosts and the test suites take rather than restate: 1 GiB for a node's replica stores. A node whose bounds handed out together pass its budget SHALL report it. A replica store held in memory carries no bound at all. A host running where memory is scarce states the budget once at that application's first start, from the memory that device can spare, and keeps it with its own settings; this spec states the expectation and no mobile host implements it here. The bound caps resident memory rather than reserving it.
@@ -168,7 +192,7 @@ A node SHALL be spawned with the memory its replica stores may hold together, an
 - **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
 
 ### Requirement: One author per hosted identity, persisted with that identity's stores
-Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a pod binds to an identity on this device is that identity's author and not the node's.
+Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a pod binds to an identity on this device is that identity's author and not the node's. The file naming the author SHALL be written once the author is committed to the replica store, beside its final name, synced and renamed over, so a crash leaves it whole or absent: a torn one would fail every later start of the identity.
 
 **Example:** a1 writes its device record `devices/<a1-hex>` into Alice's PMS, the node restarts, and it writes the record again; A1 and A2 are authors.
 

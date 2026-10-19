@@ -14,7 +14,7 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 | step | a1's store | a1's subscription |
 |---|---|---|
-| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`, and 64 on the RPC stream), drops the rest; the live buffer does not fill, since the 600 records share one payload |
+| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`), drops the rest; the live buffer does not fill, since the 600 records share one payload |
 | a1 records one pod more | the write answers | — |
 | a1 reads the subscription at last | — | the inserts that fitted, then their `Lagged`, with the live events merged in, some of them after it |
 | a1 lists the held pods on the `Lagged` | all 601 records | a drop in either buffer after this read leaves a `Lagged` of that buffer's own |
@@ -36,7 +36,7 @@ A subscription to a replica's events SHALL NOT make the store wait for its subsc
 
 ### Requirement: The live engine takes its events while it waits on the store
 
-The store's live engine SHALL keep taking the events of its waiting delivery while it waits for any answer of the store, and SHALL handle them in the order they arrived once the step that waited is over. The store waits for room in that delivery's buffer of 1,024 events and answers nothing meanwhile, so an engine that waited on the store without reading would leave both waiting for good as soon as the store had more events to emit ahead of the engine's request than the buffer holds. A first catch-up does exactly that: a node that holds nothing of a store receives all of the store's entries in one message, and the store inserts them in one step. While the engine waits on anything other than the store — gossip, the blob store — the store still waits for it, so a session cannot run ahead of the engine.
+The store's live engine SHALL keep taking the events of its waiting delivery while it waits for any answer of the store, and SHALL handle them in the order they arrived once the step that waited is over. The store waits for room in that delivery's buffer of 1,024 events and answers nothing meanwhile, so an engine that waited on the store without reading would leave both waiting for good as soon as the store had more events to emit ahead of the engine's request than the buffer holds. A first catch-up does exactly that: a node that holds nothing of a store receives all of the store's entries in one message, and the store inserts them in one step. While the engine waits on anything other than the store — gossip, the blob store — the store still waits for it, so a session cannot run ahead of the engine. The engine takes a finished payload download before anything else, its inbox included: under load the inbox holds a gossip op on nearly every turn, and a download that finished behind it waited 946 ms on the median and 17.7 s at the 90th percentile before the engine marked its payload readable, in a load test with 16 members writing 20 records a second together, against 30 ms when taken first. The finished downloads are bounded by the downloads the engine started, so nothing waits long behind them.
 
 **Example:** Bob's node imports a ticket to a store of 2,000 entries, and its engine restarts the store's sync while the catch-up runs.
 
