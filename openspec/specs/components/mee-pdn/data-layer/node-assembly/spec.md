@@ -225,6 +225,8 @@ A node SHALL send to a peer on a path the peer still receives on. Of its paths t
 
 iroh's default selector, `BiasedRttPathSelector` in iroh 1.3.0, keeps a path once selected until a path of the same tier is at least 5 ms faster by its last measured round-trip time. A peer killed and started again listens on a new port, and the old path to it is dead but keeps the last round-trip time it measured, 1.9 ms on the stand, while its previous connection lives on until its idle timeout. On a local network no path is 5 ms faster than that, so every new connection the node opens to the peer sends its handshake to the dead port — the node's sync dials and payload downloads toward the restarted peer time out — while the connections the peer opens toward the node work. iroh selects again only when the last connection to the peer closes, and the node's own failed dials keep a connection on the dead path, so that can take minutes.
 
+A node SHALL also run the pass over its pods' stores once within 45 seconds of its spawn, besides every pod reconcile interval. iroh asks the selector again when a connection to the peer opens or one of its paths is established or abandoned, never when a connection closes. A peer that held more connections to the old address than the restarted node opened at its start therefore keeps the dead path selected once those connections time out, 30 seconds after the kill, and its own dials keep failing until the restarted node opens one more connection to it; the pass 45 seconds after the spawn opens it.
+
 **Example:** b1's paths to Alice's node a1 after a1 was killed and started on port 33947, its old port 57771, as b1's endpoint logs them.
 
 | path | connections that received on it | last round-trip time | iroh 1.3.0 | `ReceivingPathSelector` |
@@ -235,6 +237,10 @@ iroh's default selector, `BiasedRttPathSelector` in iroh 1.3.0, keeps a path onc
 #### Scenario: A killed member's node is reached at its new port
 - **WHEN** a member's node is killed without grace and started again on a new port while the pod's other member's node still holds a connection to its old one
 - **THEN** the other member's dials and payload downloads reach the restarted node, and it reads a record the restarted node placed after its start, payload included, within the convergence budget
+
+#### Scenario: A killed member is reached though the other member held more connections to its old port
+- **WHEN** a member's node is killed without grace while the pod's other member's node holds eight connections to its old port, and is started again on a new port
+- **THEN** the other member reads a record the restarted node placed after its start, payload included, within the convergence budget
 
 #### Scenario: The path more connections receive on is selected
 - **WHEN** a path to a peer is received on by more of the node's connections to it than the selected path of the same tier, whatever their round-trip times, or the selected path is received on by none of them while another is
