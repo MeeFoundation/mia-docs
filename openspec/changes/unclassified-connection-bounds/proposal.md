@@ -10,7 +10,7 @@ The first is what one connection buffers. The endpoint sets two numbers of its t
 
 The second is the number of connections. Beyond what the transport buffers, each connection whose first message is still incomplete holds up to 32 KiB of the node's own buffer (`MAX_OPENING_FRAME`) for up to 300 seconds, and nothing limits how many connections one peer opens, so both figures multiply by a number the caller chooses.
 
-**Example:** Carol (outsider) knows only the address of Alice's laptop a1. She dials `/iroh-sync/1`, sends all but the last byte of a 32,768-byte first message, and writes on every other stream the transport lets her open (the node's transport settings over iroh 1.1.0 and noq 1.2.0).
+**Example:** Carol (outsider) knows only the address of Alice's laptop a1. She dials `/iroh-sync/1`, sends all but the last byte of a 32,768-byte first message, and writes on every other stream the transport lets her open (the node's transport settings over iroh 1.3.0 and noq 1.3.0).
 
 | | one connection | 10 connections |
 |---|---|---|

@@ -74,7 +74,7 @@ A node spawned on a directory holding a key SHALL bind its endpoint with that ke
 |---|---|---|---|
 | `devices/<a1>` in Alice's PMS | her other devices | names a1 | names an id that never answers |
 | a ticket a1 minted, `<a1>` in `DocTicket.nodes` | whoever imported it | dials a1 | dials nobody |
-| `devices/<a1>` in the device set she publishes | Bob's node b1 | admits a1's sessions | refuses the new id as not hosted |
+| `member/<Alice>/devices/1` naming a1 in a pod's membership store | Bob's node b1 | serves a1 the pod's stores | serves the new id nothing: no statement lists it |
 
 #### Scenario: The node id survives a restart
 - **WHEN** a node is shut down and spawned again on the same directory
@@ -192,7 +192,7 @@ A node SHALL be spawned with the memory its replica stores may hold together, an
 - **THEN** its store opens bounded at half the budget, the store already open keeps the bound it opened at, and the node reports that the bounds handed out together pass its budget
 
 ### Requirement: One author per hosted identity, persisted with that identity's stores
-Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins. Two identities of one node SHALL write with two different authors, so what a pod binds to an identity on this device is that identity's author and not the node's. The file naming the author SHALL be written once the author is committed to the replica store, beside its final name, synced and renamed over, so a crash leaves it whole or absent: a torn one would fail every later start of the identity.
+Every store a hosted identity holds SHALL write with that identity's one author, and that author SHALL be persisted with the identity's replicas, so a node that restarts writes each identity's entries as the author it wrote them as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A pending-device record written under one author and expired under another likewise stays in the replica; the pending set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the expiry scenario pins. The confirmed device set has no withdrawal: the runtime writes no tombstone at a `devices/` key. Two identities of one node SHALL write with two different authors, so what a pod binds to an identity on this device is that identity's author and not the node's. The file naming the author SHALL be written once the author is committed to the replica store, beside its final name, synced and renamed over, so a crash leaves it whole or absent: a torn one would fail every later start of the identity.
 
 **Example:** a1 writes its device record `devices/<a1-hex>` into Alice's PMS, the node restarts, and it writes the record again; A1 and A2 are authors.
 
@@ -206,9 +206,9 @@ Every store a hosted identity holds SHALL write with that identity's one author,
 - **WHEN** a hosted identity writes a path, the node restarts, and it writes the same path again
 - **THEN** the replica holds one live record for that path, carrying the newer value
 
-#### Scenario: A withdrawn device does not come back with a restart
-- **WHEN** a device is withdrawn from an identity's device set, and a device of that identity restarts
-- **THEN** the withdrawn device is absent from the set as read after the restart
+#### Scenario: An expired pending device does not come back with a restart
+- **WHEN** a sibling device records a pending device in an identity's PMS, a device of that identity restarts, and its cleanup expires the record under its own author
+- **THEN** the pending device is absent from the pending set as read after the restart
 
 #### Scenario: Two identities on one node write as two authors
 - **WHEN** two identities hosted on one node each write an entry
