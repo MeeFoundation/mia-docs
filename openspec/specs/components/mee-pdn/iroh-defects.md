@@ -54,9 +54,9 @@ The blob stores spawn their garbage collection as a task with a store handle of 
 
 ## iroh-blobs 0.103: the memory store's collection removes a payload imported while it runs
 
-A collection run marks the payloads every tag and temp tag names, then sweeps every other payload the store holds. A payload imported between the two carries a temp tag the mark did not see; the file store remembers every payload written since the run began and sweeps none of them, while the memory store keeps no such record, so its sweep removes the payload, a local write's own included: the entry stays and its payload is gone. Upstream's main branch carries the same memory store. The platform collects only over the file store a node on a storage directory runs; the memory store serves the workspace's suites, and `a_payload_fetched_while_a_run_is_under_way_stays` in the data layer's `tests/blob_collection.rs` lost the writer's payload that way in about one run in a hundred on a runner of 4 CPUs, its writer's node collecting every 200 milliseconds. The scenarios of that file run on storage directories, the store the product collects over.
+A collection run marks the payloads every tag and temp tag names, then sweeps every other payload the store holds. A payload imported between the two carries a temp tag the mark did not see; the file store remembers every payload written since the run began and sweeps none of them, while the memory store keeps no such record, so its sweep removes the payload, a local write's own included: the entry stays and its payload is gone. Upstream's main branch carries the same memory store. The platform collects only over the file store a node on a storage directory runs: a node in memory exists only in a test build, behind the data layer's `test-util` feature, and its blob store is never collected. On nodes in memory collecting every 200 milliseconds, `a_payload_fetched_while_a_run_is_under_way_stays` in the data layer's `tests/blob_collection.rs` lost the writer's payload that way in about one run in a hundred on a runner of 4 CPUs; the scenarios of that file run on storage directories.
 
-**Example:** Alice's phone collects every 200 milliseconds over a memory store while she places a claim.
+**Example:** a memory store collected every 200 milliseconds while Alice places a claim.
 
 | step | the store |
 |---|---|

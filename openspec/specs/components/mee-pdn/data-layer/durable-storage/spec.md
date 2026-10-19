@@ -2,21 +2,22 @@
 
 ## Purpose
 
-What a node keeps on disk, and where. Storage is named at the spawn — memory, or a directory — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([private metadata store](../private-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts and the pods they hold — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
+What a node keeps on disk, and where. Storage is named at the spawn — a directory, or memory in a test build — and a node given a directory keeps there everything it needs to be itself: a subdirectory per hosted identity holding that identity's replicas ([private metadata store](../private-metadata-store/spec.md), the stores of its [pods](../pod-store/spec.md)), the one author it writes them with and the record that it is hosted here, the blobs their payloads resolve through, and the endpoint secret key its node id comes from. The key is what makes the rest worth keeping: a node that came back under a fresh id would be a stranger to its own device record and to every ticket it ever handed out. A directory belongs to one running node at a time. What the runtime above rebuilds from such a directory — the identities it hosts and the pods they hold — is [restart recovery](../../pdn-node/restart-recovery/spec.md)'s.
 
 ## Requirements
 
 ### Requirement: Storage is configured at spawn, and neither mode is a default
-A node's storage SHALL be chosen when it is spawned, by name: memory, or a directory. A spawn that names neither SHALL NOT be expressible — no caller wants a default, because the production consumer embeds the runtime and passes a directory inside its own sandbox, and the test suites want memory and say so. The location SHALL NOT be read from the process environment inside the data layer, because several nodes spawn in one process and a directory belongs to one node.
+A node's storage SHALL be chosen when it is spawned, by name: memory, or a directory. A spawn that names neither SHALL NOT be expressible — no caller wants a default, because the production consumer embeds the runtime and passes a directory inside its own sandbox, and the test suites want memory and say so. Memory SHALL exist only behind the data layer's `test-util` feature, so a product build of the runtime has no node that keeps nothing on disk: such a node loses every identity it hosts at its first restart, its node id with them, and none of the runtime's guarantees across a restart holds for it. The location SHALL NOT be read from the process environment inside the data layer, because several nodes spawn in one process and a directory belongs to one node.
 
 **Example:** who names a node's storage, and how.
 
 | caller | spawns with |
 |---|---|
-| the in-process test suites | `SpawnOptions::memory()` |
+| the in-process test suites | `SpawnOptions::memory()`, under `test-util` |
 | pdn-node-http, the container stand | `SpawnOptions::on_directory(dir)`, dir read by the host from `PDN_DATA_DIR` |
 | a host shipped to a device | `SpawnOptions::for_product(dir)`, dir inside its own sandbox |
 | a `SpawnOptions` naming no storage | does not compile: storage is a field with no default, and `SpawnOptions` has no `Default` |
+| a product build naming memory | does not compile: `StorageConfig::Memory` and `SpawnOptions::memory` exist only under `test-util` |
 
 #### Scenario: A node spawned on memory stores in memory
 - **WHEN** a node is spawned with memory named as its storage
