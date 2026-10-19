@@ -95,4 +95,4 @@ Open questions, none blocking this decision: the QR encoding of the invite (a ho
 
 Related: [ADR-0012](0012-linking-over-raw-iroh.md) (the ceremony shape this decision shares), [ADR-0013](0013-identity-isolation-on-one-node.md) (two identities of one node, joined inside the process), [ADR-0014](0014-store-sessions-judged-by-the-embedder.md) (the sessions that serve the newcomer after the join).
 
-External references: iroh protocol multiplexing — one endpoint, several ALPN-keyed handlers on a router (`Router::builder(endpoint).accept(alpn, handler)`); pdn-store `DocTicket { capability, nodes }` — a bearer token carrying the replica capability and node addresses (`src/ticket.rs`).
+External references: iroh protocol multiplexing — one endpoint, several ALPN-keyed handlers on a router (`Router::builder(endpoint).accept(alpn, handler)`); pdn-store `DocTicket { capability, nodes, identity }` — a bearer token carrying the replica capability, node addresses and the identity whose replica those nodes hold (`src/ticket.rs`).

@@ -57,7 +57,7 @@ A key orders one writer's operations; a merge across writers needs the operation
 | option | a2 |
 |---|---|
 | dependencies in the payload | holds the deletion; the merge waits for operation 3, or merges over the gap if it allows one |
-| dependencies read by the record store | reads the deletion only once operation 3 is held |
+| dependencies read by the record view | reads the deletion only once operation 3 is held |
 
 ### What keeps a document's history bounded
 
@@ -90,7 +90,7 @@ Several devices of one member edit one document while disconnected from each oth
 
 ## Capabilities
 
-None is settled. Every option touches `components/mee-pdn/pdn-node/pods`, whose reading of a mergeable-document returns operations; a merge in pdn-layer adds a capability of pdn-layer, and a dependency read by the record store touches `components/mee-pdn/data-layer/pod-store`.
+None is settled. Every option touches `components/mee-pdn/pdn-node/pods`, whose reading of a mergeable-document returns operations; a merge in pdn-layer adds a capability of pdn-layer, and a dependency read by the record view touches `components/mee-pdn/data-layer/pod-store`.
 
 ## Impact
 

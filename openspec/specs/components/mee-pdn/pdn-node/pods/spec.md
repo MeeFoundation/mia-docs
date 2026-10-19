@@ -88,7 +88,7 @@ trait PodsService {
     async fn list_unknown(&self, identity: PdnId, pod: PodId) -> Result<Vec<UnknownEntry>>;
 }
 
-/// The create act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by the device sweep — never through `act`.
+/// The create act is written by `create`, the invite act by the inviting device inside the join dialogue, device statements by `create`, the join dialogue and a device registering itself — never through `act`.
 enum PodAct { Promote(PdnId), Demote(PdnId), Remove(PdnId), Leave }
 struct RecordRef { member: PdnId, kind: RecordKind, id: RecordId }
 enum RecordKind { Claim, MergeableDocument, ImmutableDocument }

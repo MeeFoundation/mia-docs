@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from a pod's join because the stakes differ (a write ticket to the whole private metadata store (PMS) versus a pod's two store tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its PMS, which is what every later device is brought up onto. The dialogue hands the newcomer that PMS directly — a write ticket to the identity's [PMS](../../data-layer/private-metadata-store/spec.md), minted from the inviter's local replica and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter registers the newcomer as pending before replying, the newcomer confirming itself once the ticket is in hand. The exchange is bearer-level: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue that is not built, and both devices must be online — pending linking invites, device removal and revocation are not provided.
+How a further device joins an identity, realizing [ADR-0012](../../../../architecture/adr/0012-linking-over-raw-iroh.md) on the runtime: a linking dialogue — one raw bidirectional exchange on the dedicated linking ALPN, separate from a pod's join because the stakes differ (a write ticket to the whole private metadata store (PMS) versus a pod's two store tickets) — whose handler the runtime registers at spawn through the data-layer [assembly slot](../../data-layer/node-assembly/spec.md) and whose dial side rides the node's dial handle. The first-device counterpart belongs here too: creating an identity provisions its PMS, which is what every later device is brought up onto. The dialogue hands the newcomer that PMS directly — a write ticket to the identity's [PMS](../../data-layer/private-metadata-store/spec.md), minted from the inviter's local replica and carried in the reply — so nothing in the linking critical path waits on reconciliation, and the inviter registers the newcomer as pending before replying, the newcomer confirming itself once the ticket is in hand. The exchange is bearer-level: the KERI proof of control over the presented `PdnId` is a marked step of this dialogue that is not built, and both devices must be online — an invite redeemed while the inviting device is offline, device removal and revocation are not provided.
 
 ## Requirements
 
@@ -236,7 +236,7 @@ Creating an identity SHALL provision its store set on the creating device: the P
 | key | value | what it records |
 |---|---|---|
 | `devices/<a1-node-id>` | `01` | a1, the only confirmed device |
-| `identity-key` | the serialized identity key pair | the key Alice's `PdnId` derives from |
+| `identity-key` | the identity key pair's 32 secret bytes | the key Alice's `PdnId` derives from |
 
 #### Scenario: Creation provisions the PMS
 - **WHEN** an identity is created on a runtime

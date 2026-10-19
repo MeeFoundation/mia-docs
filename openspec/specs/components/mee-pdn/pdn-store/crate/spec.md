@@ -113,7 +113,7 @@ An item of the store SHALL be public only when something outside the store's sou
 | binary | holds |
 |---|---|
 | the library's unit tests | the tests in `src/` |
-| `client` | the default author's tests |
+| `client` | the handles' tests: the default author, a handle outliving the last `Docs`, a flushed write on disk |
 | `dispatch` | the dispatch of a session to the identity it names, and the dial retries |
 | `sync` | the scenarios of two or more engines syncing |
 

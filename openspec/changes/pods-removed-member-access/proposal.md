@@ -36,12 +36,12 @@ Nothing is decided. The change settles how a pod sheds a member entirely and wha
 
 ### What a removed member's device is sent unasked
 
-A dial from a replica whose membership view lists nobody yet sends its callee the device statements of the replica's own identity, the callee unchecked, as the pod-store spec and Invariant 2 allow, so a device whose siblings are gone reaches a member device. That callee is a node the store's ticket names, and a ticket names the devices of the identity that minted it: a newcomer whose inviter was removed before the newcomer's first session sends its statement to the removed member's device, an entry outside that device's departure's past. The code chooses the same egress when the view lists members but the member the callee is named as lists no device (`unserved` in `crates/data-layer/src/access.rs`), a case no spec states.
+A dial from a replica whose membership view lists nobody yet sends its callee the device statements of the replica's own identity, the callee unchecked, as the pod-store spec and Invariant 2 allow, so a device whose siblings are gone reaches a member device. That callee is a node the store's ticket names, and a ticket names the devices of the identity that minted it: a newcomer whose inviter was removed before the newcomer's first session sends its statement to the removed member's device, an entry outside that device's departure's past. The code chooses the same egress when the view counts no current member, a view listing only former members included, and when the view lists members but the member the callee is named as lists no device (`unserved` in `crates/data-layer/src/access.rs`); the pod-store spec and Invariant 2 record both cases as what the code does, and require neither.
 
-- Keep the egress as Invariant 2 names it, the device statements of one identity being all a removed member's device is sent this way, and either state the second case in the pod-store spec or close it in the code.
+- Keep the egress as Invariant 2 names it, the device statements of one identity being all a removed member's device is sent this way, and either make the second case a requirement of the pod-store spec or close it in the code.
 - Drop the egress from dials and rely on the accept side, where a session naming a current member whose records do not list the caller takes that member's statements: the newcomer then waits until a member device dials it, which without address lookup may not happen.
 
-**Example:** Bob joins "Family" through Alice's phone a1 while a1 is offline; Carol, an owner, then removes Alice; Bob's phone b1 has had no session yet.
+**Example:** Bob joins "Family" through Alice's phone a1, which goes offline as the dialogue ends; Carol, an owner, then removes Alice, and a1 takes the removal once it is back; Bob's phone b1 has had no session yet.
 
 | step | b1 | a1 |
 |---|---|---|
