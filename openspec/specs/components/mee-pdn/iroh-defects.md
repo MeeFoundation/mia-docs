@@ -17,6 +17,7 @@ Every defect listed here carries a name: the crate it lies in and a number of th
 | iroh-blobs-003 | a request reaching a file store that is shutting down panics | issue #233 and pull request #214, open | the node's stop order and a blob protocol handler of its own |
 | iroh-blobs-004 | a store's garbage collection outlives the store | no issue names it | the protect callback ends the collection's task |
 | iroh-blobs-005 | the memory store's collection removes a payload imported while it runs | unfixed on main | no collection runs over a memory store |
+| iroh-blobs-006 | a download from a provider that accepts the request and sends nothing never ends | no issue names it | pdn-store fetches in a task of its own, dropped after 10 s with no progress |
 | iroh-docs-001 | a dial the remote aborts as already syncing leaves the pair stuck | pull request #111 of ours, open | pdn-store's own fix |
 | iroh-docs-002 | a payload the session's sender lacked waits on one gossip message | pull request #112 of ours, open | pdn-store's own fix |
 | iroh-gossip-001 | a peer that restarted with the same node id gets no neighbor | fixed on main, unreleased | upstream's main at a fixed revision |
@@ -95,6 +96,10 @@ A collection run marks the payloads every tag and temp tag names, then sweeps ev
 | the run marks every tag and temp tag | the claim's payload not imported yet |
 | the claim's payload is imported, its temp tag taken, its entry written | entry and payload held |
 | the run sweeps | the payload removed: no mark names it, and the memory store does not remember it was just written |
+
+## iroh-blobs-006 · iroh-blobs 0.103: a download from a provider that accepts the request and sends nothing never ends
+
+iroh-blobs' `Downloader` asks the providers of a payload one after another, in a task of its own, and moves to the next only when one fails. A provider that accepts the request and sends nothing never fails: iroh's keep-alive, every 5 seconds, keeps the connection open, and nothing bounds the request in time. The download waits for as long as the provider stays connected, and a provider registered later reaches it only through a new download, which the engine starts after a failure that never comes. Dropping the download's handle does not help: the downloader's task notices a receiver gone only at its next progress message, which a silent provider never causes, so the request's stream stays taken. A modified node does this by answering nothing, and an honest node does it when its blob store hangs. `a_silent_providers_payloads_come_from_another_provider` in pdn-store's `tests/sync.rs` reproduces it: against an engine that downloads through the `Downloader`, none of 5 payloads first asked of a provider that answers nothing arrives within 60 seconds, though a second provider holding them finished a session with the replica. The platform does not use the `Downloader`: pdn-store's live actor fetches each payload from one provider with `fetch`, whose future runs in a task the actor owns, and drops it after 10 seconds with no progress, freeing its stream and handing the payload to the other providers registered for it, the reconciliation sessions spec's "A download that makes no progress is handed on". The same test holds it: against the fetch, every payload arrives from the second provider about 10 seconds after its request to the silent one.
 
 ## iroh-002 · iroh 1.3: an HTTP client in the same build panics on its first request
 
