@@ -196,7 +196,7 @@ A session cut short at the bound loses what it had not delivered, not what it ha
 
 ### Requirement: A gossip neighbor a dial cannot reach is tried again
 
-A sync dial that fails to connect, and a payload download that fails, toward a peer that is a gossip neighbor in some swarm of the node's engine for that identity SHALL be tried again 1 s after the failure, each further wait twice the one before up to 16 s, for at most 2 minutes after the first failure; an exchange with the pair that ends any way but a failed connection, the download succeeding, or the peer ceasing to be a neighbor in every swarm SHALL end the series. A series SHALL keep at most one try due: a failure that another trigger brings while a try is due schedules none of its own, and a series that has run its 2 minutes SHALL stay run out until what ends it, so no later failure starts it again. A try due when its replica is left SHALL dial and fetch nothing for it. A peer that is no neighbor SHALL NOT be retried this way: its next sync report or pass dials it. The transport sends a new connection's handshake on the path it last selected for a peer while any connection to that peer lives, and selects again only when a connection or one of its paths opens or a path is abandoned, so a device that restarts on a new port connects to the others at once while their dials keep going to its old port until it opens another connection. Without the retry, what a device places after a restart without a goodbye — a kill, a crash, a battery pulled — waits for the other members' next pod pass even when its announcement arrived; with it, the record follows the path's healing. A record whose announcement reached no neighbor still waits for that pass.
+A sync dial that fails to connect, and a payload download that fails to connect, loses its connection or makes no progress, toward a peer that is a gossip neighbor in some swarm of the node's engine for that identity SHALL be tried again 1 s after the failure, each further wait twice the one before up to 16 s, for at most 2 minutes after the first failure; an exchange with the pair that ends any way but a failed connection, the download succeeding, or the peer ceasing to be a neighbor in every swarm SHALL end the series. A series SHALL keep at most one try due: a failure that another trigger brings while a try is due schedules none of its own, and a series that has run its 2 minutes SHALL stay run out until what ends it, so no later failure starts it again. A try due when its replica is left SHALL dial and fetch nothing for it. A peer that is no neighbor SHALL NOT be retried this way: its next sync report or pass dials it. The transport sends a new connection's handshake on the path it last selected for a peer while any connection to that peer lives, and selects again only when a connection or one of its paths opens or a path is abandoned, so a device that restarts on a new port connects to the others at once while their dials keep going to its old port until it opens another connection. Without the retry, what a device places after a restart without a goodbye — a kill, a crash, a battery pulled — waits for the other members' next pod pass even when its announcement arrived; with it, the record follows the path's healing. A record whose announcement reached no neighbor still waits for that pass.
 
 **Example:** Alice's tablet a3 is killed and starts again on port 48670, its old one 51650; Bob's phone b1 is the other member of "Family", and a3 is a gossip neighbor of b1 throughout.
 
@@ -224,8 +224,88 @@ A sync dial that fails to connect, and a payload download that fails, toward a p
 
 #### Scenario: A download from a neighbor is tried again until its replica is left
 
-- **WHEN** a payload download fails from a provider that is a gossip neighbor in the replica's swarm
+- **WHEN** a payload download from a provider that is a gossip neighbor in the replica's swarm loses its connection
 - **THEN** the download is tried again, and a try due when the replica is left fetches nothing
+
+### Requirement: A dial crossing one its pair refused goes through
+
+When a dial arrives from a peer while this side's own dial of that pair runs, and the pair refused this side's last dial with the uniform refusal a node gives a caller it does not serve, the arriving dial SHALL take the pair over, whatever the tie-break between two crossing dials would decide; a session with the pair that goes through, in either direction, SHALL end that standing. Two crossing dials otherwise meet the tie-break, which keeps one side's dial and aborts the other's as already syncing. When the side whose dial is kept is the one the other refuses — a device that joined a pod a moment ago serves no member until its membership view counts one — and a pass or a queued resync keeps a dial of it in flight, every dial of the side that would be served is aborted and no session goes through, on a slow device for as long as the passes go on.
+
+**Example:** Dave's phone d1 joins "Family" through Alice's laptop a1, on a device slow enough that each of a1's dials takes a second and a half to be refused, while a1's pass asks for a dial of d1 every half second, and the tie-break keeps a1's dial over d1's.
+
+| t | a1 | d1 |
+|---|---|---|
+| 0 s | dials d1 | dials a1; a1 aborts it as already syncing, its own dial kept by the tie-break |
+| 1.5 s | d1 refuses the dial: its membership view counts no member yet | |
+| 1.6 s | dials d1 again | redials a1, while a1's new dial runs; a1 lets it through, since d1 refused a1's last dial, and serves it |
+| 1.7 s | | d1's view counts Alice; d1 serves a1's dials from now on |
+
+#### Scenario: A dial crossing one its pair refused takes the pair over
+
+- **WHEN** a dial arrives from a peer while this side's own dial of the pair runs, the tie-break keeping this side's dial, and the pair refused this side's last dial
+- **THEN** the arriving dial goes through, and with no refusal the same dial is aborted as already syncing
+
+### Requirement: Payload downloads toward one provider are bounded
+
+A payload's provider is a node registered as holding it: the sender of the entry that names it, when the sender holds it, the peer of a session that ends while it is wanted, or a gossip neighbor that announces it. A node's engine for an identity SHALL have at most 100 payload downloads in flight toward one provider, the number of bidirectional streams the node's endpoint grants a connection, and SHALL hold every other payload its replicas want as an entry of a queue rather than as a running download. A payload is wanted while an entry of one of the engine's replicas names it and the blob store does not hold it whole. A waiting payload SHALL be fetched from a provider registered as holding it that has room, and a provider registered while the payload waits, by a session that ends or by an announcement, SHALL be one it can be fetched from. The limit SHALL NOT be a parameter of the node's host and SHALL NOT change while the node runs. A provider grants a connection no more streams than that, so a download beyond the limit would only wait inside the transport, holding the memory of a running download. A provider's answer that it lacks a payload, whole or in part, SHALL drop that payload from it alone: the provider keeps its limit and pauses for nothing, a gossip neighbor as any other, and is asked for that payload again once it is registered for it again. A session's end registers its peer for every payload the replica waits for without knowing which it holds, so in a young pod such answers are the rule, and a pause for each would hold back the payloads the provider does hold.
+
+**Example:** Alice's tablet a3 joins "Family", a pod of 20,000 records whose payloads Alice's laptop a1 holds; Bob's phone b1, which holds them too, finishes a session with a3 midway.
+
+| moment | downloads toward a1 | downloads toward b1 | payloads waiting on a3 |
+|---|---|---|---|
+| the session with a1 has brought every entry | 100 | 0 | 19,900 |
+| a1 has answered one more request | 100 | 0 | 19,899 |
+| b1's session with a3 has ended | 100 | 100 | 19,699 |
+
+#### Scenario: A catch-up keeps the limit toward its provider
+
+- **WHEN** a replica joins a namespace of 2,000 entries whose payloads one provider holds
+- **THEN** the provider never has more of the replica's blob requests open at once than the limit, and every payload arrives
+
+#### Scenario: A provider registered during a catch-up takes waiting payloads
+
+- **WHEN** a second provider of the same payloads finishes a session with the replica while payloads wait
+- **THEN** waiting payloads are fetched from both providers, at most the limit toward each, and every payload arrives
+
+#### Scenario: A neighbor lacking a payload has its own fetched at once
+
+- **WHEN** a provider that is a gossip neighbor of the replica answers that it lacks a payload the replica waits for, and then writes a record of its own
+- **THEN** the record's payload is fetched from it at once, with no pause
+
+### Requirement: A download that makes no progress is handed on
+
+A payload download that receives nothing from its provider for 10 seconds SHALL be dropped, its stream with it, and the payload SHALL be fetched from another provider registered as holding it. The provider SHALL then pause: no download SHALL go to it for 1 second, each further pause twice the one before up to 16 seconds, for at most 2 minutes after the first; after each pause one download SHALL probe it, and a download from it that succeeds SHALL end the pauses and give it its limit back. A payload whose only provider stalled SHALL stay queued for that provider and SHALL be fetched from it again after its pause, with no session needed. A provider whose 2 minutes ran out SHALL be asked for nothing until a session with it ends, and a payload no other provider holds SHALL wait for that session. A download that fails on the node's own blob store SHALL pause no provider. Without the bound, a provider that accepts a request and sends nothing holds the download for as long as its connection stays open, and the transport keeps a quiet connection open with a keep-alive every 5 seconds.
+
+**Example:** Bob's phone b1 is the only provider of a payload P that Alice's tablet a3 wants, and b1 answers nothing for its first 25 seconds.
+
+| t | a3 |
+|---|---|
+| 0 s | asks b1 for P |
+| 10 s | drops the request; b1 pauses for 1 s |
+| 11 s | probes b1 with P |
+| 21 s | drops the probe; b1 pauses for 2 s |
+| 23 s | probes b1 with P; b1 starts answering at 25 s |
+| 25 s | P arrives; b1 may have 100 downloads in flight again |
+
+#### Scenario: A silent provider's payloads come from another provider
+
+- **WHEN** a provider accepts every blob request of a replica and answers none, while a second provider holds the same payloads
+- **THEN** every payload arrives from the second provider, those first asked of the silent one after their requests were dropped
+
+#### Scenario: The only provider, silent for a while, is asked again
+
+- **WHEN** the only provider of a replica's payloads answers nothing for 15 seconds and then serves
+- **THEN** every payload arrives once it serves, with no session between
+
+#### Scenario: A provider silent for 2 minutes waits for a session
+
+- **WHEN** a provider answers no request of a replica for 2 minutes
+- **THEN** no download goes to it until a session with it ends, and its payloads are asked for again after that session
+
+#### Scenario: A failure on the node's own blob store pauses no provider
+
+- **WHEN** a download fails because the node's blob store cannot write the payload
+- **THEN** the payload waits as one still wanted, and its provider keeps its limit
 
 ### Requirement: The gossip topic carries no content
 
