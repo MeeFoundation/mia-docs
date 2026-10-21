@@ -7,7 +7,7 @@
 ## 2. The limit
 
 - [x] 2.1 In the data layer's `src/node.rs`, one constant for the bidirectional stream count, 100, set in `bind_endpoint` beside the unidirectional count; `just check` passes
-- [x] 2.2 The store's builder in `src/protocol.rs` takes the limit of fetches in flight per provider, 100 by default, and the data layer hands it the constant of 2.1; `Engine::spawn` takes the pool's options and the limit in place of a `Downloader`; `just check` passes
+- [x] 2.2 The store's builder in `src/protocol.rs` takes the limit of fetches in flight per provider, 100 by default, and the data layer hands it the constant of 2.1; `Engine::spawn` takes the limit in place of a `Downloader`, and the pool runs on iroh-util's default options; `just check` passes
 
 ## 3. Fetching (design D2 to D6)
 
@@ -25,7 +25,7 @@
 - [x] 4.3 "The only provider, silent for a while, is asked again": the only provider answers nothing for 15 seconds and then serves, every payload arrives, and the replica records no `SyncFinished` between; with the provider left for the payload after its stall, the payloads do not arrive before a session
 - [x] 4.4 "A provider silent for 2 minutes waits for a session": the unit tests of 3.4 run the series to its end and check that no fetch goes to the provider until a session's end registers it again
 - [x] 4.5 "A failure on the node's own blob store pauses no provider": the unit test of 3.5, which fails with local failures counted against the provider
-- [x] 4.6 `downloads_past_a_hundred_toward_a_silent_peer_all_end` drives the pool the engine uses, and still fails against iroh-util 0.6.0, checked by dropping the patch locally
+- [x] 4.6 `connections_past_a_hundred_toward_a_silent_peer_all_end` drives the pool the engine uses, and still fails against iroh-util 0.6.0, checked by dropping the patch locally
 
 ## 5. Docs
 

@@ -48,7 +48,7 @@ None.
 
 ## Impact
 
-- **`crates/pdn-store`**: `src/engine/live.rs` — `queue_download`, `start_download`, `on_download_ready`, `on_sync_finished`, `on_content_scanned`, the `RetryDownload` message, `retry_unreached_download`, `end_retries_toward`, `QueuedHashes`; `ProviderNodes` goes. `Engine::spawn` in `src/engine.rs` and the builder in `src/protocol.rs` take a connection pool's options and the limit in place of a `Downloader`.
+- **`crates/pdn-store`**: `src/engine/live.rs` — `queue_download`, `start_download`, `on_download_ready`, `on_sync_finished`, `on_content_scanned`, the `RetryDownload` message, `retry_unreached_download`, `end_retries_toward`, `QueuedHashes`; `ProviderNodes` goes. `Engine::spawn` in `src/engine.rs` and the builder in `src/protocol.rs` take the limit in place of a `Downloader`; the pool runs on iroh-util's default options.
 - **`crates/data-layer`**: `bind_endpoint` in `src/node.rs` sets the bidirectional stream count from the constant it hands the store's builder.
-- **Tests**: the store's test node gains a blob handler that counts its streams and one that answers nothing; `downloads_past_a_hundred_toward_a_silent_peer_all_end` in `tests/sync.rs` drives the pool the engine now uses.
+- **Tests**: the store's test node gains a blob handler that counts its streams and one that answers nothing; `connections_past_a_hundred_toward_a_silent_peer_all_end` in `tests/sync.rs` drives the pool the engine now uses.
 - **Docs**: `crates/pdn-store/CLAUDE.md`, `components/mee-pdn/iroh-defects.md`.
