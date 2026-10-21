@@ -6,7 +6,7 @@ date: 2026-09-18
 
 ## Context and Problem Statement
 
-A node hosts the store sets of several identities of one person — Alice-at-work and Alice-at-leisure — and co-location is not a trust boundary: the platform holds two identities of one person as separate as two strangers. The node itself does not hold them apart. It keeps one replica per namespace, one author for every store it writes, and classifies a session by the caller's node id, which resolves to every identity that published it; so what two identities acquire is stored together, written under one name, and told apart only by a check at each point that reads it. The decision is what level of isolation between identities on one node the platform commits to.
+A node hosts the store sets of several identities of one person — Alice-at-work and Alice-at-leisure — and co-location is not a trust boundary: the platform holds two identities of one person as separate as two strangers. Until this decision the node itself did not hold them apart. It kept one replica per namespace, one author for every store it wrote, and classified a session by the caller's node id, which resolved to every identity that published it; so what two identities acquired was stored together, written under one name, and told apart only by a check at each point that read it. The decision is what level of isolation between identities on one node the platform commits to.
 
 ## Decision Drivers
 
@@ -31,7 +31,7 @@ Chosen: **replicas, an author and sessions per hosted identity**, over the endpo
 The shape, specified by the identity-scoped replicas and in-process sessions capabilities under `components/mee-pdn/data-layer/` and by [multi-identity](../../components/mee-pdn/data-layer/multi-identity/spec.md):
 
 * Every replica belongs to exactly one hosted identity, and the act that creates or imports it names that identity. Two identities that acquired one namespace hold a replica each.
-* A sync session names the identity whose replica it addresses and the identity its caller acts as, as opaque bytes the store compares and never interprets. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted.
+* A sync session names the identity whose replica it addresses and the identity its caller acts as, as opaque bytes the store compares and never interprets. A node may name only an identity whose device set lists its node id; anything else is refused as not hosted. An identity's PMS is the exception, served to whoever names its identity, since its ticket bounds it (Invariant 1).
 * A session's rights, its egress filter and its write admission follow the named identity alone, and are never unioned across the identities a node hosts.
 * Each identity writes with its own author, persisted with its own stores.
 * Two identities of one node reach each other through a path inside the process, because a node does not dial its own endpoint; they join a pod and converge exactly as identities on two nodes do.

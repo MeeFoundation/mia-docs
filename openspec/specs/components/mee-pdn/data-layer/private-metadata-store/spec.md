@@ -123,7 +123,7 @@ The PMS SHALL expose the namespace of its replica, so a caller that imported it 
 
 ### Requirement: One identity key pair per identity, at a fixed path
 
-The identity key pair SHALL be minted when an identity is created and stored in its PMS at path `identity-key`, the serialized key pair as the payload, written once and never rewritten. It replicates to the identity's other devices like every PMS entry, so every device of the identity holds the same key pair, and reading it SHALL return it only once its payload bytes have arrived. The key pair is one per identity and serves every pod the identity is a member of; no pod kind carries a copy.
+The identity key pair SHALL be minted when an identity is created and stored in its PMS at path `identity-key`, the key pair's 32 secret bytes, from which the pair follows, as the payload, written once and never rewritten. It replicates to the identity's other devices like every PMS entry, so every device of the identity holds the same key pair, and reading it SHALL return it only once its payload bytes have arrived. The key pair is one per identity and serves every pod the identity is a member of; no pod kind carries a copy.
 
 **Example:** Alice is created on her phone a1 and her laptop a2 is linked into her; her identity key pair is the one whose secret is 32 bytes of `33`.
 

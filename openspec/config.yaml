@@ -6,7 +6,7 @@ schema: spec-driven
 context: |
   PDN — a decentralized, local-first data platform in Rust, focused on privacy and user sovereignty. Layers: pdn-layer (domain) / data-layer (sync over pdn-store, our iroh-docs variant) / iroh (bytes on the wire), glued by the pdn-node runtime. Specs live here; the code is the sibling Cargo workspace, whose CLAUDE.md holds the code and docs rules every change is held to.
 
-  Main spec tree layout. A capability spec is specs/<path>/spec.md and its capability id is that <path>: the workspace's specs sit at components/mee-pdn/<crate>/<topic>/spec.md, one directory per crate, and the other components' at components/<component>/<topic>/spec.md. A delta sits in the change at the same path, changes/<name>/specs/<path>/spec.md, so `openspec validate --specs` covers the main tree and archive lands every delta where it belongs. Links inside a delta are written for its place in the main tree, not for the change directory. Documents without requirements — components/mee-pdn/invariants.md, components/mee-pdn/threat-model.md, the ai-assistant notes — keep the <name>.md form and are outside the tool's reach.
+  Main spec tree layout. A capability spec is specs/<path>/spec.md and its capability id is that <path>: the workspace's specs sit at components/mee-pdn/<crate>/<topic>/spec.md, one directory per crate, and the other components' at components/<component>/<topic>/spec.md. A delta sits in the change at the same path, changes/<name>/specs/<path>/spec.md, so `openspec validate --specs` covers the main tree and archive lands every delta where it belongs. Links inside a delta are written for its place in the main tree, not for the change directory. Documents without requirements — components/mee-pdn/invariants.md, components/mee-pdn/threat-model.md, components/mee-pdn/iroh-defects.md, the ai-assistant notes — keep the <name>.md form and are outside the tool's reach.
 
   Cross-cutting practices every change is held to — read the one that applies before writing, they are short:
 
@@ -41,7 +41,7 @@ rules:
     - >-
       An operating condition that changes the outcome earns its own scenario. A condition deliberately out of scope is named in the proposal, not left unmentioned — an unmentioned condition reads as one nobody considered.
     - >-
-      Verify a scenario against the running code or its test before writing it down. A plausible formulation once claimed a zero-length write degenerates into deletion, while the engine rejects it (AttemptedToInsertEmptyEntry); each scenario corresponds to a test or a checked property of pdn-store.
+      Verify a scenario against the running code or its test before writing it down. A plausible formulation once claimed a zero-length write degenerates into deletion, while the engine rejects it (InsertError::EntryIsEmpty); each scenario corresponds to a test or a checked property of pdn-store.
     - >-
       A delta that introduces a capability carries a `## Purpose`; archive seeds the main spec with it and writes a placeholder otherwise.
     - >-
