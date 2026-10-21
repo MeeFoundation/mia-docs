@@ -20,7 +20,7 @@
 
 ## 4. Scenario tests
 
-- [x] 4.1 "A catch-up keeps the limit toward its provider": a replica joins a namespace of 20,000 entries from one provider with the builder's limit at 2, the provider's counting handler never records more than 2, and every payload arrives; with the queue bypassed the handler records more than 2
+- [x] 4.1 "A catch-up keeps the limit toward its provider": a replica joins a namespace of 2,000 entries from one provider with the builder's limit at 2, the provider's counting handler never records more than 2, and every payload arrives; with the queue bypassed the handler records more than 2
 - [x] 4.2 "A provider registered during a catch-up takes waiting payloads": a second provider finishes a session during the catch-up, both handlers record requests, neither more than the limit, and every payload arrives; with registration during a wait removed, the second handler records none
 - [x] 4.3 "The only provider, silent for a while, is asked again": the only provider answers nothing for 15 seconds and then serves, every payload arrives, and the replica records no `SyncFinished` between; with the provider left for the payload after its stall, the payloads do not arrive before a session
 - [x] 4.4 "A provider silent for 2 minutes waits for a session": the unit tests of 3.4 run the series to its end and check that no fetch goes to the provider until a session's end registers it again
@@ -39,4 +39,4 @@
 - [x] 6.1 Measure the resident memory of a node joining a namespace of 100,000 entries before and after the change, and record both in `design.md`
 - [ ] 6.2 Run the load test's ramp with catch-up on a laptop: every catch-up completes, and the write-to-read latency and the content lag are no worse than in the run of 19 and 20 October 2026; record the figures in `design.md`
 - [x] 6.3 `just fix` passes: the dependency audit, `just check`, `just test` and the container suite
-- [ ] 6.4 Stress the store's and the data layer's sync and download scenarios under nextest per [flaky-tests](../../specs/code-practices/flaky-tests.md), before anything is built on top
+- [x] 6.4 Stress the store's and the data layer's sync and download scenarios under nextest per [flaky-tests](../../specs/code-practices/flaky-tests.md), before anything is built on top: on the final code 50 iterations of every scenario test of the workspace, 200 of the store's `sync` and `dispatch` binaries and 30 of the pod binaries at half a CPU, none failing

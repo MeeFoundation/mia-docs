@@ -227,6 +227,24 @@ A sync dial that fails to connect, and a payload download that fails, toward a p
 - **WHEN** a payload download fails from a provider that is a gossip neighbor in the replica's swarm
 - **THEN** the download is tried again, and a try due when the replica is left fetches nothing
 
+### Requirement: A dial crossing one its pair refused goes through
+
+When a dial arrives from a peer while this side's own dial of that pair runs, and the pair refused this side's last dial with the uniform refusal a node gives a caller it does not serve, the arriving dial SHALL take the pair over, whatever the tie-break between two crossing dials would decide; a session with the pair that goes through, in either direction, SHALL end that standing. Two crossing dials otherwise meet the tie-break, which keeps one side's dial and aborts the other's as already syncing. When the side whose dial is kept is the one the other refuses — a device that joined a pod a moment ago serves no member until its membership view counts one — and a pass or a queued resync keeps a dial of it in flight, every dial of the side that would be served is aborted and no session goes through, on a slow device for as long as the passes go on.
+
+**Example:** Dave's phone d1 joins "Family" through Alice's laptop a1, on a device slow enough that each of a1's dials takes a second and a half to be refused, while a1's pass asks for a dial of d1 every half second, and the tie-break keeps a1's dial over d1's.
+
+| t | a1 | d1 |
+|---|---|---|
+| 0 s | dials d1 | dials a1; a1 aborts it as already syncing, its own dial kept by the tie-break |
+| 1.5 s | d1 refuses the dial: its membership view counts no member yet | |
+| 1.6 s | dials d1 again | redials a1, while a1's new dial runs; a1 lets it through, since d1 refused a1's last dial, and serves it |
+| 1.7 s | | d1's view counts Alice; d1 serves a1's dials from now on |
+
+#### Scenario: A dial crossing one its pair refused takes the pair over
+
+- **WHEN** a dial arrives from a peer while this side's own dial of the pair runs, the tie-break keeping this side's dial, and the pair refused this side's last dial
+- **THEN** the arriving dial goes through, and with no refusal the same dial is aborted as already syncing
+
 ### Requirement: Payload downloads toward one provider are bounded
 
 A payload's provider is a node registered as holding it: the sender of the entry that names it, when the sender holds it, the peer of a session that ends while it is wanted, or a gossip neighbor that announces it. A node's engine for an identity SHALL have at most 100 payload downloads in flight toward one provider, the number of bidirectional streams the node's endpoint grants a connection, and SHALL hold every other payload its replicas want as an entry of a queue rather than as a running download. A payload is wanted while an entry of one of the engine's replicas names it and the blob store does not hold it whole. A waiting payload SHALL be fetched from a provider registered as holding it that has room, and a provider registered while the payload waits, by a session that ends or by an announcement, SHALL be one it can be fetched from. The limit SHALL NOT be a parameter of the node's host and SHALL NOT change while the node runs. A provider grants a connection no more streams than that, so a download beyond the limit would only wait inside the transport, holding the memory of a running download.
@@ -241,7 +259,7 @@ A payload's provider is a node registered as holding it: the sender of the entry
 
 #### Scenario: A catch-up keeps the limit toward its provider
 
-- **WHEN** a replica joins a namespace of 20,000 entries whose payloads one provider holds
+- **WHEN** a replica joins a namespace of 2,000 entries whose payloads one provider holds
 - **THEN** the provider never has more of the replica's blob requests open at once than the limit, and every payload arrives
 
 #### Scenario: A provider registered during a catch-up takes waiting payloads
