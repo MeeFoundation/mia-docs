@@ -247,7 +247,7 @@ When a dial arrives from a peer while this side's own dial of that pair runs, an
 
 ### Requirement: Payload downloads toward one provider are bounded
 
-A payload's provider is a node registered as holding it: the sender of the entry that names it, when the sender holds it, the peer of a session that ends while it is wanted, or a gossip neighbor that announces it. A node's engine for an identity SHALL have at most 100 payload downloads in flight toward one provider, the number of bidirectional streams the node's endpoint grants a connection, and SHALL hold every other payload its replicas want as an entry of a queue rather than as a running download. A payload is wanted while an entry of one of the engine's replicas names it and the blob store does not hold it whole. A waiting payload SHALL be fetched from a provider registered as holding it that has room, and a provider registered while the payload waits, by a session that ends or by an announcement, SHALL be one it can be fetched from. The limit SHALL NOT be a parameter of the node's host and SHALL NOT change while the node runs. A provider grants a connection no more streams than that, so a download beyond the limit would only wait inside the transport, holding the memory of a running download. A provider's answer that it lacks a payload, whole or in part, SHALL drop that payload from it alone: the provider keeps its limit and pauses for nothing, a gossip neighbor as any other, and is asked for that payload again once it is registered for it again. A session's end registers its peer for every payload the replica waits for without knowing which it holds, so in a young pod such answers are the rule, and a pause for each would hold back the payloads the provider does hold.
+A payload's provider is a node registered as holding it: the sender of the entry that names it, when the sender holds it, the peer of a session that ends while it is wanted, or a gossip neighbor that announces it. A node's engine for an identity SHALL have at most 100 payload downloads in flight toward one provider, the number of bidirectional streams the node's endpoint grants a connection, and SHALL hold every other payload its replicas want as an entry of a queue rather than as a running download. A payload is wanted while an entry of one of the engine's replicas names it and no download of it has landed or found the blob store holding it whole; a payload another identity of the node has already fetched stays wanted until its turn in a queue comes. A waiting payload SHALL be fetched from a provider registered as holding it that has room, and a provider registered while the payload waits, by a session that ends or by an announcement, SHALL be one it can be fetched from. The limit SHALL NOT be a parameter of the node's host and SHALL NOT change while the node runs. A provider grants a connection no more streams than that, so a download beyond the limit would only wait inside the transport, holding the memory of a running download. A provider's answer that it lacks a payload, whole or in part, SHALL drop that payload from it alone: the provider keeps its limit and pauses for nothing, a gossip neighbor as any other, and is asked for that payload again once it is registered for it again. A session's end registers its peer for every payload the replica waits for without knowing which it holds, so in a young pod such answers are the rule, and a pause for each would hold back the payloads the provider does hold.
 
 **Example:** Alice's tablet a3 joins "Family", a pod of 20,000 records whose payloads Alice's laptop a1 holds; Bob's phone b1, which holds them too, finishes a session with a3 midway.
 
@@ -274,7 +274,7 @@ A payload's provider is a node registered as holding it: the sender of the entry
 
 ### Requirement: A download that makes no progress is handed on
 
-A payload download that receives nothing from its provider for 10 seconds SHALL be dropped, its stream with it, and the payload SHALL be fetched from another provider registered as holding it. The provider SHALL then pause: no download SHALL go to it for 1 second, each further pause twice the one before up to 16 seconds, for at most 2 minutes after the first; after each pause one download SHALL probe it, and a download from it that succeeds SHALL end the pauses and give it its limit back. A payload whose only provider stalled SHALL stay queued for that provider and SHALL be fetched from it again after its pause, with no session needed. A provider whose 2 minutes ran out SHALL be asked for nothing until a session with it ends, and a payload no other provider holds SHALL wait for that session. A download that fails on the node's own blob store SHALL pause no provider. Without the bound, a provider that accepts a request and sends nothing holds the download for as long as its connection stays open, and the transport keeps a quiet connection open with a keep-alive every 5 seconds.
+A payload download that receives nothing from its provider for 10 seconds SHALL be dropped, its stream with it, and the payload SHALL be fetched from another provider registered as holding it. The provider SHALL then pause: no download SHALL go to it for 1 second, each further pause twice the one before up to 16 seconds, for at most 2 minutes after the first; after each pause one download SHALL probe it, and a download from it that succeeds SHALL end the pauses and give it its limit back. A payload whose only provider stalled SHALL stay queued for that provider and SHALL be fetched from it again after its pause, with no session needed. A provider whose 2 minutes ran out SHALL be asked for nothing until a session with it ends, and a payload no other provider holds SHALL wait for that session. A download SHALL count as landed only once the blob store holds its payload whole. A download that fails on the node's own blob store SHALL pause no provider, and its payload SHALL wait as one no provider holds does, for the next session's end or an announcement of it: a disk that fills fails every payload alike, and a payload asked for again at once would only fail again. Without the bound, a provider that accepts a request and sends nothing holds the download for as long as its connection stays open, and the transport keeps a quiet connection open with a keep-alive every 5 seconds.
 
 **Example:** Bob's phone b1 is the only provider of a payload P that Alice's tablet a3 wants, and b1 answers nothing for its first 25 seconds.
 
@@ -294,8 +294,8 @@ A payload download that receives nothing from its provider for 10 seconds SHALL 
 
 #### Scenario: The only provider, silent for a while, is asked again
 
-- **WHEN** the only provider of a replica's payloads answers nothing for 15 seconds and then serves
-- **THEN** every payload arrives once it serves, with no session between
+- **WHEN** the only provider of a replica's payloads answers none of the requests it receives for 15 seconds, and serves those it receives after
+- **THEN** every payload arrives once it serves, through requests made after the first ones were dropped, with no session between
 
 #### Scenario: A provider silent for 2 minutes waits for a session
 
@@ -304,8 +304,8 @@ A payload download that receives nothing from its provider for 10 seconds SHALL 
 
 #### Scenario: A failure on the node's own blob store pauses no provider
 
-- **WHEN** a download fails because the node's blob store cannot write the payload
-- **THEN** the payload waits as one still wanted, and its provider keeps its limit
+- **WHEN** a download fails because the node's blob store cannot write the payload, before the transfer ends or after
+- **THEN** no `ContentReady` reports the payload, its provider keeps its limit, and the payload is asked for again at the next session's end
 
 ### Requirement: The gossip topic carries no content
 
