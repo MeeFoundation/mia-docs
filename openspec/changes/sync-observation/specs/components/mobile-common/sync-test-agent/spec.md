@@ -56,7 +56,7 @@ The agent SHALL read the run id and the surface's port from the environment the 
 - **THEN** the other members fold the old identity as departed and the new one as a member, so the pod's member count is the one it had before the leave
 
 ### Requirement: The agent reports what the node and the application cost, and the application's state
-The agent SHALL take, once a second, through its native module, a sample and hand it to the surface: the user and system CPU time of the whole application process since it started (`getrusage` with `RUSAGE_SELF`); the user and system CPU time of the node's threads, those whose name starts with the facade's prefix `pdn-node` and the store's `sync-actor` threads (`task_threads`, then `thread_info` and the name of each thread); the process's resident memory (`phys_footprint` from `task_info`); the device's thermal state (`ProcessInfo.thermalState`); whether Low Power Mode is on (`ProcessInfo.isLowPowerModeEnabled`), which lowers CPU clocks and defers network work; the battery's state and level (`UIDevice.batteryState`, `batteryLevel`); and the application's state; each sample with the time it was taken on the device's clock and a sequence number. The node's CPU time SHALL be accumulated from each thread's change since the previous sample, so it never falls when a thread exits, and a thread that exits between 2 samples loses at most its CPU since the earlier one. The process total less the node's share is the application's own work and every thread no one named, and is reported as such, not as the node's. The agent SHALL also hand over every change of the application's state — `active`, `inactive`, `background` — as it happens, as a sample of its own.
+The agent SHALL take, once a second, through its native module, a sample and hand it to the surface: the user and system CPU time of the whole application process since it started (`getrusage` with `RUSAGE_SELF`); the user and system CPU time of the node's threads — those whose name starts with the facade's prefix `pdn-node`, the store's `sync-actor` threads, and the blob store's own runtime, whose threads are named `iroh-blob-store-` followed by a number and carry the node's payload imports, writes, metadata and collection (`task_threads`, then `thread_info` and the name of each thread); the process's resident memory (`phys_footprint` from `task_info`); the device's thermal state (`ProcessInfo.thermalState`); whether Low Power Mode is on (`ProcessInfo.isLowPowerModeEnabled`), which lowers CPU clocks and defers network work; the battery's state and level (`UIDevice.batteryState`, `batteryLevel`); and the application's state; each sample with the time it was taken on the device's clock and a sequence number. The node's CPU time SHALL be accumulated from each thread's change since the previous sample, so it never falls when a thread exits, and a thread that exits between 2 samples loses at most its CPU since the earlier one. The process total less the node's share is the application's own work and every thread no one named, and is reported as such, not as the node's. The agent SHALL also hand over every change of the application's state — `active`, `inactive`, `background` — as it happens, as a sample of its own.
 
 **Example:** two samples a second apart during a catch-up, as the samples route answers them: the sequence number is the surface's, the sample the native module's.
 
@@ -73,7 +73,7 @@ The coordinator reads 0.885 seconds of CPU for the process over that second, 0.7
 
 #### Scenario: The node's share is reported apart from the application's work
 - **WHEN** the coordinator streams the records of a 1,000-record catch-up through the surface
-- **THEN** the samples over the catch-up show node CPU time below the process CPU time, the difference being the CPU of the threads the facade and the store do not name
+- **THEN** the samples over the catch-up show node CPU time below the process CPU time, the difference being the CPU of the threads neither the facade, the store nor the blob store names
 
 #### Scenario: Leaving the foreground is reported
 - **WHEN** the application leaves the foreground during a run
@@ -99,10 +99,10 @@ The agent SHALL disable the application's idle timer (`isIdleTimerDisabled`) fro
 - **THEN** the samples route answers both changes of state with their times, and the samples taken while it was `inactive` say so, so the cell can be marked invalid
 
 ### Requirement: A relaunch starts new subscriptions
-A subscription SHALL NOT be taken to survive the application's process. After the application is relaunched over the cable, every subscription through its surface SHALL be a new one, carrying a new identifier and counting from `seq` 0, and the new launch's samples start over.
+A subscription SHALL NOT be taken to survive the application's process. After the application is relaunched over the cable, the relaunched surface SHALL bring no node up by itself: the coordinator asks it for a reset and joins the pod again, as the load test does, and every subscription through the surface after that SHALL be a new one, carrying a new identifier and counting from `seq` 0, and the new launch's samples start over. A node brought up again on the directory the previous launch left, under the run's settings, is no path of the surface.
 
-**Example:** the coordinator relaunches the application at 40 seconds. The records before the kill carry subscription `c41e…`, the ones after it `07b2…` counting from 0, and the records the node produced in between are reported by neither.
+**Example:** the coordinator relaunches the application at 40 seconds. The records before the kill carry subscription `c41e…`; the relaunched surface answers that no node is up until the coordinator's reset, whose node joins on a fresh invite; the records after that carry `07b2…` counting from 0, and the records the previous node produced between the kill and the reset are reported by neither.
 
 #### Scenario: A relaunched surface subscribes anew
-- **WHEN** the application is killed and launched again during a run, and the coordinator opens the event route again
-- **THEN** the new subscription carries an identifier not used before, and its records count from `seq` 0
+- **WHEN** the application is killed and launched again during a run, the coordinator asks the relaunched surface for a reset and an observed join, and opens the event route
+- **THEN** the subscription carries an identifier not used before, and its records count from `seq` 0

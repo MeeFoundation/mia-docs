@@ -33,6 +33,7 @@ A capability id is the spec's path under `specs/`; the delta sits at the same pa
 | ---------------------------- | --------------------------------------------------------- |
 | `components/mee-pdn/pdn-mobile/host` | `openspec/specs/components/mee-pdn/pdn-mobile/host/spec.md` |
 | `components/pdn-sdk/artifacts`      | `openspec/specs/components/pdn-sdk/artifacts/spec.md`       |
+| `components/mee-pdn/data-layer/node-assembly` | `openspec/specs/components/mee-pdn/data-layer/node-assembly/spec.md` |
 
 ### New Capabilities
 
@@ -41,7 +42,9 @@ A capability id is the spec's path under `specs/`; the delta sits at the same pa
 
 ### Modified Capabilities
 
-None: this change alters no capability of another component. One line of `components/mee-pdn/pdn-node-http/host/spec.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
+- `components/mee-pdn/data-layer/node-assembly`: gains the periodic reconcile pass over the replicas outside a pod, the interval its spawn names and the 10-second default, as task 6.5 records; a pod's stores keep the pod-store spec's own pass.
+
+Otherwise this change alters no capability of another component. One line of `components/mee-pdn/pdn-node-http/host/spec.md` becomes false when this lands — it says other hosts embed the same core *later* — and is corrected in the same change without a delta, since it is prose rather than a requirement.
 
 ## Impact
 

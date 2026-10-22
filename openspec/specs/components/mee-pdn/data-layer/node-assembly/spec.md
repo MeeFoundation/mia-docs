@@ -204,19 +204,6 @@ The node SHALL run blob collection over its one blob store at an interval `Spawn
 - **WHEN** an entry arrives from a peer after a collection run has read the replicas, and its payload is fetched before that run removes anything
 - **THEN** the blob store still holds the payload after the run, and the entry reads
 
-### Requirement: Every replica the node holds open joins a periodic reconcile pass, at a cadence the spawn names
-`SyncNode` SHALL run a periodic pass that re-requests a sync for every document it holds open, whichever synchronization strategy that document follows, and the interval SHALL be named at the spawn with a default of 10 seconds.
-
-The interval is what bounds every convergence no read of its own nudges: a write reaching another device of the same identity, and a linking catch-up, whose re-dial cadence is that pass. It is written down here because a host that configures its own value — a phone trading battery against how long a person waits — needs somewhere to configure it *from*, and because the resulting speed is otherwise read as a property of the network rather than of a number somebody chose.
-
-#### Scenario: A spawn that names no interval gets the default
-- **WHEN** a node is spawned without naming a reconcile interval
-- **THEN** its periodic pass runs at 10 seconds
-
-#### Scenario: A host's own interval is what the node runs at
-- **WHEN** a node is spawned with an interval of its embedder's choosing
-- **THEN** the periodic pass runs at that interval, and no route, environment variable or harness call changes it afterwards
-
 ### Requirement: A peer that restarts with the same node id is a neighbor again at once
 A node SHALL take a peer back into a store's swarm as soon as the peer, killed and started again with the same node id, joins that swarm again, while the node still holds the peer's previous connection open and counts the peer among its neighbors. The node's gossip SHALL answer that peer's `Join` with a `Neighbor` message, so the peer counts the node as a neighbor too and its announcements reach the node. iroh-gossip 0.101.0, the latest release, sends no `Neighbor` in that case: the node keeps a neighbor request to the peer pending from the moment they first met — a `Neighbor` it sent in answer to the peer's own, which the peer never answers — and the pending entry suppresses every later `Neighbor` to that peer, while the old connection's eventual timeout is never reported as the peer's loss once a newer connection to the peer exists. Upstream fixed it on its `main` branch (pull request #161, "answer a join from a peer that is already a neighbor", 2026-10-09) without a release, so the workspace takes iroh-gossip from that branch at a fixed revision through `[patch.crates-io]` until a release carries the fix.
 

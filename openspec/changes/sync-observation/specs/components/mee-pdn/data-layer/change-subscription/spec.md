@@ -4,7 +4,7 @@
 
 ### Requirement: An ordered subscription reports a session's entries before the session
 
-The store SHALL offer an ordered subscription to one replica the live sync holds open, and SHALL refuse one for a replica it does not. The store SHALL also open an ordered subscription together with the start of a replica's sync, registered before the replica is opened for sync and before its first dial, so no event of that sync precedes it; for a replica whose sync is already running, it is the ordered subscription a caller takes alone. The ordered subscription SHALL report every local and remote insert of the replica, every finished session, every completed download and every end of a session's downloads, in one sequence in which each remote insert a session made comes before that session's end, each download's completion comes after the remote insert that asked for it, and no remote insert of a pair's later session comes before the end of that pair's earlier one. A session between 2 identities of one node SHALL be reported in the same order as a session over the network. The ordered subscription SHALL end when the replica is dropped. The subscription "A subscriber never holds up the store" describes SHALL keep its 2 buffers and their order.
+With its `observation` feature, which only a test build enables and no build that ships does ([store crate](../../pdn-store/crate/spec.md)), the store SHALL offer an ordered subscription to one replica the live sync holds open, and SHALL refuse one for a replica it does not; without the feature the store SHALL offer no ordered subscription. The store SHALL also open an ordered subscription together with the start of a replica's sync, registered before the replica is opened for sync and before its first dial, so no event of that sync precedes it; for a replica whose sync is already running, it is the ordered subscription a caller takes alone. The ordered subscription SHALL report every local and remote insert of the replica, every finished session, every completed download and every end of a session's downloads, in one sequence in which each remote insert a session made comes before that session's end, each download's completion comes after the remote insert that asked for it, and no remote insert of a pair's later session comes before the end of that pair's earlier one. A session between 2 identities of one node SHALL be reported in the same order as a session over the network. The ordered subscription SHALL end when the replica is dropped. The subscription "A subscriber never holds up the store" describes SHALL keep its 2 buffers and their order.
 
 **Example:** one session of the reader with member device w5 on a pod's record store inserts 1,000 entries, and the pair's next session inserts one more.
 
@@ -48,6 +48,11 @@ The store SHALL offer an ordered subscription to one replica the live sync holds
 - **WHEN** a replica with an open ordered subscription is dropped
 - **THEN** the subscription ends after the events reported before the drop, and an entry written to the same namespace by a peer afterwards reaches no subscriber of it
 
+#### Scenario: A product build offers no ordered subscription
+
+- **WHEN** the store is built without its `observation` feature, as every build that ships is
+- **THEN** it has no ordered subscription to offer, the product's subscription keeps its 2 buffers, and the workspace's product-graph check fails if a product dependency enables the feature
+
 ### Requirement: An ordered subscription holds what its caller asked for, and reports what it drops
 
 An ordered subscription SHALL be created with the capacity its caller names and SHALL follow the lag rule of "A subscriber never holds up the store" past it: events beyond the capacity are dropped, one lag notice follows the last event the subscriber still receives, and the live actor does not wait. The store's other subscriptions keep their fixed capacity of 256.
@@ -71,15 +76,17 @@ An ordered subscription SHALL be created with the capacity its caller names and 
 
 ### Requirement: A session event names its session, its stage and its counts
 
-The event reporting a finished session SHALL carry, beside the counterpart node, the origin, the start and finish times and the result: a session id, when the session ran over a network connection, that both ends derive from that connection's keying material and that is the same on both ends and different for every connection; for a failure, the stage it failed at, one of `connect`, `remote_abort`, `sync` and `close`, named by the error's variant; and the counts of entries sent and received whenever the session's rounds completed, which is every success and every failure at `close`. A session between 2 identities of one node SHALL carry no session id and SHALL name the node itself as its counterpart. A session refused as already syncing SHALL be reported by neither side, and a session the accepting side refuses before the pair registers SHALL be reported only by the dialing side, at `remote_abort`.
+The event reporting a finished session SHALL carry, beside the peer node, the counterpart identity, the origin, the start and finish times and the result: with the store's `observation` feature, which only a test build enables and no build that ships does, a session id, when the session ran over a network connection, that both ends derive from that connection's keying material and that is the same on both ends and different for every connection, and without the feature no session id; for a failure, the stage it failed at, one of `connect`, `remote_abort`, `sync` and `close`, named by the error's variant; and the counts of entries sent and received whenever the session's rounds completed, which is every success and every failure at `close`. A session between 2 identities of one node SHALL carry no session id and SHALL name the node itself as its peer. A session refused as already syncing SHALL be reported by neither side, and a session the accepting side refuses before the pair registers SHALL be reported only by the dialing side, at `remote_abort`.
 
-**Example:** the reader dials member device w5 three times.
+**Example:** the reader dials member device w5 three times, both built with `observation`.
 
 | reader's event | w5's event |
 |---|---|
 | failed at `connect`, no session id | none |
 | failed at `remote_abort`, session id `51c0…` | none: refused before the pair registered |
 | ok, received 12, session id `9f3a…` | ok, sent 12, session id `9f3a…` |
+
+The same 3 dials on a product build report the same stages and counts with no session id on either side.
 
 #### Scenario: Both sides of one session carry one session id
 
@@ -104,4 +111,9 @@ The event reporting a finished session SHALL carry, beside the counterpart node,
 #### Scenario: A session between two identities of one node carries no session id
 
 - **WHEN** 2 identities hosted on one node, both holding a replica of one namespace, run a session in process
-- **THEN** both report it with the node's own id as the counterpart and no session id
+- **THEN** both report it with the node's own id as the peer and no session id
+
+#### Scenario: A product build reports no session id
+
+- **WHEN** a reader and a writer built without the store's `observation` feature complete a session
+- **THEN** both report it with its origin, stage and counts and no session id
