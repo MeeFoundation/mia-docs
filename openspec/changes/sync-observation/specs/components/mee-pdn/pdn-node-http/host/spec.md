@@ -170,7 +170,7 @@ The host SHALL read `PDN_CONNECTIVITY` at startup, in every build, and bring the
 - **THEN** the process exits with an error naming the accepted values, serving neither liveness nor the debug surface
 
 ### Requirement: The debug surface opens to a browser's page of any origin only when asked
-The host SHALL read `PDN_ANY_ORIGIN` at startup, in every build, with the closed set `PDN_DEBUG` takes: `1` or `true` turn it on, unset, `0` and `false` leave it off, and any other value SHALL stop the start with an error naming the accepted values. On, and only where the debug surface is served, every answer under `/debug/` SHALL carry the cross-origin headers that let a page of any origin read it — `access-control-allow-origin: *`, the allowed methods and the `content-type` header — and a preflight `OPTIONS` under `/debug/` SHALL be answered HTTP 204 with those headers before any handler. Off, the host SHALL send none of those headers, so a page of another origin in a browser on the machine cannot read what the subtree answers, though it can still send a request a browser sends without a preflight, whose answer it cannot read; the `Host` header is not checked, so a page made same-origin by DNS rebinding reads the subtree either way. `GET /live` and `GET /ready` SHALL never carry the headers. The flag exists for the demo's browser screens, which a browser loads from a file and so from no origin; it opens the subtree's live ceremony secrets to every page open in a browser on that machine, and a host that serves the subtree to a browser it does not trust is the demo's to avoid.
+The host SHALL read `PDN_ANY_ORIGIN` at startup, in every build, with the closed set `PDN_DEBUG` takes: `1` or `true` turn it on, unset, `0` and `false` leave it off, and any other value SHALL stop the start with an error naming the accepted values. On, and only where the debug surface is served, every answer under `/debug/` SHALL carry the cross-origin headers that let a page of any origin read it — `access-control-allow-origin: *`, the allowed methods and the `content-type` header — and a preflight `OPTIONS` under `/debug/` SHALL be answered HTTP 204 with those headers before any handler. Off, the host SHALL send none of those headers, so a page of another origin in a browser on the machine cannot read what the subtree answers, though it can still send a request a browser sends without a preflight, whose answer it cannot read. Whatever the flag, the host SHALL answer HTTP 421 to a request under `/debug/` whose `Host` header names anything but an IP literal or `localhost`, with or without a port, so a page made same-origin by DNS rebinding is kept out. `GET /live` and `GET /ready` SHALL never carry the headers. The flag exists for the demo's browser screens, which a browser loads from a file and so from no origin; it opens the subtree's live ceremony secrets to every page open in a browser on that machine, and a host that serves the subtree to a browser it does not trust is the demo's to avoid.
 
 **Example:** the pods demo, `PDN_DEBUG=1` and `PDN_ANY_ORIGIN=1` on every node, the nodes published on the demo host's loopback; a page of any site open in a browser on that machine.
 
@@ -180,10 +180,15 @@ The host SHALL read `PDN_ANY_ORIGIN` at startup, in every build, with the closed
 | a `POST` of an act under Alice's pod route, with a JSON body | a preflight answered 204, then the act performed under Alice's name |
 | the same with `PDN_ANY_ORIGIN` unset | the `GET`'s answer carries no `access-control-allow-origin`, so the browser withholds it from the page; the `POST` is never sent, its preflight carrying no header the browser accepts |
 | `fetch("http://127.0.0.1:3021/live")` with the flag on | no cross-origin header: the probes stay outside |
+| `fetch("http://evil.example:3021/debug/status")`, the name rebound to `127.0.0.1` | HTTP 421, whatever the flag |
 
 #### Scenario: The subtree opens to any origin only when asked
 - **WHEN** one host starts with `PDN_DEBUG=1` and `PDN_ANY_ORIGIN=1` and another with `PDN_DEBUG=1` alone
 - **THEN** every answer under `/debug/` of the first carries `access-control-allow-origin: *` and an `OPTIONS` under `/debug/` is answered HTTP 204, while no answer of the second carries the header, and neither host's `/live` does
+
+#### Scenario: A request naming another host is refused
+- **WHEN** a host serving the debug surface is asked for `/debug/status` with `Host: localhost`, and then with `Host: evil.example:3011`
+- **THEN** the first is answered and the second is refused HTTP 421
 
 #### Scenario: An unrecognized flag value stops the start
 - **WHEN** the host starts with `PDN_ANY_ORIGIN` set to a value other than `1`, `true`, `0` or `false`
