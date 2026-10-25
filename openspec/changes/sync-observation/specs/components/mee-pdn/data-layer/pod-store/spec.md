@@ -34,13 +34,13 @@ On a device that holds the pod's tombstone, a join SHALL start the membership st
 | on c1 | the record store |
 |---|---|
 | the membership store's session with a1 brings Carol's new joined event; its join statement is still on its way | not started: the view shows Carol's leave |
-| the join statement lands 300 ms later; the view lists Carol as a member | started: its first session with a1 is served whole and brings Alice's claim, and `join` returns with it |
+| the join statement lands 300 ms later; the view lists Carol as a member | started: its first session with a1 is served whole and brings the entry of Alice's claim, and `join` returns with that entry held; the claim reads once its payload lands |
 | a1 unreachable after the membership store's session | started 5 seconds after the membership store's; the join's catch-up then waits for its session as for any join |
 
-#### Scenario: A join after a leave answers with the records placed meanwhile
+#### Scenario: A join after a leave answers with the entries of the records placed meanwhile
 
 - **WHEN** a member left on its device, an owner placed a record afterwards and invites the member again, and the device joins while the join statement's payload lands a second after the session that brought the joined event
-- **THEN** the join answers with that record held on the device, and the record store had no session before the join statement landed
+- **THEN** the join answers with that record's entry held on the device, the record reads once its payload lands, and the record store had no session before the join statement landed
 
 ### Requirement: A pod's stores are first started by the start that registers them
 
