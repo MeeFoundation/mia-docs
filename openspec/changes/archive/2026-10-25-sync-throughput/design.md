@@ -8,7 +8,7 @@ What the code does, checked for this design:
 
 - `Store::snapshot_owned` in `crates/pdn-store/src/store/fs.rs` commits the open write transaction before it opens a read transaction, and every session start (`SyncSessionStart` in `actor.rs`) and every listing (`get_many`) goes through it. redb 4 commits with `Durability::Immediate` unless told otherwise, which syncs the file.
 - The actor's timer commits the batch once no action arrives for `MAX_COMMIT_DELAY`, 500 ms; a transaction older than that is committed on the next write.
-- `AccessBook::classify` in `crates/data-layer/src/access.rs` builds the membership view through `membership_view_and_entries` for every session on a pod's store, the dialing and the accepting side alike, and `pod_contacts` in `node.rs` builds it for every derivation of a pod's contacts. A build reads every membership entry with `get_many`, asks the blob store for each payload, and checks the signature of every created event, join statement and device statement (`MembershipView::new`).
+- `AccessBook::classify` in `crates/data-layer/src/access.rs` builds the membership view through `membership_view_and_entries` for every session on a pod's store, the dialing and the accepting side alike, and `pod_contacts` in `node.rs` builds it for every derivation of a pod's contacts. A build reads every membership entry with `get_many`, asks the blob store for each payload, and checks the signatures of the created event, every joined event and every device statement (`MembershipView::new`).
 - `Store::writes_of` counts the writes applied to a replica in memory; `remove_replica` did not count.
 
 ## Goals / Non-Goals
@@ -16,7 +16,7 @@ What the code does, checked for this design:
 **Goals:**
 
 - `r` takes in records at the writers' rate at N = 100 on the laptop.
-- A slow log sink stops no runtime worker of the laptop host.
+- A slow log sink stops no runtime worker of the HTTP host.
 - Nothing a spec promises changes: what a session serves, what it admits, what reaches the disk and when.
 
 **Non-Goals:**
@@ -47,7 +47,7 @@ A session needs the batch readable, which an unsynced commit gives at once; the 
 - Every commit unsynced, the timer alone syncing
   - **Cons:** an actor never idle for 500 ms would hold writes off the disk for as long as it stays busy.
 
-### D2. A book keeps each pod's membership view while the membership store takes no write
+### D2. The access book keeps each pod's membership view while the membership store takes no write
 
 `AccessBook` keeps the last view it built per pod with the write count the store had before its entries were read, and serves that view while the count holds. A view that read a payload still awaited is not kept: a payload's arrival changes the view and moves no count. A replica's removal counts as a write, so a store dropped and imported again is never mistaken for the one read. The book keeps at most 256 pods' views and drops them together past that.
 
@@ -90,7 +90,7 @@ The store's live actor is one task, and it logs a few lines at `info` for every 
 - A writer of the host's own over a channel
   - **Cons:** the same mechanism as the tracing project's maintained crate, kept by us.
 
-### D4. An ordered subscription converts its events 64 at a time
+### D4. An ordered subscription converts up to 64 events ahead of its reader
 
 With the store's `observation` feature, an ordered subscription hands its reader each event through a conversion that asks the blob store whether a remote insert's payload is held. `observed_events` in `src/engine.rs` runs up to 64 of these conversions at once, ahead of the reader, and yields the events in the channel's order. One at a time, each conversion waits on a blob store that a catch-up keeps busy importing the very payloads it downloads, and after D1 the live actor no longer pauses on a file sync between snapshots: the reader falls behind, the channel of 4,096 events drops what it has no room for, and the subscription carries `lagged`. A content status read ahead is read closer to the insert it describes, never further from it.
 
@@ -102,6 +102,7 @@ With the store's `observation` feature, an ordered subscription hands its reader
 | D1 to D3, N = 24 | 28,834 | 3 |
 | D1 to D3, N = 100 | 25,505 | 4 |
 | D1 to D4, N = 24 | 40,086 | 0 |
+| D1 to D4, N = 100 | 40,239 | 0 |
 
 **Rejected alternatives:**
 

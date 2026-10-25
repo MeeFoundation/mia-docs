@@ -28,10 +28,10 @@ Scope: the two costs the N = 100 profile names, each removed without a change to
 - [x] 4.2 `just test-docker`
 - [x] 4.3 The stress pass over the scenario tests after D1 and D2: 20 iterations of `just stress`, no failure
 - [x] 4.4 The stress pass at the size `flaky-tests.md` asks for: 100 iterations of `just stress` over the scenario suite with D1 to D3, no failure, and 100 of the `pod_tombstone` binary. Before them `a_join_after_a_leave_catches_up_on_the_records_placed_meanwhile` in `crates/data-layer/tests/pod_tombstone.rs` failed about once in 90 iterations, and not by D2: as the join answered, the claim's entry was held and its payload was still on its way, which a catch-up allows — it answers once a session went through, not once payloads landed. The test now asserts the entry at the answer and the record once its payload lands, and still fails with the record store started before the membership view shows the join
-- [x] 4.5 The quick profile at N = 100 before and after each decision (the proposal's table), D3 as an A/B of three runs each
+- [x] 4.5 A short ramp at N = 100, to 1,000 records, before and after each decision (the proposal's table), D3 as an A/B of three runs each
 
-## 5. An ordered subscription converts its events 64 at a time (design, D4)
+## 5. An ordered subscription converts up to 64 events ahead of its reader (design, D4)
 
 - [x] 5.1 `observed_events` in `crates/pdn-store/src/engine.rs`: with the `observation` feature, up to `OBSERVED_CONVERSIONS` conversions in flight, yielded in order, behind `Engine::observe` and `Engine::sync_with_peers_observed`; `Engine::subscribe` keeps its one-at-a-time conversion
 - [x] 5.2 `a_ten_thousand_entry_session_drained_at_conversion_pace_loses_nothing` in `crates/pdn-store/tests/observe.rs` guards it: with the conversions one at a time it lagged in 2 of 145 iterations of a 4-CPU runner over the workspace, and the peak fill of its channel under the store's own tests at 16 threads fell from 1,508 to 44
-- [x] 5.3 The load test's catch-up at N = 24 on the laptop: the fresh `r`'s stream of 40,086 events carries no `lagged`, where D1 to D3 alone carried 3; the ramp's delays stay as they were
+- [x] 5.3 The load test's catch-up at N = 24 on the laptop: the fresh `r`'s stream of 40,086 events carries no `lagged`, where D1 to D3 alone carried 3; the ramp's delays stay as they were. At N = 100, the default ramp to 20,000 records: the fresh `r`'s 40,239 events carry no `lagged`, where D1 to D3 alone carried 4, and it catches up in 2.1 s
