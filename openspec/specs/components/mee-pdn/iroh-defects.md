@@ -23,6 +23,7 @@ Every defect listed here carries a name: the crate it lies in and a number of th
 | iroh-blobs-009 | a provider that lacks a payload answers as one that fails | on main since #298, unreleased; no issue names it | upstream's main at the commit before it |
 | iroh-docs-001 | a dial the remote aborts as already syncing leaves the pair stuck | pull request #111 of ours, open | pdn-store's own fix |
 | iroh-docs-002 | a payload the session's sender lacked waits on one gossip message | pull request #112 of ours, open | pdn-store's own fix |
+| iroh-docs-003 | the sync report of a session that brought 100 authors or more is never sent | same code on main; no issue names it | none yet |
 | iroh-gossip-001 | a peer that restarted with the same node id gets no neighbor | fixed on main, unreleased | upstream's main at a fixed revision |
 | iroh-util-001 | the connection pool hangs past 100 waiting requests for one peer | fixed in 0.7.0 | the release 0.7.0, which iroh-blobs' main takes |
 
@@ -148,11 +149,11 @@ A node whose replica holds an entry and not its payload is registered as a provi
 | "lacked" | the neighbor lacks it: that pair is dropped | `leaf hash mismatch`: the neighbor is paused for at least 1 second |
 | "own", written next | arrives at once | arrives once the pause ends, 2.7 seconds after its entry |
 
-###### Issue Title
+### Issue Title
 
 A provider answers a request for a blob it holds no data of with data that fails verification
 
-###### Issue Body
+### Issue Body
 
 A store that was only asked what it lacks of a blob — `Remote::local`, which `Remote::fetch` also asks first — keeps the blob as an entry without data: its status turns from `NotFound` to `Partial { size: None }`. A request for that blob from another node used to end the way a request for a hash the store never saw ends, with the stream reset with an error code. Since #298 it fails with `leaf hash mismatch` at offset 0, the error a requester gets from a provider that sends data other than the blob.
 
@@ -244,6 +245,30 @@ When the remote aborts a dial because it sees an exchange with the dialer alread
 ## iroh-docs-002 · iroh-docs: a payload the session's sender lacked waits on one gossip message
 
 An entry can arrive before its payload, when the peer that sent it lacks the payload itself. iroh-docs parks such a payload and asks for it again only when a gossip `ContentReady` names it, a message gossip may lose, and once that message is lost nothing asks for the payload until some unrelated insert does. pdn-store asks the peer of every later successful session for the payloads the namespace has parked (`on_sync_finished` in `src/engine/live.rs`), and `sync_fetches_parked_content_from_later_sync_peer` in pdn-store's `tests/sync.rs` holds it. The fix went upstream as pull request #112 in July 2026 and is open with no review.
+
+## iroh-docs-003 · iroh-docs: the sync report of a session that brought 100 authors or more is never sent
+
+After a session that brought entries, the engine announces to its gossip neighbors the heads it received, the latest timestamp of each author, as a `SyncReport`; a neighbor that lacks the latest entry of any author the report names runs a sync with the sender at once, and that sync brings everything the neighbor lacks. The engine sizes the heads by gossip's `max_message_size`, the limit of a whole message, 4,096 bytes by default, while the message also carries the report's other fields, and gossip's own encoding takes its share of the limit: gossip takes at most 4,055 bytes of content, and in pdn-store the report of a session that brought 99 authors is 4,028 bytes and one of 100 authors 4,068 bytes. No report of 100 authors or more is ever sent: iroh-gossip 0.101.0 drops it in its write loop, its main since pull request #178 also resets the topic's stream and loses the messages queued behind it, and since #187 it refuses the broadcast with `TooLarge`, which pdn-store discards in silence (`broadcast_neighbors` in `src/engine/gossip.rs`). A neighbor that is behind then learns of the news only at its own next pass, every 300 seconds in a pod. Upstream iroh-docs sizes the report the same way, by `AuthorHeads::encode(Some(max_message_size))` in its `engine/live.rs`. pdn-store does not answer it yet; its reach is a pod with 100 or more devices that write, such as the load test's 100 nodes.
+
+**Example:** the report a session sends to the neighbors, against gossip's 4,055 bytes of content.
+
+| authors whose entries the session brought | the report | sent |
+|---|---|---|
+| 99 | 4,028 bytes | yes |
+| 100 | 4,068 bytes | no |
+| 102 or more | 4,148 bytes, the heads cut at 4,096 bytes | no |
+
+### Issue Title
+
+The sync report of a session with about 100 authors or more exceeds the gossip message limit and is never delivered
+
+### Issue Body
+
+After a sync that received entries, the live actor broadcasts a `SyncReport` to the topic's neighbors, so that a neighbor that is behind syncs at once. It encodes the report's heads with `AuthorHeads::encode(Some(self.gossip.max_message_size()))`, which caps the heads alone at the limit of a whole gossip message; the `Op` around them, the namespace and the heads' length prefix, and gossip's own encoding of the message, about 40 bytes, come on top. With the default `max_message_size` of 4,096 bytes and a head taking about 40 bytes, a report of about 100 authors or more no longer fits.
+
+Such a report is never delivered. With iroh-gossip 0.101.0, `broadcast_neighbors` returns `Ok` and the message fails in the write loop; on iroh-gossip's main, after n0-computer/iroh-gossip#178, the failed write also resets the topic's stream, losing the messages queued behind it; after n0-computer/iroh-gossip#187, the broadcast returns `ApiError::TooLarge`, which the live actor discards. Neighbors that are behind then catch up only on their own next sync, and a document with that many authors stops spreading news through reports at all.
+
+Sizing the heads by the content limit gossip now exposes, `GossipSender::max_content_size`, less the encoded size of the report around the heads, keeps every report within the limit; `AuthorHeads::encode` already keeps the newest heads when it has to cut.
 
 ## iroh-docs: everything pdn-store diverges in
 
