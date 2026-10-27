@@ -40,6 +40,24 @@ The only guarantee anything in iroh carries is the workspace's own tests. A hook
 | a fork of our own, iroh-blobs-001 | `MeeFoundation/iroh-blobs`, patched in | `a_blob_store_that_cannot_open_fails_the_spawn` in the data layer's `tests/persistence.rs` |
 | our own configuration, iroh-002 | the stand's HTTP client | every stand test |
 
+### Forks and patched revisions
+
+A fix the workspace needs that upstream's main branch does not carry is held in a fork of our own, and every fork lives under `github.com/MeeFoundation`. Once upstream's main carries every fix a fork holds, released or not, the workspace patches in upstream's main at a fixed revision, leaves the fork as it is, and names above the patch in `Cargo.toml` every defect that revision answers.
+
+A fork's own work lives on branches named `pdn/001`, `pdn/002` and on, counted per fork; the slash keeps them apart from upstream's branches and from defect names such as `iroh-blobs-001`. A branch the workspace has named is never deleted, rewritten or force-pushed, so every revision a `Cargo.lock` has recorded stays reachable. `Cargo.toml` takes the branch's head by `rev`, never by `branch`, and its comment names the branch.
+
+Each commit on such a branch fixes one defect, is titled by the defect's name — `iroh-blobs-001: …` — rather than in upstream's commit convention, and names in its message the test of ours that fails without it, a test that fails every time. The commits lie in the order of their numbers and each applies on its own; one that rests on another names it. A pull request offered upstream is prepared apart, in upstream's own convention.
+
+A move onto a newer upstream base starts the next branch at that base and takes the defects one at a time, in order. Each defect's test runs first without its commit: if it passes, upstream fixed the defect, the commit stays behind and the defect's entry records upstream's fix; otherwise the commit is applied, adapted where it no longer applies, and the defect's test and the workspace's suite pass before the next defect is taken. Meanwhile the workspace builds against a local checkout of the fork, patched in by path and never committed; only the finished branch is pushed. A branch that would carry no commit is not made.
+
+**Example:** iroh-blobs, whose fork held one fix when upstream's main came to carry it.
+
+| step | what the workspace takes | `a_blob_store_that_cannot_open_fails_the_spawn` |
+|---|---|---|
+| before | `MeeFoundation/iroh-blobs` at `2b0f54d`: upstream's 0.103.1 with our fix of iroh-blobs-001, made before this convention, on branch `fix-runtime-drop-on-own-thread` | passes |
+| upstream's 0.103.1, without the fix | — | fails: the spawn still hangs after 30 seconds |
+| upstream's main at `3369597`, carrying its own fix, #293, and no commit of ours | upstream's main at that revision, its comment naming iroh-blobs-001 and iroh-blobs-002; no `pdn/` branch is made, and the fork stays as it was | passes |
+
 ## iroh-001 · iroh 1.3: a peer that restarted at a new address is dialed at its old one
 
 iroh's default path selector, `BiasedRttPathSelector`, keeps a selected path until a path of the same tier is at least 5 ms faster by its last measured round-trip time. A peer killed and started again listens on a new port; the old path is dead, but it keeps the round-trip time it last measured, and the connection that carried it lives on until its idle timeout. On a local network no path is 5 ms faster than a dead one measured at under 2 ms, so every connection the node opens to the restarted peer sends its handshake to the dead port, and the node's sync dials and payload downloads time out while the connections the peer opens toward it work. iroh drops its selection only once the last connection to the peer closes, and the node's own failed dials keep one open on the dead path.
