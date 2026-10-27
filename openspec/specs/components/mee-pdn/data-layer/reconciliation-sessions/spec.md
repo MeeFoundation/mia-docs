@@ -309,7 +309,7 @@ A payload download that receives nothing from its provider for 10 seconds SHALL 
 
 ### Requirement: The gossip topic carries no content
 
-A replica's gossip topic SHALL carry only content-free announcements, never entries. A local insert SHALL broadcast a content-free author-head digest (a sync report) to neighbors, naming the identity whose replica sends it so a pull it triggers addresses that identity; the entry itself SHALL NOT be broadcast, and an entry received over gossip SHALL be dropped, never inserted. Content SHALL flow only over the classified reconciliation an announcement triggers — the receiver, seeing it has news, pulls, and re-announces to its own neighbors after pulling (the cascade). Because the topic id equals the namespace id and topic membership is unauthorized, a subscriber that knows the id obtains only activity metadata (author heads, timing, and the identity whose replica announces), never keys, hashes, or values, and the reconciliation an announcement would trigger is classified, so a subscriber the store's records admit to nothing obtains nothing at all. For a PMS the identity an announcement names is the PMS's own, which a holder of the namespace id knows already; in a pod's swarm a holder of the stores' tickets that is no member learns which members' replicas write, as the [threat model](../../threat-model.md) records. The content hash a fetch-hint announcement carries, and the blob channel behind it, are outside this requirement and recorded in the threat model.
+A replica's gossip topic SHALL carry only content-free announcements, never entries. A local insert SHALL broadcast a content-free author-head digest (a sync report) to neighbors, naming the identity whose replica sends it so a pull it triggers addresses that identity; the entry itself SHALL NOT be broadcast, and an entry received over gossip SHALL be dropped, never inserted. Content SHALL flow only over the classified reconciliation an announcement triggers — the receiver, seeing it has news, pulls, and re-announces to its own neighbors after pulling (the cascade). The report a session's end sends SHALL fit the content gossip takes in one message, about 4,055 bytes: of the heads the session brought it names the newest that fit with the report around them, so a session that brought the entries of 100 authors or more still reports, and a neighbor behind only on an author it leaves out catches up at its own next pass ([iroh-docs-003](../../iroh-defects.md)). Because the topic id equals the namespace id and topic membership is unauthorized, a subscriber that knows the id obtains only activity metadata (author heads, timing, and the identity whose replica announces), never keys, hashes, or values, and the reconciliation an announcement would trigger is classified, so a subscriber the store's records admit to nothing obtains nothing at all. For a PMS the identity an announcement names is the PMS's own, which a holder of the namespace id knows already; in a pod's swarm a holder of the stores' tickets that is no member learns which members' replicas write, as the [threat model](../../threat-model.md) records. The content hash a fetch-hint announcement carries, and the blob channel behind it, are outside this requirement and recorded in the threat model.
 
 **Example:** a1 and a2 are Alice's devices; a1 records a device in her PMS, and the topic of her PMS, whose id is the namespace id, carries this.
 
@@ -326,6 +326,11 @@ received:    an Op::Put carrying an entry is dropped, never inserted
 
 - **WHEN** an identity's device writes an entry into its PMS and another of its devices is a swarm member
 - **THEN** the second device converges on the entry — obtained over the reconciliation the announcement triggered, not received as a broadcast entry
+
+#### Scenario: A session that brought many authors still reports to the neighbors
+
+- **WHEN** a session brings the entries of 150 authors
+- **THEN** the report it sends to the replica's neighbors fits the content gossip takes in one message and names the newest heads that fit
 
 #### Scenario: A topic subscriber that is no member obtains no content
 
