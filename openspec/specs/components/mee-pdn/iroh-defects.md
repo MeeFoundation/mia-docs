@@ -12,18 +12,21 @@ Every defect listed here carries a name: the crate it lies in and a number of th
 |---|---|---|---|
 | iroh-001 | a peer that restarted at a new address is dialed at its old one | no fix; a pull request of ours is prepared and not yet sent | a path selector of our own |
 | iroh-002 | an HTTP client in the same build panics on its first request | declined, issue #4442 | the stand's client configures TLS itself |
-| iroh-blobs-001 | a file store that fails to open hangs its process | issues #249, #252 and #260, open | a fork of our own |
-| iroh-blobs-002 | the file store builds only by luck | — | pdn-store enables the tokio feature it lacks |
+| iroh-blobs-001 | a file store that fails to open hangs its process | fixed on main by #293, unreleased; issue #249 open | upstream's main at a fixed revision |
+| iroh-blobs-002 | the file store builds only by luck | fixed on main by #272, unreleased | upstream's main at a fixed revision |
 | iroh-blobs-003 | a request reaching a file store that is shutting down panics | issue #233 and pull request #214, open | the node's stop order and a blob protocol handler of its own |
 | iroh-blobs-004 | a store's garbage collection outlives the store | no issue names it | the protect callback ends the collection's task |
 | iroh-blobs-005 | the memory store's collection removes a payload imported while it runs | unfixed on main | no collection runs over a memory store |
 | iroh-blobs-006 | a download from a provider that accepts the request and sends nothing never ends | no issue names it | pdn-store fetches in a task of its own, dropped after 10 s with no progress |
 | iroh-blobs-007 | a request whose stream fails to open reports a failure of the local store | no issue names it | pdn-store opens the stream itself |
 | iroh-blobs-008 | a payload the store failed to write is reported fetched | no issue names it | pdn-store asks the store once the request reports done |
+| iroh-blobs-009 | a provider that lacks a payload answers as one that fails | on main since #298, unreleased; no issue names it | upstream's main at the commit before it |
 | iroh-docs-001 | a dial the remote aborts as already syncing leaves the pair stuck | pull request #111 of ours, open | pdn-store's own fix |
 | iroh-docs-002 | a payload the session's sender lacked waits on one gossip message | pull request #112 of ours, open | pdn-store's own fix |
+| iroh-docs-003 | the sync report of a session that brought 100 authors or more is never sent | same code on main; no issue names it | pdn-store's own fix |
+| iroh-docs-004 | a sync report announces entries the store refused | same code on main; no issue names it | pdn-store's own fix |
 | iroh-gossip-001 | a peer that restarted with the same node id gets no neighbor | fixed on main, unreleased | upstream's main at a fixed revision |
-| iroh-util-001 | the connection pool hangs past 100 waiting requests for one peer | fixed on main, unreleased | upstream's main at a fixed revision |
+| iroh-util-001 | the connection pool hangs past 100 waiting requests for one peer | fixed in 0.7.0 | the release 0.7.0, which iroh-blobs' main takes |
 
 ## The stance
 
@@ -36,9 +39,27 @@ The only guarantee anything in iroh carries is the workspace's own tests. A hook
 | answer | where it lives | what holds it |
 |---|---|---|
 | a selector of our own, iroh-001 | `crates/data-layer/src/path_selector.rs` | its unit tests and the stand's kill scenario |
-| a patched revision, iroh-gossip-001 and iroh-util-001 | `[patch.crates-io]` in the workspace `Cargo.toml` | the stand's kill scenario, and `connections_past_a_hundred_toward_a_silent_peer_all_end` in pdn-store's `tests/sync.rs` |
-| a fork of our own, iroh-blobs-001 | `MeeFoundation/iroh-blobs`, patched in | `a_blob_store_that_cannot_open_fails_the_spawn` in the data layer's `tests/persistence.rs` |
+| a patched revision, iroh-gossip-001, iroh-blobs-001 and iroh-blobs-009 | `[patch.crates-io]` in the workspace `Cargo.toml` | the stand's kill scenario, `a_blob_store_that_cannot_open_fails_the_spawn` in the data layer's `tests/persistence.rs`, and `a_provider_that_asked_what_it_lacks_answers_that_it_lacks_it` in pdn-store's `src/engine/live.rs` |
+| a release, iroh-util-001 | iroh-util 0.7.0, which iroh-blobs' main takes | `connections_past_a_hundred_toward_a_silent_peer_all_end` in pdn-store's `tests/sync.rs` |
 | our own configuration, iroh-002 | the stand's HTTP client | every stand test |
+
+### Forks and patched revisions
+
+A fix the workspace needs that upstream's main branch does not carry is held in a fork of our own, and every fork lives under `github.com/MeeFoundation`. Once upstream's main carries every fix a fork holds, released or not, the workspace patches in upstream's main at a fixed revision, leaves the fork as it is, and names above the patch in `Cargo.toml` every defect that revision answers.
+
+A fork's own work lives on branches named `pdn/001`, `pdn/002` and on, counted per fork; the slash keeps them apart from upstream's branches and from defect names such as `iroh-blobs-001`. A branch the workspace has named is never deleted, rewritten or force-pushed, so every revision a `Cargo.lock` has recorded stays reachable. `Cargo.toml` takes the branch's head by `rev`, never by `branch`, and its comment names the branch.
+
+Each commit on such a branch fixes one defect, is titled by the defect's name — `iroh-blobs-001: …` — rather than in upstream's commit convention, and names in its message the test of ours that fails without it, a test that fails every time. The commits lie in the order of their numbers and each applies on its own; one that rests on another names it. A pull request offered upstream is prepared apart, in upstream's own convention.
+
+A move onto a newer upstream base starts the next branch at that base and takes the defects one at a time, in order. Each defect's test runs first without its commit: if it passes, upstream fixed the defect, the commit stays behind and the defect's entry records upstream's fix; otherwise the commit is applied, adapted where it no longer applies, and the defect's test and the workspace's suite pass before the next defect is taken. Meanwhile the workspace builds against a local checkout of the fork, patched in by path and never committed; only the finished branch is pushed. A branch that would carry no commit is not made.
+
+**Example:** iroh-blobs, whose fork held one fix when upstream's main came to carry it.
+
+| step | what the workspace takes | `a_blob_store_that_cannot_open_fails_the_spawn` |
+|---|---|---|
+| before | `MeeFoundation/iroh-blobs` at `2b0f54d`: upstream's 0.103.1 with our fix of iroh-blobs-001, made before this convention, on branch `fix-runtime-drop-on-own-thread` | passes |
+| upstream's 0.103.1, without the fix | — | fails: the spawn still hangs after 30 seconds |
+| upstream's main at `3369597`, carrying its own fix, #293, and no commit of ours | upstream's main at that revision, its comment naming iroh-blobs-001 and iroh-blobs-002; no `pdn/` branch is made, and the fork stays as it was | passes |
 
 ## iroh-001 · iroh 1.3: a peer that restarted at a new address is dialed at its old one
 
@@ -59,15 +80,15 @@ A selector cannot cover every case from its side. iroh asks it when a connection
 
 When two nodes first meet in a swarm, the node that answered the other's `Neighbor` with a `Neighbor` of its own keeps that answer pending, and the other never replies to it. A peer killed and started again with the same node id joins the swarm anew; the node still counts it as a neighbor and sends a `Neighbor` back only when none to that peer is pending, so it sends nothing. The restarted peer is left with no neighbor and announces its writes to nobody, and the node never learns the peer's old connection is gone, because a newer connection to the peer exists when the old one times out. A write placed on the restarted node reaches the other member only at the pod's next pass, up to 300 s later.
 
-Upstream fixed it on its main branch, pull request #161 ("answer a join from a peer that is already a neighbor"), on 2026-10-09, with #178 and #191 on the connection and swarm lifecycle after it, and released none of them. The workspace takes iroh-gossip from that branch at a fixed revision through `[patch.crates-io]` until a release carries the fix. The [node assembly](data-layer/node-assembly/spec.md) spec states it as "A peer that restarts with the same node id is a neighbor again at once"; the same stand scenario holds it.
+Upstream fixed it on its main branch, pull request #161 ("answer a join from a peer that is already a neighbor"), on 2026-10-09, with #178, #191 and #192 on the connection and swarm lifecycle after it, and released none of them. The workspace takes iroh-gossip from that branch at a fixed revision through `[patch.crates-io]` until a release carries the fix. The [node assembly](data-layer/node-assembly/spec.md) spec states it as "A peer that restarts with the same node id is a neighbor again at once"; the same stand scenario holds it.
 
 ## iroh-blobs-001 · iroh-blobs 0.103: a file store that fails to open hangs its process
 
-`FsStore::load` spawns a tokio runtime of its own, and when opening the store fails, the runtime is dropped from one of its own threads, which blocks for good: the error never reaches the caller and the process hangs. A teardown of the store can deadlock the same way. Upstream holds three issues on it, #249, #252 and #260, all open. The workspace takes iroh-blobs from a fork of its own, `MeeFoundation/iroh-blobs`, upstream's release with the fix, through `[patch.crates-io]`; the fork's `UPSTREAM.md` records what it carries and when it goes. `a_blob_store_that_cannot_open_fails_the_spawn` in the data layer's `tests/persistence.rs` holds it: against upstream's 0.103.1 the spawn of a node whose blob database cannot open hangs, and against the fork it fails with an error.
+`FsStore::load` spawns a tokio runtime of its own, and when opening the store fails, the runtime is dropped from one of its own threads, which blocks for good: the error never reaches the caller and the process hangs. A teardown of the store can deadlock the same way. Upstream fixed it on its main branch, pull request #293 ("shut down the store runtime without blocking"), on 2026-10-21, closing its issues #252 and #260, and has released nothing since; #249, which asks that the store spawn no runtime of its own at all, stays open. The workspace takes iroh-blobs from that branch at a fixed revision through `[patch.crates-io]` until a release carries the fix; the fork it took before, `MeeFoundation/iroh-blobs`, stays as it was. `a_blob_store_that_cannot_open_fails_the_spawn` in the data layer's `tests/persistence.rs` holds it: against upstream's 0.103.1 the spawn of a node whose blob database cannot open hangs, and against the revision it fails with an error at once.
 
 ## iroh-blobs-002 · iroh-blobs 0.103: the file store builds only by luck
 
-iroh-blobs' `fs-store` feature calls tokio's `block_in_place` without enabling `rt-multi-thread`, the tokio feature it sits behind, so a crate that enables `fs-store` alone does not compile. pdn-store enables `rt-multi-thread` on its own tokio dependency, beside a comment that says why.
+iroh-blobs' `fs-store` feature calls tokio's `block_in_place` without enabling `rt-multi-thread`, the tokio feature it sits behind, so a crate that enables `fs-store` alone does not compile. Upstream's main enables it with `fs-store` since pull request #272, on 2026-10-06, and has released nothing since; the revision the workspace takes carries it, so pdn-store enables nothing for it, and the product build of pdn-store, with no feature of its own (`just test-product`), compiles only with it.
 
 ## iroh-blobs-003 · iroh-blobs 0.103: a request reaching a file store that is shutting down panics
 
@@ -118,17 +139,101 @@ A request over a connection hands each piece it receives to the blob store's imp
 | 40,960 bytes, 3 chunk groups | the only one, after the transfer's end | done | a failure of the local store |
 | 1 MiB | the first, during the transfer | `IrpcSend` | a failure of the local store |
 
+## iroh-blobs-009 · iroh-blobs main since #298: a provider that lacks a payload answers as one that fails
+
+A node whose replica holds an entry and not its payload is registered as a provider of that payload once a session with it ends, and a fetch from it ends with the provider's answer that it lacks the payload, which pdn-store takes as such: it drops that pair alone and pauses nothing (`outcome_of_failure` in `src/engine/live.rs`). Such a node has usually asked its own blob store what it lacks of the payload, through `Remote::local`, which every fetch asks first, iroh-blobs' own `Remote::fetch` included, and the question leaves the payload in the store as an entry without data: its status turns from `NotFound` to `Partial` with no size. Asked for that payload, a provider at the commit before pull request #298 ("detect truncated export_bao streams without relying on Done", 2026-10-26) resets the stream with an error code, the answer that it lacks the payload; with #298 the requester's fetch fails with `leaf hash mismatch` at offset 0, the error of a provider that sends data other than the payload, and pdn-store pauses the provider for at least 1 second, so a payload that only that node holds waits out the pause. #298 itself says that its provider now fails on an entry without data and leaves the store's early return for such an entry to a later change. `a_provider_that_asked_what_it_lacks_answers_that_it_lacks_it` in pdn-store's `src/engine/live.rs` holds it, failing with #298 and passing at the commit before it, `3369597`, as does the scenario `a_neighbor_lacking_a_payload_has_its_own_fetched_at_once` in `tests/sync.rs`. The workspace takes upstream's main at that commit. No upstream issue names it.
+
+**Example:** a replica fetches two payloads from its neighbor, which holds the entry of "lacked" and not its payload, and then writes "own".
+
+| fetch from the neighbor | upstream's main at `3369597` | with #298 |
+|---|---|---|
+| "lacked" | the neighbor lacks it: that pair is dropped | `leaf hash mismatch`: the neighbor is paused for at least 1 second |
+| "own", written next | arrives at once | arrives once the pause ends, 2.7 seconds after its entry |
+
+### Issue Title
+
+A provider answers a request for a blob it holds no data of with data that fails verification
+
+### Issue Body
+
+A store that was only asked what it lacks of a blob — `Remote::local`, which `Remote::fetch` also asks first — keeps the blob as an entry without data: its status turns from `NotFound` to `Partial { size: None }`. A request for that blob from another node used to end the way a request for a hash the store never saw ends, with the stream reset with an error code. Since #298 it fails with `leaf hash mismatch` at offset 0, the error a requester gets from a provider that sends data other than the blob.
+
+A requester can then no longer tell a provider that lacks a blob from one that sends corrupt data, so a downloader that backs off from failing providers backs off from an honest node that merely started a download of the blob. #298 says that `send_blob` now fails for an entry without data and leaves the early return in `export_bao_impl` for a later change; this is that gap as a requester sees it.
+
+Reproduction, against iroh 1.4.1, with `anyhow`, `iroh = "1.4.1"`, iroh-blobs at the revision named and `tokio` with `macros` and `rt-multi-thread`:
+
+```rust
+use iroh::{endpoint::presets, protocol::Router, Endpoint};
+use iroh_blobs::{
+    protocol::GetRequest, store::mem::MemStore, BlobsProtocol, Hash, HashAndFormat, ALPN,
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let provider_store = MemStore::new();
+    let hash = Hash::new(b"payload");
+    println!("status before local(): {:?}", provider_store.blobs().status(hash).await?);
+    // Only ask what is missing; nothing is downloaded.
+    provider_store.remote().local(HashAndFormat::raw(hash)).await?;
+    println!("status after local():  {:?}", provider_store.blobs().status(hash).await?);
+
+    let provider = Router::builder(Endpoint::bind(presets::Minimal).await?)
+        .accept(ALPN, BlobsProtocol::new(&provider_store, None))
+        .spawn();
+    let requester = Endpoint::bind(presets::Minimal).await?;
+    let conn = requester.connect(provider.endpoint().addr(), ALPN).await?;
+    let res = MemStore::new()
+        .remote()
+        .execute_get(conn, GetRequest::from(HashAndFormat::raw(hash)))
+        .await;
+    println!("get from the provider: {res:?}");
+
+    // The same request for a hash the provider's store was never asked about.
+    let other = Hash::new(b"other");
+    let conn = requester.connect(provider.endpoint().addr(), ALPN).await?;
+    let res = MemStore::new()
+        .remote()
+        .execute_get(conn, GetRequest::from(HashAndFormat::raw(other)))
+        .await;
+    println!("get of a hash never asked about: {res:?}");
+
+    requester.close().await;
+    provider.shutdown().await?;
+    Ok(())
+}
+```
+
+At `3369597`, the commit before #298:
+
+```
+status before local(): NotFound
+status after local():  Partial { size: None }
+get from the provider: Err(io: stream reset by peer: error 3)
+get of a hash never asked about: Err(io: stream reset by peer: error 3)
+```
+
+At `2cd6ed8`, with #298:
+
+```
+status before local(): NotFound
+status after local():  Partial { size: None }
+get from the provider: Err(leaf hash mismatch: 0)
+get of a hash never asked about: Err(io: stream reset by peer: error 3)
+```
+
+Expected: a provider answers a request for a blob it holds no data of as it answers one for a hash its store never saw.
+
 ## iroh-002 · iroh 1.3: an HTTP client in the same build panics on its first request
 
 iroh enables reqwest's `rustls-no-provider` feature, and cargo unifies it into every reqwest client of the build: under it a client takes only a TLS provider installed process-wide, so the stand's own HTTP client panicked on its first request, plain HTTP included. iroh's maintainers keep the feature and decline to change it (iroh issue #4442). The stand's client passes a TLS configuration of its own, the one iroh's relay tests build, in `plain_http_tls` in the host's `tests/common/mod.rs`.
 
 ## iroh-util-001 · iroh-util 0.6.0: the connection pool hangs past 100 waiting requests for one peer
 
-pdn-store's engine takes the connections its payload fetches run over from iroh-util's `ConnectionPool`, one pool per engine and one `get_or_connect` per fetch, with at most `fetches_per_provider` fetches in flight toward one provider. In iroh-util 0.6.0 each peer's connection actor runs inside the pool's own task and reads a queue of 100 requests, and the pool's task waits whenever that queue is full. A queue that fills while the pool's task is busy is never read again: more than 100 requests for one peer at once, toward a peer whose connect hangs or one already connected, hang every fetch of that engine, in every pod of its identity, until the process restarts. Upstream described it in iroh-util pull request #1 and fixed it on its main branch by rewriting the pool as one actor, pull request #5, on 2026-10-07, followed by #17 and #18, and has released nothing since. The workspace takes iroh-util from that branch at a fixed revision through `[patch.crates-io]` until a release carries the fix. `connections_past_a_hundred_toward_a_silent_peer_all_end` in pdn-store's `tests/sync.rs` holds it: against the revision, 500 connection requests toward a peer whose handshake gets no answer all end within 10 seconds, and against 0.6.0 none of them ends. The revision adds a bound 0.6.0 lacks, `max_pending_connections`, 64 attempts to connect running at once, and turns away every attempt past it: the engine would take an attempt turned away for a provider that failed to connect, and drop a provider that is no gossip neighbor for it. The engine sets that bound to the pool's bound on connections, 1,024, so attempts are bounded as in 0.6.0 (`fetch_pool_options` in `src/engine/live.rs`); `the_fetch_pool_turns_away_no_attempt_to_connect` there holds it, 65 attempts toward silent peers none of which is turned away. Whether a node of ours has met it is open. A node that joined a pod of 20,000 records on a laptop in a load test received every entry and then no payload for 200 seconds, with the cause not established, while a catch-up of 20,000 entries between two engines in one process completes against 0.6.0.
+pdn-store's engine takes the connections its payload fetches run over from iroh-util's `ConnectionPool`, one pool per engine and one `get_or_connect` per fetch, with at most `fetches_per_provider` fetches in flight toward one provider. In iroh-util 0.6.0 each peer's connection actor runs inside the pool's own task and reads a queue of 100 requests, and the pool's task waits whenever that queue is full. A queue that fills while the pool's task is busy is never read again: more than 100 requests for one peer at once, toward a peer whose connect hangs or one already connected, hang every fetch of that engine, in every pod of its identity, until the process restarts. Upstream described it in iroh-util pull request #1 and fixed it on its main branch by rewriting the pool as one actor, pull request #5, on 2026-10-07, followed by #17 and #18, and released it in 0.7.0 on 2026-10-22. iroh-blobs' main takes 0.7.0, and the workspace takes it with it. `connections_past_a_hundred_toward_a_silent_peer_all_end` in pdn-store's `tests/sync.rs` holds it: against 0.7.0, 500 connection requests toward a peer whose handshake gets no answer all end within 10 seconds, and against 0.6.0 none of them ends. 0.7.0 adds a bound 0.6.0 lacks, `max_pending_connections`, 64 attempts to connect running at once, and turns away every attempt past it: the engine would take an attempt turned away for a provider that failed to connect, and drop a provider that is no gossip neighbor for it. The engine sets that bound to the pool's bound on connections, 1,024, so attempts are bounded as in 0.6.0 (`fetch_pool_options` in `src/engine/live.rs`); `the_fetch_pool_turns_away_no_attempt_to_connect` there holds it, 65 attempts toward silent peers none of which is turned away. Whether a node of ours has met it is open. A node that joined a pod of 20,000 records on a laptop in a load test received every entry and then no payload for 200 seconds, with the cause not established, while a catch-up of 20,000 entries between two engines in one process completes against 0.6.0.
 
 **Example:** requests from one pool toward a peer whose handshake gets no answer.
 
-| requests | iroh-util 0.6.0 | the revision the workspace takes |
+| requests | iroh-util 0.6.0 | iroh-util 0.7.0 |
 |---|---|---|
 | 50 | all fail after the 1-second connect timeout | all fail after the 1-second connect timeout |
 | 150 | none answered after 10 seconds | all fail after the 1-second connect timeout |
@@ -141,6 +246,53 @@ When the remote aborts a dial because it sees an exchange with the dialer alread
 ## iroh-docs-002 · iroh-docs: a payload the session's sender lacked waits on one gossip message
 
 An entry can arrive before its payload, when the peer that sent it lacks the payload itself. iroh-docs parks such a payload and asks for it again only when a gossip `ContentReady` names it, a message gossip may lose, and once that message is lost nothing asks for the payload until some unrelated insert does. pdn-store asks the peer of every later successful session for the payloads the namespace has parked (`on_sync_finished` in `src/engine/live.rs`), and `sync_fetches_parked_content_from_later_sync_peer` in pdn-store's `tests/sync.rs` holds it. The fix went upstream as pull request #112 in July 2026 and is open with no review.
+
+## iroh-docs-003 · iroh-docs: the sync report of a session that brought 100 authors or more is never sent
+
+After a session that brought entries, the engine announces to its gossip neighbors the heads it received, the latest timestamp of each author, as a `SyncReport`; a neighbor that lacks the latest entry of any author the report names runs a sync with the sender at once, and that sync brings everything the neighbor lacks. The engine sizes the heads by gossip's `max_message_size`, the limit of a whole message, 4,096 bytes by default, while the message also carries the report's other fields, and gossip's own encoding takes its share of the limit: gossip takes at most 4,055 bytes of content, and in pdn-store the report of a session that brought 99 authors is 4,028 bytes and one of 100 authors 4,068 bytes. No report of 100 authors or more is ever sent: iroh-gossip 0.101.0 drops it in its write loop, its main since pull request #178 also resets the topic's stream and loses the messages queued behind it, and since #187 it refuses the broadcast with `TooLarge`, which pdn-store discards in silence (`broadcast_neighbors` in `src/engine/gossip.rs`). A neighbor that is behind then learns of the news only at its own next pass, every 300 seconds in a pod. Upstream iroh-docs sizes the report the same way, by `AuthorHeads::encode(Some(max_message_size))` in its `engine/live.rs`; the reach is a pod with 100 or more devices that write, such as the load test's 100 nodes. pdn-store sizes the heads by the topic's content limit less the report around them, so a report names the newest heads that fit (`sync_report_message` in `src/engine/live.rs`), and logs gossip's refusal of a message over its limit as a warning instead of discarding it. `a_report_of_many_authors_fits_the_topic_and_names_the_newest` in the same file holds it: sized by the whole message's limit, the report of 150 authors is 4,148 bytes and gossip refuses it.
+
+**Example:** the report a session sends to the neighbors, against gossip's 4,055 bytes of content.
+
+| authors whose entries the session brought | the report | sent |
+|---|---|---|
+| 99 | 4,028 bytes | yes |
+| 100 | 4,068 bytes | no |
+| 102 or more | 4,148 bytes, the heads cut at 4,096 bytes | no |
+
+### Issue Title
+
+The sync report of a session with about 100 authors or more exceeds the gossip message limit and is never delivered
+
+### Issue Body
+
+After a sync that received entries, the live actor broadcasts a `SyncReport` to the topic's neighbors, so that a neighbor that is behind syncs at once. It encodes the report's heads with `AuthorHeads::encode(Some(self.gossip.max_message_size()))`, which caps the heads alone at the limit of a whole gossip message; the `Op` around them, the namespace and the heads' length prefix, and gossip's own encoding of the message, about 40 bytes, come on top. With the default `max_message_size` of 4,096 bytes and a head taking about 40 bytes, a report of about 100 authors or more no longer fits.
+
+Such a report is never delivered. With iroh-gossip 0.101.0, `broadcast_neighbors` returns `Ok` and the message fails in the write loop; on iroh-gossip's main, after n0-computer/iroh-gossip#178, the failed write also resets the topic's stream, losing the messages queued behind it; after n0-computer/iroh-gossip#187, the broadcast returns `ApiError::TooLarge`, which the live actor discards. Neighbors that are behind then catch up only on their own next sync, and a document with that many authors stops spreading news through reports at all.
+
+Sizing the heads by the content limit gossip now exposes, `GossipSender::max_content_size`, less the encoded size of the report around the heads, keeps every report within the limit; `AuthorHeads::encode` already keeps the newest heads when it has to cut.
+
+## iroh-docs-004 · iroh-docs: a sync report announces entries the store refused
+
+The heads a session's report announces, as the news this replica holds, are taken from every entry the session's messages carry, before the store judges them (`sync_process_message` in `src/sync.rs`), and the report goes out whenever the session received anything. An entry the store refuses — a bad signature, a timestamp too far in the future, and in pdn-store the session's ingest verdict — therefore names a head the replica does not hold: a neighbor that lacks that author's entry runs a session with the sender for nothing, and since the refused entry's sender offers it again in every later session, every such session sends the same report again. A modified node that a session admits can thus offer, each time, an entry under a fresh author with a signature that does not verify, and turn each of its sessions into a session with every neighbor of the honest node, for nothing; in honest operation a device whose clock runs more than 10 minutes ahead writes entries its peers refuse as too far in the future until their clocks reach them, and every session that offers those entries sends the report again. Upstream iroh-docs takes the heads the same way. pdn-store takes them from the entries the store inserted, in the callback the store calls on each insert, and sends a report only when that left a head; `a_dropped_entry_names_no_received_head` in `src/sync.rs` holds it, an entry the verdict drops crossing the wire and naming no head.
+
+**Example:** Bob's session with a node that offers two entries, one of which his session's ingest verdict drops.
+
+| entry offered | stored | in the report before | in the report now |
+|---|---|---|---|
+| "ok", by author k | yes | k | k |
+| "dropped", by author d | no | d: every neighbor without d's entry pulls from Bob for nothing | not named |
+
+### Issue Title
+
+A sync report announces heads of entries the store rejected
+
+### Issue Body
+
+`Replica::sync_process_message` records `heads_received` from every entry of the incoming message, before `validate_entry` runs, and the live actor broadcasts a `SyncReport` of those heads whenever `num_recv > 0`. An entry that fails validation — a bad signature, a timestamp past `MAX_TIMESTAMP_FUTURE_SHIFT` — is not inserted, yet its author and timestamp are announced to the topic's neighbors as news the reporting node holds.
+
+A neighbor that lacks that author's entry then syncs with the reporter and receives nothing for it. The peer that sent the rejected entry offers it again in every later sync, so each of those syncs announces it again, and a peer that sends such entries on purpose turns each sync it has with a node into a sync between that node and each of its neighbors.
+
+Recording the heads in the `on_insert` callback, which the store calls for each entry it actually inserts, and broadcasting a report only when that left a head, announces only what the node holds.
 
 ## iroh-docs: everything pdn-store diverges in
 

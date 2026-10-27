@@ -448,6 +448,11 @@ A member's departure — the counted left or removed event at which the membersh
 - **WHEN** a removed member's device holds the pod's tombstone, and an owner invites the member again
 - **THEN** the device takes its new joined event from a member device, lists its member as a member again, and writes under its new sequence records every member device reads
 
+#### Scenario: A dial begun before a leave runs no session on the record store joined again
+
+- **WHEN** a member's device begins a dial of the record store before the member leaves, and the dial connects only after the member is invited again and the device imports the record store again, while its membership view still shows the departure
+- **THEN** the dial runs no session on the record store imported again, and the join's catch-up brings the records placed in the member's absence
+
 #### Scenario: Every device of a departed identity keeps the tombstone
 
 - **WHEN** a member leaves on one device while another device of its identity holds the pod, and the identity's PMS syncs

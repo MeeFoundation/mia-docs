@@ -82,7 +82,7 @@ The proposal says why the store is cut down. What shapes how:
 | `just check` | default features, warnings allowed | the one configuration, warnings denied, rustdoc |
 | `just check-store` | 4 builds, one of them for `wasm32-unknown-unknown` | gone |
 | `just test-store` | 2 nextest runs and a doctest run | gone |
-| pipeline | jobs `lint-test-wasm` and `store` | job `lint-test` |
+| pipeline | jobs `lint-test-wasm` and `store` | jobs `lint` and `in-process-tests` |
 | `rust-toolchain.toml` targets | `wasm32-wasip1`, `wasm32-unknown-unknown` | none beyond the host's |
 
 **Rejected alternatives:**

@@ -1,8 +1,14 @@
 # Store crate
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: The store builds in one configuration
+**Reason**: The store declares a feature, `observation`, which a test build alone enables, so it builds in the product configuration and in that one.
+**Migration**: "The store's one feature, observation, is built by tests alone" holds the targets, the file-backed store and counters built always, and the pipeline's lack of a store job.
+
+## ADDED Requirements
+
+### Requirement: The store's one feature, observation, is built by tests alone
 The store SHALL declare exactly one feature, `observation` — the ordered subscription and the session id the sync tests observe a pod's sync by — and no optional dependency, and SHALL be built for the targets the workspace builds for. Only a test build SHALL enable the feature: the data layer's `test-util` feature turns it on, and the product's dependency graph SHALL never include it, which `scripts/check-product-graph.sh` asserts in `just check`. `just check` SHALL lint the store in both configurations, and `just test-product` SHALL run the store's suite in the product configuration, so the store the product runs is compiled, linted and tested as such. What a feature used to switch off — the file-backed store, the counters a test reads — SHALL always be built.
 
 **Example:** the configurations of the store each recipe compiles.
@@ -24,4 +30,4 @@ The store SHALL declare exactly one feature, `observation` — the ordered subsc
 
 #### Scenario: The pipeline runs no job for the store alone
 - **WHEN** a change is proposed
-- **THEN** the store is linted and tested by the workspace's job, and the pipeline has no `store` job
+- **THEN** the store is linted and tested by the workspace's jobs, and the pipeline has no `store` job
