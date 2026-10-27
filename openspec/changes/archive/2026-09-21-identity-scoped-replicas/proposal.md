@@ -2,7 +2,7 @@
 
 ## Why
 
-A node hosts the store sets of any number of identities, and co-location is not a trust boundary: two identities of one person are as separate as two strangers ([operating-conditions](../../specs/code-practices/operating-conditions.md)). The node does not hold them apart. One replica per namespace, one author per node and one classification keyed by node id mean that what belongs to two identities is stored together, written under one name, and told apart only by a check at each point that reads it.
+A node hosts the store sets of any number of identities, and co-location is not a trust boundary: two identities of one person are as separate as two strangers ([operating-conditions](../../../specs/code-practices/operating-conditions.md)). The node does not hold them apart. One replica per namespace, one author per node and one classification keyed by node id mean that what belongs to two identities is stored together, written under one name, and told apart only by a check at each point that reads it.
 
 Three consequences are recorded across the tree. A node hosting two audiences of one issuer binds one replica and receives the union of both grants into it, and a local read of that replica answers from the union, because it is addressed by issuer and carries no acting identity. Every store on the node writes with the node's one author, so on a shared node two members of one pod publish the same author key, an entry passes as either member's, and a membership act resolves to two actors at once — the open question F2 of the pods change. And a grant withdrawn toward one audience leaves the other's replica holding what the first one received, because the bytes were never separate.
 

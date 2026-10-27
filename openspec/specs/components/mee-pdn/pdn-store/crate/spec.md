@@ -67,7 +67,7 @@ The store SHALL declare no feature and SHALL be built for the targets the worksp
 
 #### Scenario: The pipeline runs no job for the store alone
 - **WHEN** a change is proposed
-- **THEN** the store is linted and tested by the workspace's job, and the pipeline has no `store` job
+- **THEN** the store is linted and tested by the workspace's jobs, and the pipeline has no `store` job
 
 ### Requirement: The workspace check denies the store's warnings
 `just check` SHALL lint the store, every target of it, with warnings denied, under the store's own `[lints]` table rather than the workspace's, and SHALL build the store's documentation with rustdoc's warnings denied.
