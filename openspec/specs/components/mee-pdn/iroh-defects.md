@@ -24,6 +24,7 @@ Every defect listed here carries a name: the crate it lies in and a number of th
 | iroh-docs-001 | a dial the remote aborts as already syncing leaves the pair stuck | pull request #111 of ours, open | pdn-store's own fix |
 | iroh-docs-002 | a payload the session's sender lacked waits on one gossip message | pull request #112 of ours, open | pdn-store's own fix |
 | iroh-docs-003 | the sync report of a session that brought 100 authors or more is never sent | same code on main; no issue names it | pdn-store's own fix |
+| iroh-docs-004 | a sync report announces entries the store refused | same code on main; no issue names it | pdn-store's own fix |
 | iroh-gossip-001 | a peer that restarted with the same node id gets no neighbor | fixed on main, unreleased | upstream's main at a fixed revision |
 | iroh-util-001 | the connection pool hangs past 100 waiting requests for one peer | fixed in 0.7.0 | the release 0.7.0, which iroh-blobs' main takes |
 
@@ -269,6 +270,29 @@ After a sync that received entries, the live actor broadcasts a `SyncReport` to 
 Such a report is never delivered. With iroh-gossip 0.101.0, `broadcast_neighbors` returns `Ok` and the message fails in the write loop; on iroh-gossip's main, after n0-computer/iroh-gossip#178, the failed write also resets the topic's stream, losing the messages queued behind it; after n0-computer/iroh-gossip#187, the broadcast returns `ApiError::TooLarge`, which the live actor discards. Neighbors that are behind then catch up only on their own next sync, and a document with that many authors stops spreading news through reports at all.
 
 Sizing the heads by the content limit gossip now exposes, `GossipSender::max_content_size`, less the encoded size of the report around the heads, keeps every report within the limit; `AuthorHeads::encode` already keeps the newest heads when it has to cut.
+
+## iroh-docs-004 · iroh-docs: a sync report announces entries the store refused
+
+The heads a session's report announces, as the news this replica holds, are taken from every entry the session's messages carry, before the store judges them (`sync_process_message` in `src/sync.rs`), and the report goes out whenever the session received anything. An entry the store refuses — a bad signature, a timestamp too far in the future, and in pdn-store the session's ingest verdict — therefore names a head the replica does not hold: a neighbor that lacks that author's entry runs a session with the sender for nothing, and since the refused entry's sender offers it again in every later session, every such session sends the same report again. A modified node that a session admits can thus offer, each time, an entry under a fresh author with a signature that does not verify, and turn each of its sessions into a session with every neighbor of the honest node, for nothing; in honest operation a device whose clock runs more than 10 minutes ahead writes entries its peers refuse as too far in the future until their clocks reach them, and every session that offers those entries sends the report again. Upstream iroh-docs takes the heads the same way. pdn-store takes them from the entries the store inserted, in the callback the store calls on each insert, and sends a report only when that left a head; `a_dropped_entry_names_no_received_head` in `src/sync.rs` holds it, an entry the verdict drops crossing the wire and naming no head.
+
+**Example:** Bob's session with a node that offers two entries, one of which his session's ingest verdict drops.
+
+| entry offered | stored | in the report before | in the report now |
+|---|---|---|---|
+| "ok", by author k | yes | k | k |
+| "dropped", by author d | no | d: every neighbor without d's entry pulls from Bob for nothing | not named |
+
+### Issue Title
+
+A sync report announces heads of entries the store rejected
+
+### Issue Body
+
+`Replica::sync_process_message` records `heads_received` from every entry of the incoming message, before `validate_entry` runs, and the live actor broadcasts a `SyncReport` of those heads whenever `num_recv > 0`. An entry that fails validation — a bad signature, a timestamp past `MAX_TIMESTAMP_FUTURE_SHIFT` — is not inserted, yet its author and timestamp are announced to the topic's neighbors as news the reporting node holds.
+
+A neighbor that lacks that author's entry then syncs with the reporter and receives nothing for it. The peer that sent the rejected entry offers it again in every later sync, so each of those syncs announces it again, and a peer that sends such entries on purpose turns each sync it has with a node into a sync between that node and each of its neighbors.
+
+Recording the heads in the `on_insert` callback, which the store calls for each entry it actually inserts, and broadcasting a report only when that left a head, announces only what the node holds.
 
 ## iroh-docs: everything pdn-store diverges in
 
