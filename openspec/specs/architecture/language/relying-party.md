@@ -2,4 +2,4 @@
 
 ## Overview
 
-A [Person](person.md) or [Organization](organization.md) with which the [User](user.md) has a [Connection](connection.md).
+A [Person](person.md) or [Organization](organization.md) the [User](user.md) shares a [pod](pod.md) with.

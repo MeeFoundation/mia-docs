@@ -9,7 +9,7 @@
 - [x] 1.1 Session registry in the sync actor: `sync_session_start` opens a snapshot for an open, sync-enabled replica and returns a `SyncSession` guard; ids resolve per call, so concurrent sessions over one replica each hold their own view
 - [x] 1.2 Resolution is fail-closed (D2): an unregistered id, or one registered for another namespace, is an error rather than a silent fall back to live reads; a stale id after the replica closed fails too
 - [x] 1.3 Release on every exit path (D3): the guard's drop releases the snapshot on completion, refusal, failure, and cancellation; closing a replica sweeps its snapshots, covering a release message lost to a full actor queue
-- [x] 1.4 `StoreInstance::session_snapshot` consumed by `get_first` and `get_range`, and by the fingerprints the store derives from them; `prefixes_of`, `entry_put`, and `remove_prefix_filtered` stay live (D4), with the two consumers of that rule recorded on the field
+- [x] 1.4 `StoreInstance::session_snapshot` consumed by `get_first` and `get_range`, and by the fingerprints the store derives from them; `entry_get` and `entry_put` stay live (D4), with the two consumers of that rule recorded on the field
 - [x] 1.5 Session ids threaded from `net/codec.rs` through both roles: the dialing side opens before its initial message, the accepting side opens after the request is allowed, so a rejected request never opens one
 
 ## 2. Verification in the fork

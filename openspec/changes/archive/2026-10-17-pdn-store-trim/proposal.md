@@ -1,0 +1,54 @@
+## Why
+
+`crates/pdn-store` carries everything n0's `iroh-docs` offers its own users, while the platform calls a fraction of it: of the 27 requests its API defines, the data layer sends 15; of its three feature sets and two targets, the product builds one. Every reader of the crate pays for the rest — an agent reviewing a change, one adapting the engine, one chasing a flaky test through the live actor — and pays again in every run of the tests that exercise it. The crate has also stopped following upstream in practice: each of the six upstream commits since the crate merged upstream's 0.101.0 was adapted by hand, found not applicable, or found already fixed here. This change cuts the crate down to what the platform uses, removes the in-process RPC layer that stands between the data layer and the engine, and turns the relation to upstream from tracking every commit into a watch on fixes and a look at upstream whenever the platform needs something new.
+
+**Example:** one write to an identity's private metadata store (PMS), `doc.set_bytes(author, key, value)` in `crates/data-layer/src/private_metadata.rs`.
+
+| step | today | after this change |
+|---|---|---|
+| the data layer calls | `Doc::set_bytes` | `Doc::set_bytes` |
+| the call becomes | a `SetRequest` sent over an irpc channel to the identity's `RpcActor` task | a call on the engine |
+| it waits for | every request of every replica of that identity sent before it, one at a time — a session's access decision reading the membership store among them | the sync actor, as every store operation already does |
+| it runs | `doc_set` in `src/api/actor.rs`: `add_bytes` into the blob store, `insert_local`, `get_exact` to return the entry | `add_bytes`, `insert_local`, `get_exact` |
+| an error comes back | as a `serde_error::Error` built from its message | as the error the engine raised, its chain intact |
+
+## What Changes
+
+- **Last upstream pass.** Upstream's `main` holds no commit past `8cfeacb` (2026-08-19), the newest one `UPSTREAM.md` has a verdict for; the pass records that as of 2026-10-15 and gives a verdict to each of upstream's open pull requests titled as a fix that touches code this crate keeps (#93, #94, #106, #111, #112, #114, #88). A defect one of them confirms here becomes a change of its own.
+- **The relation to upstream changes** (new ADR-0016). The crate is the platform's own: it no longer tracks upstream commit by commit, and an upstream patch is no longer expected to apply. Two duties stay: at every bump of iroh in the workspace, upstream's commits and open pull requests that fix code the crate keeps are read and given a verdict in `UPSTREAM.md`; and a change that needs the store to do something new looks at upstream first for an answer. ADR-0014 is edited where it says the crate tracks upstream.
+- **The version number becomes the workspace's**, `0.1.0` as `pdn-node` carries, in place of upstream's `0.101.0`.
+- **BREAKING (Rust API) — the in-process RPC layer goes.** `DocsProtocol`, `RpcActor`, the irpc client inside `DocsApi` and `Doc`, and the `rpc` feature with `DocsApi::connect` and `DocsApi::listen`. `Doc` and `DocsApi` stay as handles that call the engine directly. Each call keeps the order its caller gives it; calls from different tasks no longer queue behind each other in one task per identity.
+- **BREAKING (Rust API) — what the platform does not call goes, with its tests:** read capabilities (`Capability::Read`, `ShareMode`), download policies, author listing, import, export, deletion and setting the default, file import and export, `Doc::close`, `status`, `set_hash`, `get_exact`, `leave`, `import(ticket)`, `import_and_subscribe`, `start_sync_scoped`, the query options no caller sets (sort and offset), the store's schema migrations 001 to 004, `Docs` as a protocol handler of its own (`DocsDispatch` is the one accept path), the store's metrics no one reads, the README and its doctest, and `examples/setup.rs`. The full inventory is in the design.
+- **One configuration.** The feature flags go — the file store and the two metrics a test reads are always built — and with them the `wasm32-unknown-unknown` build, the `wasm_browser` alias, `just check-store`, `just test-store` and the pipeline's `store` job. `just check` denies the store's warnings and rustdoc's, as `just check-store` does now. Nothing else in the workspace builds for wasm, so `rust-toolchain.toml` drops both its wasm targets — `wasm32-wasip1` has had no user since v3-single-device's `crates/mee-wasm` went — and the tooling around the matrix follows: the comment on `deny.toml`'s `all-features`, the root `README.md`, and the rust-analyzer project list in `mee-pdn.code-workspace`, which still names v3-single-device's crates.
+- **The public surface is what is named outside the store's sources** — by another crate of the workspace or by the store's own integration tests — and what a public item's signature carries, as the compiler requires. Every other item is crate-private, so the compiler's dead-code lint, denied for the store, finds whatever nothing calls.
+- **A node killed and started again is reached at once, and at its new address.** The stand's kill scenario passed in 301 s: a write placed on the restarted node reached the other member only at the pod's next pass, the scenario hiding it behind a six-minute budget. Two iroh defects cause it, each now answered in the workspace: iroh-gossip 0.101.0 answers the restarted node's `Join` with nothing, and the workspace takes iroh-gossip from upstream's main branch, which fixed it and released nothing; iroh 1.3.0's path selector keeps sending to the restarted node's old port, and the data layer installs a path selector of its own through iroh's hook. The scenario's budget comes down to two minutes, and it passes in 13 s. What iroh gets wrong, and what the platform does about each, is written down in a new document, `components/mee-pdn/iroh-defects.md`.
+- **An entry whose hash and length disagree on emptiness is dropped at ingest**, in `validate_entry`, so one entry no longer reads as a deletion to one reader and as content to another.
+- **A node stops its engines before its router, and closes its blob store after the router**, since a running engine's downloads read the store, the router shuts its protocols down before it cancels their connections, and iroh-blobs panics on a read reaching a store that is shutting down.
+- **The store's wire and disk stay byte-identical.** A ticket, a sync message and a store file written before the change read the same after it. The iroh-gossip revision adds a flag byte to the header of its own stream, which a node on 0.101.0 reads and ignores.
+- **The crate's guidance follows.** `crates/pdn-store/CLAUDE.md` loses the RPC layer, the feature matrix, the wasm notes, and every "upstream does otherwise" and "an upstream patch touching this is adapted" clause; the root `CLAUDE.md` and `.claude/rules/pdn-store.md` lose the two recipes.
+
+Out of scope: the store's adoption of the workspace's lints, which upstream's code would fail in hundreds of places; the sync ALPN `/iroh-sync/1`, whose name the wire-format-versioning change already weighs. Of the operating conditions, a device that restarts is the one that changes the outcome — a store file and the tickets a PMS holds must read the same after the update — and the design names it.
+
+## Capabilities
+
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `components/mee-pdn/data-layer/node-assembly`: a peer that restarts with the same node id is a neighbor again at once, and one that restarts at a new address is reached at it; the node stops its engines before its router.
+- `components/mee-pdn/pdn-node-http/container-stand`: a restarted node, killed or stopped, converges with its peer within the convergence budget.
+- `components/mee-pdn/data-layer/reconciliation-sessions`: an entry whose hash and length disagree on emptiness is dropped on every replica.
+- `components/mee-pdn/data-layer/pod-store`: what pdn-store drops on its own includes that entry.
+- `components/mee-pdn/data-layer/change-subscription`: a subscription's example loses the RPC stream's slots.
+- `components/mee-pdn/pdn-store/crate`: the crate carries the workspace's version number; it builds in one configuration, and the requirement for its other configurations gives way to one that the workspace check denies its warnings; its public surface is what is named outside its sources; its tests run with the workspace's without doctests or other feature sets, and the nightly hunt's example loses the feature-set rows.
+
+## Impact
+
+- **`crates/pdn-store`**: `src/api.rs`, `src/api/actor.rs` and `src/api/protocol.rs` give way to direct handles; `src/protocol.rs`, `src/actor.rs`, `src/sync.rs`, `src/store.rs`, `src/store/fs.rs` and its `migrations.rs` and `tables.rs`, `src/ticket.rs`, `src/metrics.rs`, `src/engine.rs` and `src/engine/live.rs` lose what the inventory lists; `build.rs`, `README.md`, `examples/setup.rs` and `tests/gc.rs` go; `tests/client.rs`, `tests/sync.rs`, `tests/dispatch.rs` and `tests/util.rs` keep the tests of kept behaviour, reaching the store through the surface the platform uses. `Cargo.toml` loses `[features]`, `noq`, `serde-error` and `cfg_aliases`; `irpc` stays, since iroh-blobs' API answers in its types.
+- **`crates/data-layer`** and **`crates/pdn-node`**: `share_ticket`, `Doc::share` and `Doc::ticket` lose their mode argument, and the re-export of `ShareMode` goes; three data-layer tests that minted read tickets as fixtures mint write tickets.
+- **Tooling**: `justfile` (`check`, `check-store`, `test-store`, `precommit-check`, `fix`), `.github/workflows/ci.yml` (the `store` job), `rust-toolchain.toml` (both wasm targets), `deny.toml` (the comment on `all-features`), `mee-pdn.code-workspace` (rust-analyzer's `linkedProjects`).
+- **Specs and guidance**: the deltas for `pdn-store/crate`, `data-layer/reconciliation-sessions`, `data-layer/pod-store` and `data-layer/change-subscription`; ADR-0014 edited, ADR-0016 new; `crates/pdn-store/CLAUDE.md`, `crates/pdn-store/UPSTREAM.md`, the root `CLAUDE.md` and `README.md`, `.claude/rules/pdn-store.md`.
+- **iroh**: the workspace `Cargo.toml` patches iroh-gossip to a revision of upstream's main branch, admitted in `deny.toml`; `crates/data-layer` enables iroh's `unstable-custom-transports` and installs `ReceivingPathSelector` (`src/path_selector.rs`); `crates/data-layer/src/node.rs` stops the engines before the router; `crates/pdn-store/src/sync.rs` checks emptiness at ingest; the host's `tests/stand_restart.rs` waits the convergence budget, and `POD_PASS_BUDGET` goes; `components/mee-pdn/iroh-defects.md` is new.
+- **Stress**: the change touches the engine's wiring, so it ends with the stress pass over the data layer's and `pdn-node`'s scenarios.

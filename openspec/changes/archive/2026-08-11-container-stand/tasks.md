@@ -70,7 +70,7 @@
 
 ## 10. The live demo
 
-- [x] 10.1 Write `ops/compose.yml` (D13): seven nodes on one network, the debug flag on, each node's HTTP port published on loopback of the demo host at a fixed port of its own.
-- [x] 10.2 Write `ops/demo.sh`: the narration, driving the nodes over HTTP alone, reading its base URLs from the environment, and waiting for every node's liveness before the first step so a slow start is not mistaken for a broken one later.
+- [x] 10.1 Write `ops/compose-connections.yml` (D13): seven nodes on one network, the debug flag on, each node's HTTP port published on loopback of the demo host at a fixed port of its own.
+- [x] 10.2 Write `ops/demo-connections.sh`: the narration, driving the nodes over HTTP alone, reading its base URLs from the environment, and waiting for every node's liveness before the first step so a slow start is not mistaken for a broken one later.
 - [x] 10.3 Add the `demo` recipe: build the image, bring the nodes up and wait for them, run the narration, and remove the nodes on every exit including a failing one. Take the node count from the compose file rather than writing it in the recipe.
 - [x] 10.4 Run the demo end to end and confirm both halves of the show: every read converges by repeating the read, and a second run starts from nothing.

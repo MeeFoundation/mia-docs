@@ -1,13 +1,13 @@
 ## MODIFIED Requirements
 
-### Requirement: The directory lives in a dedicated replica
+### Requirement: The private metadata store (PMS) lives in a dedicated replica
 An identity's private metadata SHALL be stored in its own pdn-store replica, separate from every data store and from every other identity's private metadata store. The store handle returned at creation or import is how the replica is addressed; no domain `NamespaceId` is allocated for it. Private metadata stores of several identities SHALL coexist on one node without sharing a replica.
 
 #### Scenario: Creating the store allocates a dedicated replica
 - **WHEN** a node creates a private metadata store
 - **THEN** a fresh pdn-store replica is created for it, reached through the returned store handle, and no domain `NamespaceId` is allocated
 
-#### Scenario: Two identities' directories on one node
+#### Scenario: Two identities' PMSs on one node
 - **WHEN** private metadata stores are created on one node for identity A and identity B
 - **THEN** they are two distinct replicas, and entries written under A are invisible under B
 
@@ -20,26 +20,26 @@ The ticket for a store of kind `k` SHALL be stored at path `tickets/<k>`, with t
 
 #### Scenario: The pair's tickets are discoverable on a linked device
 - **WHEN** establishment publishes the `own` and `peer` kinds for a counterparty on the phone, and a laptop is linked into the identity
-- **THEN** the laptop reads both tickets from its directory replica after replication, keyed by that counterparty
+- **THEN** the laptop reads both tickets from its PMS replica after replication, keyed by that counterparty
 
 #### Scenario: The data ticket is published at creation
 - **WHEN** an identity is created and a second device is linked
-- **THEN** the linked device eventually reads the identity's data-namespace ticket under the `data` kind from its directory replica
+- **THEN** the linked device eventually reads the identity's data-namespace ticket under the `data` kind from its PMS replica
 
-### Requirement: The directory routes; grants live in connection metadata stores
-The directory carries the identity's own device-internal state — its device set, its connections records, and the tickets to its own stores and to its connections' metadata pairs. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](connection-metadata-store.md), where the granting side can withdraw them, so no copy in a directory outlives the grant.
+### Requirement: The PMS routes; grants live in connection metadata stores
+The PMS carries the identity's own device-internal state — its device set, its connections records, and the tickets to its own stores and to its connections' metadata pairs. It SHALL NOT hold tickets to another identity's data stores: those travel only inside [connection metadata stores](connection-metadata-store.md), where the granting side can withdraw them, so no copy in a PMS outlives the grant.
 
-#### Scenario: No counterparty data ticket in the directory
+#### Scenario: No counterparty data ticket in the PMS
 - **WHEN** establishment and a data-grant exchange with a peer complete
-- **THEN** the receiving identity's directory contains the metadata-pair kinds for that peer and no ticket to the peer's data namespace — the data-store ticket is read from the metadata store
+- **THEN** the receiving identity's PMS contains the metadata-pair kinds for that peer and no ticket to the peer's data namespace — the data-store ticket is read from the metadata store
 
 ## ADDED Requirements
 
 ### Requirement: The replica reports its namespace and waits for a sync session
-The directory SHALL expose the namespace of its replica, so a caller that imported it can name it to forget it, and SHALL offer a bounded wait for the first successful sync session of that replica which started after a given instant. The property waited on is "this replica has caught up with a peer" — a session that started and succeeded — not "some content arrived": polling contents cannot distinguish a replica that synced and found nothing new from one that never synced at all. A wait that elapses SHALL surface as a timeout, never as a hang. Importing a replica already starts its first session and enrols it in the node's periodic reconcile pass with the ticket's contacts, so the wait needs no trigger of its own and a first exchange that fails is re-dialed within the wait's own budget.
+The PMS SHALL expose the namespace of its replica, so a caller that imported it can name it to forget it, and SHALL offer a bounded wait for the first successful sync session of that replica which started after a given instant. The property waited on is "this replica has caught up with a peer" — a session that started and succeeded — not "some content arrived": polling contents cannot distinguish a replica that synced and found nothing new from one that never synced at all. A wait that elapses SHALL surface as a timeout, never as a hang. Importing a replica already starts its first session and enrols it in the node's periodic reconcile pass with the ticket's contacts, so the wait needs no trigger of its own and a first exchange that fails is re-dialed within the wait's own budget.
 
 #### Scenario: The wait returns on a successful session, not on content
-- **WHEN** a directory replica is imported and a sync session with a peer holding it starts after the given instant and completes successfully
+- **WHEN** a PMS replica is imported and a sync session with a peer holding it starts after the given instant and completes successfully
 - **THEN** the wait returns; it would not have returned for a session that started before that instant, nor for one that failed
 
 #### Scenario: A replica that cannot reach a peer times out
@@ -47,15 +47,15 @@ The directory SHALL expose the namespace of its replica, so a caller that import
 - **THEN** the wait fails with a timeout, and the caller can tell it apart from a successful catch-up
 
 ### Requirement: One entry per connection, counterparty in the key
-A live connection to peer `P` SHALL be represented by a directory entry at path `connections/<P-hex>` (64 lowercase hex chars of the counterparty's `PdnId`). The payload SHALL be treated as opaque, and liveness decisions MUST NOT depend on payload bytes: a connection is visible as soon as its record syncs, before any payload is fetched.
+A live connection to peer `P` SHALL be represented by a PMS entry at path `connections/<P-hex>` (64 lowercase hex chars of the counterparty's `PdnId`). The payload SHALL be treated as opaque, and liveness decisions MUST NOT depend on payload bytes: a connection is visible as soon as its record syncs, before any payload is fetched.
 
 #### Scenario: Connect writes the marker entry
 - **WHEN** `connect(P)` is called on a device
-- **THEN** an entry exists at `connections/<P-hex>` in the directory replica with a non-zero length
+- **THEN** an entry exists at `connections/<P-hex>` in the PMS replica with a non-zero length
 
 #### Scenario: Connect on one device, observed on another
 - **WHEN** the phone calls `connect(P)` while the phone and the laptop are reachable
-- **THEN** the laptop's directory eventually lists `P` as a live connection, without waiting on payload content
+- **THEN** the laptop's PMS eventually lists `P` as a live connection, without waiting on payload content
 
 ### Requirement: Disconnect is a tombstone
 `disconnect(P)` SHALL write a pdn-store tombstone (empty entry, length 0) at `connections/<P-hex>`. A connection SHALL be considered live if and only if the latest entry for its key across all authors has non-zero length; tombstones participate in per-key last-writer-wins like ordinary entries.
@@ -66,7 +66,7 @@ A live connection to peer `P` SHALL be represented by a directory entry at path 
 
 #### Scenario: Revocation propagates
 - **WHEN** the phone calls `disconnect(P)` after `P` was live on the laptop
-- **THEN** the laptop's directory eventually shows `P` as not live
+- **THEN** the laptop's PMS eventually shows `P` as not live
 
 #### Scenario: Offline conflict resolves deterministically
 - **WHEN** the phone calls `connect(P)` and the laptop calls `disconnect(P)` while partitioned, and the devices then sync

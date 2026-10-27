@@ -2,7 +2,7 @@
 
 ## Overview
 
-A [User](user.md)'s software application responsible for data sharing between the user and a [Relying Party](relying-party.md), governed by [Capability](capability.md) validation.
+A [User](user.md)'s software application responsible for data sharing among the members of each [pod](pod.md) the user's identity is a member of, a [Relying Party](relying-party.md) among them.
 
 ## Details
 

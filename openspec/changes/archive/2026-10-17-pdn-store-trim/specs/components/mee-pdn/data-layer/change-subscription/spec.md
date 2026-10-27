@@ -1,0 +1,29 @@
+## MODIFIED Requirements
+
+### Requirement: A subscriber never holds up the store
+
+A subscription to a replica's events SHALL NOT make the store wait for its subscriber. A subscription merges two buffers of 256 events each: one for the replica's inserts — an entry written on this device or arrived by sync — and one for the live events — a payload become readable, a session finished, a neighbor up or down. When either buffer is full, the store SHALL drop the event and SHALL follow the last event that buffer still delivers with a lag notice of that buffer's own; the subscriber reads a notice only after every event it stands for was emitted, so a subscriber that reads the replica again on the notice finds every entry those events reported. The guarantee holds per buffer: one burst can yield two lag notices, one from each buffer, and events of one buffer can arrive after the other buffer's notice. The sessions and the downloads a dropped event reported are not recorded anywhere and are lost. Only the store's own live engine subscribes with a delivery that waits for room, since what it does on an event — announcing a local write, queueing a download — has no other trigger; no interface outside the store offers that delivery. Without this, a subscriber that stops reading stops the store behind it: every replica of the identity stops answering, sessions to its siblings and to the other members of its pods stall, and a caller holding a lock the subscriber waits on never gets its answer.
+
+**Example:** a1 holds a subscription to Alice's PMS that it never reads; a2 records 600 pods, one `pods/<pod>/1` record each.
+
+| step | a1's store | a1's subscription |
+|---|---|---|
+| a2's 600 records arrive | takes in all 600 | keeps the `InsertRemote` events that fit (the 256-slot insert buffer, its last slot for the `Lagged`), drops the rest; the live buffer does not fill, since the 600 records share one payload |
+| a1 records one pod more | the write answers | — |
+| a1 reads the subscription at last | — | the inserts that fitted, then their `Lagged`, with the live events merged in, some of them after it |
+| a1 lists the held pods on the `Lagged` | all 601 records | a drop in either buffer after this read leaves a `Lagged` of that buffer's own |
+
+#### Scenario: A subscriber that stops reading holds up no sync
+
+- **WHEN** a device holds a subscription to its PMS that it never reads, and a sibling writes more records than the subscription buffers
+- **THEN** the device takes in every record, its own writes and reads go on answering, and the subscription, read at last, yields a change
+
+#### Scenario: An unread subscription holds up neither entries nor their content
+
+- **WHEN** a node holds a subscription to a replica that it never reads, and a peer writes more entries of distinct content than the subscription buffers
+- **THEN** every entry and its content become readable on the node
+
+#### Scenario: Dropped events leave one notice behind per buffer
+
+- **WHEN** a subscriber stops reading, and the store emits more events into one of the subscription's two buffers than it holds
+- **THEN** the subscriber, reading again, receives that buffer's events that fitted and then one lag notice for them, with the other buffer's events merged in before or after it, and a drop in that buffer after the subscriber has read the notice leaves a notice of its own

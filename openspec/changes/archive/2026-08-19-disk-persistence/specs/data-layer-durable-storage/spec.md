@@ -38,7 +38,7 @@ A node spawned on a directory holding a key SHALL bind its endpoint with that ke
 - **THEN** it reports a node id of its own, holding none of another directory's state
 
 ### Requirement: One author per node, persisted with the stores
-Every store on a node SHALL write with one author, and that author SHALL be persisted with the replicas, so a node that restarts writes as the same author it wrote as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and prefix deletion are scoped to the writing author, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins.
+Every store on a node SHALL write with one author, and that author SHALL be persisted with the replicas, so a node that restarts writes as the same author it wrote as before. An author minted per store or per start makes a rewritten key accumulate one live record per author: replacement and deletion are scoped to the writing author and to one key, so every superseded copy stays live in the replica and replicates. A device record written under one author and withdrawn under another likewise stays in the replica; the set still reads the device as absent, because the latest-per-key collapse sees the tombstone before empty entries are excluded — a query behavior the withdrawal scenario pins.
 
 #### Scenario: A rewritten key keeps one live record
 - **WHEN** a node writes a path, restarts, and writes the same path again

@@ -4,7 +4,7 @@
 
 ### Requirement: Two identities of one node establish through the same dialogue
 
-Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own directories, and the connection's metadata pair SHALL be two replicas — one held for each identity — that converge without any peer being reachable.
+Two identities hosted on one node SHALL establish a connection through the dialogue this spec states, run inside the process ([in-process sessions](../../data-layer/in-process-sessions/spec.md)), because a node does not dial its own endpoint. The invite SHALL be one-time and short-lived and its secret SHALL be verified and burned as it is between two nodes, both identities SHALL record the connection in their own private metadata stores (PMSs), and the connection's metadata pair SHALL be two replicas — one held for each identity — that converge without any peer being reachable.
 
 #### Scenario: Two identities of one node connect and exchange a grant
 

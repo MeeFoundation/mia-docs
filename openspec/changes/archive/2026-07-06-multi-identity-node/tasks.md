@@ -17,7 +17,7 @@
 
 ## 3. First-device provisioning
 
-- [x] 3.1 Add `provision_identity` to `linking.rs` (create the connections store, publish its ticket under the directory's connections key, register the device; returns `LinkedStores`) and export it
+- [x] 3.1 Add `provision_identity` to `linking.rs` (create the connections store, publish its ticket under the private metadata store (PMS) connections key, register the device; returns `LinkedStores`) and export it
 - [x] 3.2 Simplify the tests over it: `device_linking.rs` replaces its inline provisioning; `multi_identity.rs`'s helper shrinks to provisioning plus test fixtures (peer connection, data namespace)
 - [x] 3.3 Run `just precommit-check` and fix fallout
 

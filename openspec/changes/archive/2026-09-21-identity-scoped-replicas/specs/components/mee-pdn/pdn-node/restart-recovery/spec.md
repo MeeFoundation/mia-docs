@@ -8,22 +8,22 @@
 ## MODIFIED Requirements
 
 ### Requirement: The runtime records which identities it hosts
-A runtime with durable storage SHALL keep, for each identity it hosts, a hosting record in that identity's own subdirectory of its storage directory, beside the identity's replica store: the namespace of the identity's private metadata directory, the identity being the name of the subdirectory. It SHALL record nothing else about it — no data namespace, no connections, no metadata pairs, no bound grants — because the directory is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. A record SHALL be written beside and renamed over, so an interrupted write leaves no record and the operation failed, and it belongs to its own identity alone: recording one identity never rewrites another's.
+A runtime with durable storage SHALL keep, for each identity it hosts, a hosting record in that identity's own subdirectory of its storage directory, beside the identity's replica store: the namespace of the identity's private metadata store (PMS), the identity being the name of the subdirectory. It SHALL record nothing else about it — no data namespace, no connections, no metadata pairs, no bound grants — because the PMS is already the durable record of an identity's own state, and a second record of the same facts can disagree with it. A record SHALL be written beside and renamed over, so an interrupted write leaves no record and the operation failed, and it belongs to its own identity alone: recording one identity never rewrites another's.
 
 #### Scenario: Hosting is recorded when an identity is created
 - **WHEN** an identity is created on a runtime with durable storage
-- **THEN** that identity's subdirectory holds a record naming its directory namespace, and nothing else about it
+- **THEN** that identity's subdirectory holds a record naming its PMS namespace, and nothing else about it
 
 #### Scenario: Hosting is recorded when a device links
 - **WHEN** a device links to an identity and its catch-up completes
-- **THEN** that identity's subdirectory holds a record naming the directory namespace it imported
+- **THEN** that identity's subdirectory holds a record naming the PMS namespace it imported
 
 #### Scenario: A failed record change loses no identity
 - **WHEN** recording a second identity fails — the process killed, the disk full — and the runtime restarts
 - **THEN** the first identity is hosted from its own record, untouched by the attempt, and the second is either fully hosted or absent, never half-recorded
 
 ### Requirement: A restarted runtime recovers each hosted identity along the product path
-At spawn, a runtime SHALL host every identity whose subdirectory holds a hosting record and whose store holds the directory replica that record names, each with stores of its own, by opening that identity's private metadata directory from the replica that identity already holds and performing the same registration a newly created identity performs: the directory arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the directory rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records, all imported for that identity. A contact re-derived this way that names this node's own address SHALL be reached inside the process. Recovery SHALL require no peer, no ceremony, and no network.
+At spawn, a runtime SHALL host every identity whose subdirectory holds a hosting record and whose store holds the PMS replica that record names, each with stores of its own, by opening that identity's PMS from the replica that identity already holds and performing the same registration a newly created identity performs: the PMS arms session classification, the identity enters the hosted set, and its connection sweep begins. Everything else SHALL be re-derived from the PMS rather than recorded: the identity's data namespace from its published `data` ticket, its connections from its connection records, each connection's metadata pair from that pair's two published tickets, and the granted namespaces from the counterparty's grant records, all imported for that identity. A contact re-derived this way that names this node's own address SHALL be reached inside the process. Recovery SHALL require no peer, no ceremony, and no network.
 
 #### Scenario: An identity comes back hosted
 - **WHEN** a runtime restarts on a directory recording one hosted identity
@@ -71,12 +71,12 @@ A record SHALL become durable only after its identity's replicas are durable, so
 - **THEN** it starts hosting nothing, and creating an identity writes that identity's record
 
 ### Requirement: A record whose replica is missing is skipped, not fatal
-A hosting record naming a directory replica its identity's store does not hold — the store gone from the subdirectory, or holding no such replica — SHALL be skipped: that identity is not hosted, the skip is reported, the record is left as it is, and every other identity recovers as usual. Where the store is gone, the skip SHALL open none in its place. A record whose replica the store does hold but cannot open SHALL stop the start, naming the identity — a runtime that silently hosted less than its records name would look healthy while refusing everything. The two SHALL be told apart by what the replica store holds, never by the wording of a failure.
+A hosting record naming a PMS replica its identity's store does not hold — the store gone from the subdirectory, or holding no such replica — SHALL be skipped: that identity is not hosted, the skip is reported, the record is left as it is, and every other identity recovers as usual. Where the store is gone, the skip SHALL open none in its place. A record whose replica the store does hold but cannot open SHALL stop the start, naming the identity — a runtime that silently hosted less than its records name would look healthy while refusing everything. The two SHALL be told apart by what the replica store holds, never by the wording of a failure.
 
 The asymmetry is the reason: skipping loses one identity's hosting on this device, and the record stays readable by whoever ends the hosting, while stopping the start loses every identity on that disk at once — and a runtime that cannot start cannot be asked to repair itself, leaving erasure of the storage directory as the only way back.
 
 #### Scenario: A record whose replica is absent is skipped and the rest comes back
-- **WHEN** a runtime starts on a directory recording three identities — one whose store holds its directory replica, one whose store is gone, and one whose store holds no such replica — and creates a fourth identity afterwards
+- **WHEN** a runtime starts on a directory recording three identities — one whose store holds its PMS replica, one whose store is gone, and one whose store holds no such replica — and creates a fourth identity afterwards
 - **THEN** the first is hosted and its entries read back, the other two are not hosted and reads addressed to them are refused, no store is opened where one was gone, the start succeeds, and both skipped records are left as they were
 
 ## ADDED Requirements

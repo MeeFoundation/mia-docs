@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Each direction of a connection lives in a dedicated replica
-A connection between identities A and B SHALL be served by two dedicated pdn-store replicas: one issued by A toward B and one issued by B toward A. Each SHALL be separate from every data store, from the private-metadata directory, and from every other connection's metadata stores; no domain `NamespaceId` is allocated — the store handle returned at creation or import is how the replica is addressed. Metadata stores of several connections and several identities SHALL coexist on one node without sharing a replica.
+A connection between identities A and B SHALL be served by two dedicated pdn-store replicas: one issued by A toward B and one issued by B toward A. Each SHALL be separate from every data store, from the private metadata store (PMS), and from every other connection's metadata stores; no domain `NamespaceId` is allocated — the store handle returned at creation or import is how the replica is addressed. Metadata stores of several connections and several identities SHALL coexist on one node without sharing a replica.
 
 #### Scenario: Creating the store allocates a dedicated replica
 - **WHEN** a node creates a connection metadata store

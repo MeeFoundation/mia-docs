@@ -17,8 +17,8 @@
 - **THEN** the isolation guarantees are `data-layer-multi-identity`'s
 
 ### Requirement: A device links from a single seed
-**Reason**: The seed — a bearer write ticket carried in a QR — is gone: linking starts from a bearer-free payload, and the bootstrap tickets ride the dialogue's reply (`pdn-node-device-linking`). Discovery through the directory is no longer part of the linking critical path; nothing remains for it to discover.
-**Migration**: The linking payload replaces the seed; the reply's directory and data tickets replace ticket discovery.
+**Reason**: The seed — a bearer write ticket carried in a QR — is gone: linking starts from a bearer-free payload, and the bootstrap tickets ride the dialogue's reply (`pdn-node-device-linking`). Discovery through the private metadata store (PMS) is no longer part of the linking critical path; nothing remains for it to discover.
+**Migration**: The linking payload replaces the seed; the reply's PMS and data tickets replace ticket discovery.
 
 #### Scenario: Superseded by the dialogue
 - **WHEN** a device links after this change
@@ -33,17 +33,17 @@
 - **THEN** its device record is written by the inviter as part of the dialogue
 
 ### Requirement: The device set is bidirectional
-**Reason**: Carried by `pdn-node-device-linking`'s scenarios (the newcomer is registered on the inviting device; success implies the caught-up newcomer reads the existing devices) together with the directory's replication requirement — no separate requirement needed.
+**Reason**: Carried by `pdn-node-device-linking`'s scenarios (the newcomer is registered on the inviting device; success implies the caught-up newcomer reads the existing devices) together with the PMS's replication requirement — no separate requirement needed.
 **Migration**: No behavior change.
 
-#### Scenario: Carried by the ceremony and directory specs
+#### Scenario: Carried by the ceremony and PMS specs
 - **WHEN** a device links after this change
-- **THEN** both directions of device-set visibility follow from the ceremony and directory requirements
+- **THEN** both directions of device-set visibility follow from the ceremony and PMS requirements
 
-### Requirement: Bootstrap is directory-first
-**Reason**: The premise dissolved: the directory is no longer the discovery channel for the linking critical path (the reply hands the bootstrap tickets over directly), and the connections store this requirement ordered against no longer exists. The directory remains the durable record (`tickets/data`, per-connection kinds) consumed outside the ceremony.
-**Migration**: See `pdn-node-device-linking` ("The reply hands over the bootstrap tickets") and the directory's typed-tickets requirement.
+### Requirement: Bootstrap is PMS-first
+**Reason**: The premise dissolved: the PMS is no longer the discovery channel for the linking critical path (the reply hands the bootstrap tickets over directly), and the connections store this requirement ordered against no longer exists. The PMS remains the durable record (`tickets/data`, per-connection kinds) consumed outside the ceremony.
+**Migration**: See `pdn-node-device-linking` ("The reply hands over the bootstrap tickets") and the PMS's typed-tickets requirement.
 
 #### Scenario: Superseded by tickets-in-reply
 - **WHEN** a device links after this change
-- **THEN** the stores it comes up with arrive from the reply, not from directory discovery
+- **THEN** the stores it comes up with arrive from the reply, not from PMS discovery
