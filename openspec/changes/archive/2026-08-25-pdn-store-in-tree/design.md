@@ -72,7 +72,7 @@ Not carried from the pipeline: cross and android builds, semver checks and the M
 
 ### Operating conditions
 
-None of the conditions in [operating-conditions](../../specs/code-practices/operating-conditions.md) change the outcome of this change: no behaviour of the runtime, the data layer, or the store moves. Several identities, several devices, linking, an unstable connection, a full disk, a restart, a membership that moves — each is handled by code this change copies byte for byte and builds from a different path. The tests that back them are the same tests, run by the same runner under the same feature set, plus the configurations the store's pipeline was meant to run.
+None of the conditions in [operating-conditions](../../../specs/code-practices/operating-conditions.md) change the outcome of this change: no behaviour of the runtime, the data layer, or the store moves. Several identities, several devices, linking, an unstable connection, a full disk, a restart, a membership that moves — each is handled by code this change copies byte for byte and builds from a different path. The tests that back them are the same tests, run by the same runner under the same feature set, plus the configurations the store's pipeline was meant to run.
 
 ## Risks / Trade-offs
 

@@ -88,7 +88,7 @@ Walked per [operating-conditions](../../specs/code-practices/operating-condition
 - **A platform suspension** — the condition a phone adds to the restart case, and the one that can amend D2. The spike answers it.
 - **Memory pressure** — the second condition a phone adds; D9 bounds the input the host controls. What an unbounded inbound replica does is not bounded here and is named as out of scope.
 - **An unstable connection** — the ceremony bounds and the repeated read are the whole answer; nothing here retries on a caller's behalf.
-- **A disk that fills** — the node writes to the directory named at bring-up, and a storage failure is reported rather than swallowed ([durable storage](../../specs/components/data-layer/durable-storage.md)). The facade adds nothing to that.
+- **A disk that fills** — the node writes to the directory named at bring-up, and a storage failure is reported rather than swallowed ([durable storage](../../specs/components/mee-pdn/data-layer/durable-storage/spec.md)). The facade adds nothing to that.
 - **Capabilities granted, narrowed, revoked, granted again** — in a pod these are promote, demote, remove and a rejoin, all the runtime's acts; the facade passes them through and holds no state of its own about them. Verified at the runtime level, not here.
 
 ## Risks / Trade-offs

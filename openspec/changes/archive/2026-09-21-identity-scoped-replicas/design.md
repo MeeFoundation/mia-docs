@@ -211,7 +211,7 @@ What a modified node can obtain is bounded by the identities it is genuinely a d
 
 ## Operating conditions
 
-Walked against [operating-conditions](../../specs/code-practices/operating-conditions.md), with the ones that change the outcome named.
+Walked against [operating-conditions](../../../specs/code-practices/operating-conditions.md), with the ones that change the outcome named.
 
 - **Several identities on one node** is what the change is about: it moves from a classification that can resolve to several identities to a session that names exactly one, and every decision above is a consequence (D1, D3, D4, D5).
 - **One device or several** changes the outcome twice: an identity's replicas reconcile with that identity's other devices as they do now, and a co-located identity reaches them only through the in-process path (D7).

@@ -39,7 +39,7 @@ No test of the store SHALL carry an ignore mark: each SHALL run in every ordinar
 |---|---|---|
 | `just test` | runs | runs |
 | `just test -p pdn-store` | runs | runs |
-| nightly job `in-process-scenarios` | 15 iterations, selected by `-E 'kind(test)'` | 15 iterations |
+| nightly job `in-process-tests` | 15 iterations, selected by `-E 'kind(test)'` | 15 iterations |
 
 #### Scenario: An ordinary run skips none of the store's tests
 - **WHEN** `just test` runs
@@ -67,7 +67,7 @@ The store SHALL declare no feature and SHALL be built for the targets the worksp
 
 #### Scenario: The pipeline runs no job for the store alone
 - **WHEN** a change is proposed
-- **THEN** the store is linted and tested by the workspace's job, and the pipeline has no `store` job
+- **THEN** the store is linted and tested by the workspace's jobs, and the pipeline has no `store` job
 
 ### Requirement: The workspace check denies the store's warnings
 `just check` SHALL lint the store, every target of it, with warnings denied, under the store's own `[lints]` table rather than the workspace's, and SHALL build the store's documentation with rustdoc's warnings denied.

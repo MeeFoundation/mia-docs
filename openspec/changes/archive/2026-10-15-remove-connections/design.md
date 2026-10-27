@@ -294,7 +294,7 @@ openspec retires a capability only when its spec holds requirement statements an
 | `data-layer/write-retraction` | all 5 | go with grants |
 | `data-layer/data-store` | A write affects only its own path | reconciliation sessions: "An entry affects only its own key", which carries the refusal of a zero-length write from "Entries are opaque payloads at validated paths" too |
 | | its other 8 requirements | go with the data namespace: an identity's own data is a pod of one (D2) |
-| `pdn-node/namespace-addressing` | all 4 | go with the data namespace; a record is addressed by pod id and record reference ([pods](../../specs/components/mee-pdn/pdn-node/pods/spec.md)) |
+| `pdn-node/namespace-addressing` | all 4 | go with the data namespace; a record is addressed by pod id and record reference ([pods](../../../specs/components/mee-pdn/pdn-node/pods/spec.md)) |
 
 **Rejected alternatives:**
 
