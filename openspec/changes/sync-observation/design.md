@@ -331,7 +331,7 @@ coordinator → 127.0.0.1:3311:    POST /debug/agent/reset {"pod_interval_secs":
 - The store's actor thread renamed to the facade's prefix
   - **Cons:** a divergence in `pdn-store` for a name the sampler can list beside the prefix.
 - The blob store's runtime named with the facade's prefix
-  - **Cons:** iroh-blobs takes no runtime from its caller, so the name needs a second divergence of the iroh-blobs fork, which is held to one fix; the sampler lists the prefix iroh-blobs sets instead, and an iroh-blobs bump re-reads it.
+  - **Cons:** iroh-blobs takes no runtime from its caller, so the name needs a fork of iroh-blobs that carries no defect's fix, only this name; the sampler lists the prefix iroh-blobs sets instead, and an iroh-blobs bump re-reads it.
 
 ### D12. An observed join opens the subscription between the import and the start of sync
 
