@@ -151,7 +151,7 @@ The suite SHALL NOT run as part of the workspace's default test run, nor be sele
 | `just test` | skipped, no image built |
 | `just stress` | skipped: its default selection, `-E 'kind(test)'`, runs no ignored test |
 | `just test-docker` | `just build-image`, then nextest with `-E 'binary(~stand)' --run-ignored all`; a daemon reporting 8 CPUs: `--profile cap-8`, at most 8 stand tests at once |
-| the pipeline's stand job | on every pull request: the image built, then the same nextest run |
+| the pipeline's `docker-tests` job | on every pull request: the image built, then the same nextest run |
 
 #### Scenario: A machine without a daemon still passes
 - **WHEN** the default test run or the flaky hunt runs with no selection given

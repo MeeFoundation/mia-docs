@@ -39,7 +39,7 @@ No test of the store SHALL carry an ignore mark: each SHALL run in every ordinar
 |---|---|---|
 | `just test` | runs | runs |
 | `just test -p pdn-store` | runs | runs |
-| nightly job `in-process-scenarios` | 15 iterations, selected by `-E 'kind(test)'` | 15 iterations |
+| nightly job `in-process-tests` | 15 iterations, selected by `-E 'kind(test)'` | 15 iterations |
 
 #### Scenario: An ordinary run skips none of the store's tests
 - **WHEN** `just test` runs
