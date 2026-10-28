@@ -24,6 +24,8 @@ The facade SHALL export the operations named above and SHALL NOT export the runt
 
 Beside those operations the facade SHALL export exactly 1 value that reaches no service call: the ceiling on one record payload or operation, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
 
+On Android the facade SHALL export besides exactly 1 symbol the binding generator does not produce: the JNI entry `Java_uniffi_pdn_1mobile_AndroidContext_install`, which hands the runtime the application's context (the requirement on the Android context below). It reaches no service call and changes nothing a node does except where its DNS resolvers come from.
+
 #### Scenario: The withheld operations are absent, not merely undocumented
 - **WHEN** the facade's exported surface is enumerated
 - **THEN** it names no share, no import, no forced write, and no observation of a replica
@@ -75,6 +77,23 @@ A host that could hold several nodes invites a staging in which several devices 
 #### Scenario: A second bring-up is refused
 - **WHEN** a bring-up is requested while a node is already up
 - **THEN** the facade refuses it and the running node is untouched
+
+### Requirement: An Android host hands the runtime its application context
+An Android application SHALL call `uniffi.pdn_mobile.AndroidContext.install(context)` with its application context once, after `System.loadLibrary("pdn_mobile")` and before its first bring-up. The runtime's DNS reader asks Android for the active network's resolvers through JNI and needs that context to; without it the reader panics, the panic is caught, and the node falls back to public resolvers, which a network that answers only its own resolvers — a VPN's, a company's — then leaves unable to find its relay. The first call SHALL count and a later one SHALL change nothing. The facade SHALL take the call as a JNI entry and not through the generated bindings, because JNA loads the library without running `JNI_OnLoad`; the Kotlin declaration, `object AndroidContext { @JvmStatic external fun install(context: Any) }` in the package `uniffi.pdn_mobile`, is the application's, since the packaging carries no hand-written Kotlin. A build of the facade for Android SHALL NOT set `panic = "abort"`: a bring-up without the context would then abort the process at its first lookup instead of falling back.
+
+**Example:** an application's `Application.onCreate` calls `System.loadLibrary("pdn_mobile")`, then `AndroidContext.install(this)`, then brings its node up; on the emulator the node reads the resolvers `10.0.2.3` and `10.0.2.4`, reaches `euc1-1.relay.n0.iroh.link`, and logs no `ndk_context` panic.
+
+#### Scenario: An installed context gives the node the network's resolvers
+- **WHEN** an Android application installs its context before its first bring-up
+- **THEN** the node resolves names through the active network's DNS servers, and no JNI panic is logged
+
+#### Scenario: A bring-up without the context still runs
+- **WHEN** an Android application brings its node up without installing its context
+- **THEN** the bring-up succeeds, and the node resolves names through public DNS servers
+
+#### Scenario: A second install changes nothing
+- **WHEN** an Android application calls `install` again, with the same context or another
+- **THEN** the node keeps the context of the first call
 
 ### Requirement: Record payloads cross as bytes, unchanged and bounded
 A record's payload and a mergeable-document's operation SHALL cross the facade as raw bytes on the way in and on the way out, with no encoding, escaping or transformation between what was written and what is read.
