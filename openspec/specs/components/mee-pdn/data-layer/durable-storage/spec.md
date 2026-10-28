@@ -28,13 +28,13 @@ A node's storage SHALL be chosen when it is spawned, by name: memory, or a direc
 - **THEN** each keeps its own state, and neither reads the other's directory
 
 ### Requirement: The directory holds the replicas, the blobs, the author, and the node's key
-A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its PMS, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and linked into place exclusively, so no half-written key can exist and two starts racing on one directory read one key rather than minting two. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
+A configured directory SHALL hold everything a node needs to be itself: a subdirectory per hosted identity carrying that identity's replica store, its author and its hosting record — the namespace of its PMS, written at the commit point of the create or link that hosts it ([restart recovery](../../pdn-node/restart-recovery/spec.md)) — the blob store, and the node's endpoint secret key. The node SHALL create the directory, readable only by its owner, when it is absent, read the key when it is present, and generate and store a key readable only by its owner when it is not — written beside and renamed into place, so no half-written key can exist, and generated under the directory's lock (below), so two starts on one directory never mint two keys. A rename and not a hard link: an Android app may not link a file in its own data directory, and a start that needs one fails there on its first run. A staging file left by a start that died mid-write SHALL NOT stop the next start. A key file that cannot be parsed SHALL stop the start with an error naming it, and SHALL NOT be replaced with a fresh key. A configuration that persists the stores without the key SHALL NOT be expressible.
 
 **Example:** `/var/lib/pdn` after Alice-work and Alice-leisure are hosted; `<x>` is identity x's `PdnId` in 64 hex digits.
 
 ```
 /var/lib/pdn/                    mode 0700 when the node creates it
-  node.key                       mode 0600: the endpoint's secret key in hex, written as node.key.tmp, then hard-linked into place
+  node.key                       mode 0600: the endpoint's secret key in hex, written as node.key.tmp, then renamed into place
   lock                           held by the running node
   peers                          the address book: the last addresses of the node's peers, JSON
   blobs/                         the payloads, one store for the node
