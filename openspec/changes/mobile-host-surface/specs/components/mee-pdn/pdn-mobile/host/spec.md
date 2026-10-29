@@ -7,7 +7,7 @@ Three words are used throughout with the meanings the runtime gives them. An *id
 ## ADDED Requirements
 
 ### Requirement: The facade covers the runtime's operations and adds none
-The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload and consuming one; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite and joining a pod by one, and writing a membership act; placing a record, from one buffer or in pieces, appending an operation to a mergeable-document, reading a record, whole or in pieces, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
+The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload, consuming one, and answering what became of one minted here; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite, answering what became of one minted here, and joining a pod by one, and writing a membership act; placing a record, from one buffer or in pieces, appending an operation to a mergeable-document, reading a record, whole or in pieces, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
 
 Each exported call SHALL delegate to one service call and SHALL add no orchestration of its own. It retries no ceremony, remembers no result, and holds no rule about what a member may read. An application and a facade that each kept a view of the same thing would drift, and the drift would show as a screen contradicting the node it sits on.
 
@@ -184,6 +184,26 @@ The facade SHALL state that a payload carries a live one-time secret. Nothing in
 #### Scenario: A payload's lifetime is the application's choice
 - **WHEN** a payload is minted with a lifetime given
 - **THEN** the secret expires after it, and consuming the payload afterwards is refused
+
+### Requirement: A host learns what became of a code it minted
+The facade SHALL answer, for a linking payload and for a pod invite with the identity it was minted for, what became of the code on this node, as the runtime answers it ([device-linking](../../pdn-node/device-linking/spec.md), [pods](../../pdn-node/pods/spec.md)): pending, burned, used — naming the newcomer's node id for a linking payload and the joiner's identity for a pod invite — expired, or unknown. Each call SHALL decode the code as the call that consumes it decodes it, so a code of the other kind is refused as malformed input, and SHALL write nothing. Nothing is pushed: a screen that waits for someone to come in on the code it shows asks again, as it does for everything else it shows.
+
+**Example:** Bob's phone shows an invite to "Family" and asks about it every 2 seconds.
+
+| moment | `pod_invite_state(bob, code)` |
+|---|---|
+| shown | `Pending` |
+| Carol's phone presented it, her joined event being written | `Burned` |
+| Carol's phone holds the pod's tickets | `Used { by: <carol> }`: the screen closes |
+| the same code asked as a linking payload | refused as malformed input |
+
+#### Scenario: A code reads used once another device consumed it
+- **WHEN** a pod invite and a linking payload are minted through the facade and a second handle consumes each
+- **THEN** each reads pending before and used afterwards, naming the joiner's identity and the newcomer's node id
+
+#### Scenario: A code asked about as the other kind is refused
+- **WHEN** a pod invite is asked about as a linking payload, and a linking payload as a pod invite
+- **THEN** each call is refused as malformed input
 
 ### Requirement: A ceremony call ends within a bounded time
 An exported ceremony call SHALL either complete or fail within a bounded time, never remaining outstanding indefinitely, so a screen showing progress reaches an outcome. Consuming a linking payload SHALL take the caller's bound for the whole act — the dialogue spends from it first and the catch-up gets what remains — and SHALL report a distinct failure when the catch-up did not finish inside it, having rolled back what it imported. Joining a pod SHALL answer once both of the pod's stores caught up, and a catch-up that runs out of its bound SHALL be reported as that, the pod recorded and its catch-up continuing.
