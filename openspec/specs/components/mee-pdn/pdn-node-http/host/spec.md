@@ -168,7 +168,7 @@ client:        403, body "linking into the identity", for a refusal wrapped in t
 - **THEN** the host returns HTTP 413 without invoking the pods service
 
 ### Requirement: The debug surface covers identities, linking and pods
-When enabled, the debug surface SHALL make identity creation and linking, [pods](../../../../architecture/language/pod.md), node status, and hosted identities reachable over HTTP. A pods operation SHALL name the identity performing it as well as the pod, so a caller reaches exactly what that identity holds. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The pods routes SHALL cover every operation of the pods service, one route each: creating and listing pods and listing a pod's members; inviting and joining; the membership acts; placing records, appending operations, reading and listing records; and listing the entries outside the key layout.
+When enabled, the debug surface SHALL make identity creation and linking, what became of a linking invite, [pods](../../../../architecture/language/pod.md), node status, and hosted identities reachable over HTTP. A pods operation SHALL name the identity performing it as well as the pod, so a caller reaches exactly what that identity holds. Each route SHALL delegate to a runtime service call and add no orchestration of its own. The pods routes SHALL cover every operation of the pods service, one route each: creating and listing pods and listing a pod's members; inviting, what became of an invite, and joining; the membership acts; placing records, appending operations, reading and listing records; and listing the entries outside the key layout.
 
 **Example:** two requests to the host on Alice's tablet a3, which hosts Alice-leisure, a member of the pod `ad58a3faa04cdc5576c8dc5823a347c6`, and Alice-work, no member; `<alice-leisure>`, `<alice-work>`: 64 lowercase hex chars of each `PdnId`.
 
@@ -188,6 +188,10 @@ When enabled, the debug surface SHALL make identity creation and linking, [pods]
 #### Scenario: A pod scenario runs over HTTP alone
 - **WHEN** 3 hosts are driven only over HTTP through creating a pod, two invitations, a record placed by one member and an operation appended to it by another
 - **THEN** every member reads the record and the operation without an in-process call into any runtime
+
+#### Scenario: An invite's state is read over HTTP
+- **WHEN** a pod invite and a linking invite are minted on 1 host and each is consumed on a second, over HTTP alone
+- **THEN** the first host answers each invite as pending before it is consumed and as used afterwards, naming the joiner's identity and the newcomer's node id
 
 ### Requirement: The surface hands over no store ticket
 The surface SHALL NOT expose a store ticket handover, forced reconciliation, state reset, or direct store access: a pod invite carries a one-time secret and no ticket, and every store a node holds arrives through the runtime's own ceremonies.
