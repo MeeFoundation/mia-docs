@@ -22,7 +22,7 @@ Each exported call SHALL delegate to one service call and SHALL add no orchestra
 ### Requirement: The exported surface is exactly this set
 The facade SHALL export the operations named above and SHALL NOT export the runtime's remaining public surface. In particular it SHALL NOT export any out-of-band namespace share or import, and SHALL NOT export anything the runtime gates behind its test-only feature. The facade SHALL build with that feature disabled, so a forced write or an observation of a replica is not merely unexported but absent from the binary.
 
-Beside those operations the facade SHALL export exactly 1 value that reaches no service call: the ceiling on one record payload or operation, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
+Beside those operations the facade SHALL export exactly 1 function that reaches no service call: the ceiling on one payload by the kind of the record it belongs to, an operation counting as its mergeable-document's, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
 
 On Android the facade SHALL export besides exactly 1 symbol the binding generator does not produce: the JNI entry `Java_uniffi_pdn_1mobile_AndroidContext_install`, which hands the runtime the application's context (the requirement on the Android context below). It reaches no service call and changes nothing a node does except where its DNS resolvers come from.
 
@@ -98,7 +98,9 @@ An Android application SHALL call `uniffi.pdn_mobile.AndroidContext.install(cont
 ### Requirement: Record payloads cross as bytes, unchanged and bounded
 A record's payload and a mergeable-document's operation SHALL cross the facade as raw bytes on the way in and on the way out, with no encoding, escaping or transformation between what was written and what is read.
 
-The facade SHALL bound a single payload or operation by a stated ceiling and SHALL refuse one above it before the runtime is called. A write buffers the whole payload across the binding boundary and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The HTTP host bounds its own for the same reason and a smaller one is appropriate here.
+The facade SHALL bound a single payload or operation by a ceiling stated for its record's kind and SHALL refuse one above it before the runtime is called: an immutable-document's payload at 100 MiB (104,857,600 bytes), a claim's payload and each operation of a mergeable-document, the first included, at 1 MiB (1,048,576 bytes). A write buffers the whole payload across the binding boundary and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The room goes to the immutable-document, a file read only when asked for; an operation stays small because every read of its document reads all its operations again, and a claim is a key and a value. The HTTP host bounds its request bodies at 16 MiB for the same reason.
+
+**Example:** a photo of 40 MB placed as an immutable-document is taken; the same bytes placed as a claim, or appended as an operation to a note's mergeable-document, are refused as malformed input before the runtime is called.
 
 The bound is on what this host puts in, and SHALL NOT be applied to what a read hands back. A record another member wrote arrives in the replica whatever its size — a host over the same runtime bounds its own writes at a size a phone would not choose — and refusing to hand such a value over would make the record unreadable rather than making the device safer.
 
@@ -111,8 +113,12 @@ The bound is on what this host puts in, and SHALL NOT be applied to what a read 
 - **THEN** the facade reports malformed input, because the engine keeps no entry for one, and no record is placed
 
 #### Scenario: A payload above the ceiling is refused, not attempted
-- **WHEN** a record is placed with a payload larger than the stated ceiling
+- **WHEN** a record is placed with a payload larger than the ceiling stated for its kind
 - **THEN** the facade refuses it before calling the runtime, and the node is still up afterwards
+
+#### Scenario: Each kind has its own ceiling
+- **WHEN** a payload a byte past 1 MiB is placed as a claim, appended as an operation, and placed as an immutable-document
+- **THEN** the claim and the operation are refused before the runtime is called, and the immutable-document is placed
 
 ### Requirement: A read that answers nothing is not proof of absence
 A read of a record SHALL be able to report that it has no value, and the facade SHALL state, where a caller reads about it, that this covers a record that has not arrived as well as one that does not exist.
