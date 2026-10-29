@@ -78,6 +78,25 @@ The crate stays in this workspace, as D1 decides, and the packaging of what it p
 
 What the split can break is stated here rather than met on a phone. A release names the commit of `mee-pdn` it was built from, because an application built against a facade older than the runtime whose behaviour its screens describe fails as a refusal arriving from the runtime — and a refusal is exactly what the screens are required to show faithfully, so the one failure they cannot explain is the one where the mismatch is the cause.
 
+### D11. A file crosses in pieces, through a writer and a reader
+
+Beside `put_record` and `read_record`, which carry a payload as one buffer, `put_record_streamed` hands out a writer and `read_record_streamed` a reader, and the host moves a file through them piece by piece: a piece it writes is the one copy of those bytes the binding makes, and a piece it reads is at most 1 MiB. The runtime places the record from the pieces as a stream and reads it back as one, holding no copy of the whole payload, so the ceiling of D9 bounds what the device stores rather than what a phone holds in memory at once. The host reads the file and writes the pieces itself, so the facade takes no path and no descriptor: whatever the platform hands an application for a picked file — a path on a desktop, a content URI on Android — is read by the application's own stream. The writer counts the pieces against the ceiling as they arrive, places its record only when `finish` answers, and places nothing when it is refused, finished with nothing written or released before `finish`; a refusal answers once the placing it ended has ended, so a refusal the host sees means nothing was placed.
+
+**Example:** a phone places a video of 80,000,000 bytes, the host reading it from its content URI 1,000,000 bytes at a time.
+
+| step | the host holds | the facade and the runtime hold |
+|---|---|---|
+| 80 calls of `write`, each with 1,000,000 bytes | one piece | at most 4 pieces waiting, the rest in the blob store's temp file |
+| `finish` | nothing | the payload moved into the blob store and its entry written |
+| a member's reader, `read(1,048,576)` until it answers empty | one piece | one piece |
+
+**Rejected alternatives:**
+
+- A path the facade reads the file from, and one it writes a read payload to.
+  - **Cons:** Android hands a picked file as a content URI, which native code cannot open by path; a copy into the application's cache leaves a plaintext copy behind a crash, and a descriptor taken from the URI needs `unsafe` in the facade.
+- A foreign interface the facade pulls the pieces from.
+  - **Cons:** the runtime's threads call into the host's language and wait on it.
+
 ## Operating conditions
 
 Walked per [operating-conditions](../../specs/code-practices/operating-conditions.md), for the facade rather than for the demonstration.
@@ -86,7 +105,7 @@ Walked per [operating-conditions](../../specs/code-practices/operating-condition
 - **One device or several** — a device linked to an identity reads the pods the identity holds once its PMS replicates; the facade passes the read through and waits inside nothing.
 - **A device restarts** — the node comes back on the directory named at bring-up as the same node hosting what it hosted, and what does not come back is work in flight. Cited from the runtime's own specs rather than restated as this surface's claim.
 - **A platform suspension** — the condition a phone adds to the restart case, and the one that can amend D2. The spike answers it.
-- **Memory pressure** — the second condition a phone adds; D9 bounds the input the host controls. What an unbounded inbound replica does is not bounded here and is named as out of scope.
+- **Memory pressure** — the second condition a phone adds; D9 bounds the input the host controls, and D11 lets a file of that size cross without a whole copy in memory. What an unbounded inbound replica does is not bounded here and is named as out of scope.
 - **An unstable connection** — the ceremony bounds and the repeated read are the whole answer; nothing here retries on a caller's behalf.
 - **A disk that fills** — the node writes to the directory named at bring-up, and a storage failure is reported rather than swallowed ([durable storage](../../specs/components/mee-pdn/data-layer/durable-storage/spec.md)). The facade adds nothing to that.
 - **Capabilities granted, narrowed, revoked, granted again** — in a pod these are promote, demote, remove and a rejoin, all the runtime's acts; the facade passes them through and holds no state of its own about them. Verified at the runtime level, not here.

@@ -152,3 +152,11 @@ The generation and the packaging live in `pdn-sdk`, the crate and its target bui
 - [x] 8.1 The facade covers what the runtime offers once its connections, grants and data namespaces are gone: identities, linking, pods and their records. The calls for invites, connections, grants and entries, the claim derivation, and the error kinds only they produced leave the facade, its types and its table; the record payload keeps the entry payload's ceiling.
 - [x] 8.2 The surface tests stand on pods: the payload interop, the wrong-act refusal and the restart each go through a pod invite and a placed record, and the paired denial is a third handle that never joined the pod.
 - [x] 8.3 The host spec, the proposal and the design describe that surface; D3 is the ticket rule over pods, and D8 describes nothing and is gone.
+
+## 9. A file in pieces (D11)
+
+- [x] 9.1 `put_record_streamed` and `read_record_streamed` on the handle, delegating to the pods service's calls of the same names; `RecordWriter` with `write` and `finish`, `RecordReader` with `size` and `read`, in `src/streams.rs`
+- [x] 9.2 The writer counts its pieces against the kind's ceiling, refuses an empty finish, and answers a refusal once its placing has ended; a writer released before `finish` ends its pieces with an error
+- [x] 9.3 "A payload written in pieces reads back in pieces", "A writer past its ceiling places nothing", "A writer finished empty places nothing" and "An outsider is refused a placing in pieces and a reader": `a_payload_written_in_pieces_reads_back_in_pieces` in `tests/surface.rs`
+- [x] 9.4 "A released writer places nothing": `a_released_writer_ends_its_stream_with_an_error` in `src/streams.rs`, which fails when a released writer's pieces end as a stream that ended whole
+- [x] 9.5 The crate's `CLAUDE.md`: the writer and the reader beside the payload bound

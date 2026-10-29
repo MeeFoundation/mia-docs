@@ -7,7 +7,7 @@ Three words are used throughout with the meanings the runtime gives them. An *id
 ## ADDED Requirements
 
 ### Requirement: The facade covers the runtime's operations and adds none
-The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload and consuming one; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite and joining a pod by one, and writing a membership act; placing a record, appending an operation to a mergeable-document, reading a record, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
+The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload and consuming one; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite and joining a pod by one, and writing a membership act; placing a record, from one buffer or in pieces, appending an operation to a mergeable-document, reading a record, whole or in pieces, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
 
 Each exported call SHALL delegate to one service call and SHALL add no orchestration of its own. It retries no ceremony, remembers no result, and holds no rule about what a member may read. An application and a facade that each kept a view of the same thing would drift, and the drift would show as a screen contradicting the node it sits on.
 
@@ -21,6 +21,8 @@ Each exported call SHALL delegate to one service call and SHALL add no orchestra
 
 ### Requirement: The exported surface is exactly this set
 The facade SHALL export the operations named above and SHALL NOT export the runtime's remaining public surface. In particular it SHALL NOT export any out-of-band namespace share or import, and SHALL NOT export anything the runtime gates behind its test-only feature. The facade SHALL build with that feature disabled, so a forced write or an observation of a replica is not merely unexported but absent from the binary.
+
+The two calls that place and read a record in pieces SHALL hand out a writer and a reader, objects that reach nothing of the node beyond that one placing or that one payload, with exactly these methods: the writer's `write` and `finish`, the reader's `size` and `read`.
 
 Beside those operations the facade SHALL export exactly 1 function that reaches no service call: the ceiling on one payload by the kind of the record it belongs to, an operation counting as its mergeable-document's, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
 
@@ -65,6 +67,10 @@ The second read negative [access-control-tests](../../../../code-practices/acces
 - **WHEN** a member places a claim and a joiner reads it, and a third handle whose identity holds no invite lists the pod and reads the same claim
 - **THEN** the joiner reads the claim and the third handle obtains nothing, both of its calls refused as addressing a pod it is no member of
 
+#### Scenario: An outsider is refused a placing in pieces and a reader
+- **WHEN** a member's file written in pieces reads back on a joiner's node, and a third handle whose identity holds no invite writes a record to the pod in pieces and asks for a reader of the member's file
+- **THEN** the third handle's placing and its reader are both refused as addressing a pod it is no member of
+
 ### Requirement: One handle owns one node
 One facade handle SHALL own exactly one runtime, brought up by an explicit call that names the directory the node keeps its state in and stopped by an explicit call that is safe to repeat. The embedder names the directory because it is the one that knows its own sandbox, and the runtime's spawn requires a storage choice ([durable storage](../data-layer/durable-storage.md)). A handle SHALL NOT offer a set of nodes, and SHALL refuse a second bring-up of its own while its node is up rather than silently replacing it. The constraint is on the handle rather than on the operating-system process, so a test binary holding two handles against two runtimes remains possible while an application holding one cannot grow a node set behind it.
 
@@ -102,6 +108,10 @@ The facade SHALL bound a single payload or operation by a ceiling stated for its
 
 **Example:** a photo of 40 MB placed as an immutable-document is taken; the same bytes placed as a claim, or appended as an operation to a note's mergeable-document, are refused as malformed input before the runtime is called.
 
+A payload MAY also cross in pieces, so that neither side of the binding holds it whole: the host writes it to a writer piece by piece and reads it from a reader piece by piece, each piece a copy no larger than the host makes it on the way in and no larger than 1 MiB on the way out. The ceiling SHALL be counted as the pieces arrive and the piece that passes it refused; a writer SHALL place its record only when its `finish` answers, and a writer refused, finished with nothing written, or released before its `finish` SHALL place nothing, its refusal answering once its placing has ended. A reader SHALL answer its payload's length before its first piece and an empty piece once the payload is read whole, and SHALL be answered where `read_record` answers a value.
+
+**Example:** a video of 80,000,000 bytes written in 80 pieces of 1,000,000 bytes is placed by `finish`, and a reader of it answers 80,000,000 and then the bytes in pieces of at most 1,048,576; the same pieces written to a claim's writer are refused at the second, and nothing is placed.
+
 The bound is on what this host puts in, and SHALL NOT be applied to what a read hands back. A record another member wrote arrives in the replica whatever its size — a host over the same runtime bounds its own writes at a size a phone would not choose — and refusing to hand such a value over would make the record unreadable rather than making the device safer.
 
 #### Scenario: What was written is what is read
@@ -115,6 +125,22 @@ The bound is on what this host puts in, and SHALL NOT be applied to what a read 
 #### Scenario: A payload above the ceiling is refused, not attempted
 - **WHEN** a record is placed with a payload larger than the ceiling stated for its kind
 - **THEN** the facade refuses it before calling the runtime, and the node is still up afterwards
+
+#### Scenario: A payload written in pieces reads back in pieces
+- **WHEN** an immutable-document is written to a writer in pieces, finished, and read on a member's other node through a reader
+- **THEN** the reader answers the length written and then the bytes written, piece by piece
+
+#### Scenario: A writer past its ceiling places nothing
+- **WHEN** a claim's writer is handed a piece that takes it a byte past the claim's ceiling
+- **THEN** that piece is refused as malformed input, the writer's `finish` places nothing, and the pod lists no record of it
+
+#### Scenario: A writer finished empty places nothing
+- **WHEN** a writer is finished with nothing written
+- **THEN** the facade reports malformed input and no record is placed
+
+#### Scenario: A released writer places nothing
+- **WHEN** a writer is released after some pieces and before its `finish`
+- **THEN** the placing reads the end of its pieces as an error and writes nothing
 
 #### Scenario: Each kind has its own ceiling
 - **WHEN** a payload a byte past 1 MiB is placed as a claim, appended as an operation, and placed as an immutable-document
