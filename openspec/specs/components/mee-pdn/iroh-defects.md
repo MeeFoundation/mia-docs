@@ -21,6 +21,7 @@ Every defect listed here carries a name: the crate it lies in and a number of th
 | iroh-blobs-007 | a request whose stream fails to open reports a failure of the local store | no issue names it | pdn-store opens the stream itself |
 | iroh-blobs-008 | a payload the store failed to write is reported fetched | no issue names it | pdn-store asks the store once the request reports done |
 | iroh-blobs-009 | a provider that lacks a payload answers as one that fails | on main since #298, unreleased; no issue names it | upstream's main at the commit before it |
+| iroh-blobs-010 | an import that does not finish leaves its temp file for good | the same in 0.104.0; no issue names it | the data layer empties the temp directory before the store opens |
 | iroh-docs-001 | a dial the remote aborts as already syncing leaves the pair stuck | pull request #111 of ours, open | pdn-store's own fix |
 | iroh-docs-002 | a payload the session's sender lacked waits on one gossip message | pull request #112 of ours, open | pdn-store's own fix |
 | iroh-docs-003 | the sync report of a session that brought 100 authors or more is never sent | same code on main; no issue names it | pdn-store's own fix |
@@ -222,6 +223,39 @@ get of a hash never asked about: Err(io: stream reset by peer: error 3)
 ```
 
 Expected: a provider answers a request for a blob it holds no data of as it answers one for a hash its store never saw.
+
+## iroh-blobs-010 · iroh-blobs 0.103: an import that does not finish leaves its temp file for good
+
+The file store writes an import past the 16 KiB it keeps inline into a file of its own temp directory, `blobs/temp/` in a node's storage directory, and moves that file into its data directory only once the payload is whole (`finish_import_impl` in its `store/fs.rs`). An import that ends sooner — its source failing, a write failing on a disk that fills, the process killed — leaves the file where it is: the failed import drops its handle and keeps the file, and a later start of the store only creates the directory. Every payload past 16 KiB a node writes takes that path, through `add_bytes` as through `add_path` and `add_stream`, so each cut write of an immutable-document of 100 MiB leaves up to 100 MiB on the disk that no collection run reaches, since a run removes only what the store's database lists. Upstream's 0.104.0 carries the same code, and no issue names it. The data layer empties the temp directory before the store opens, under the directory's lock, so no import of the node can be under way (`remove_import_leftovers` in its `src/node.rs`); a file it cannot remove is warned about, and the spawn goes on. `an_import_cut_short_leaves_nothing_after_a_restart` in the data layer's `tests/persistence.rs` holds it: an import whose source fails after two chunks of 1 MiB leaves its file in the temp directory, and the next start removes it, while the payload of an immutable-document written before reads back whole.
+
+**Example:** Alice's phone, whose app the system kills 60 MiB into placing an attachment of 100 MiB.
+
+| moment | upstream's store alone | with the data layer's answer |
+|---|---|---|
+| the kill | a file of 60 MiB in `blobs/temp/`, and no entry names the attachment | the same |
+| the next start | the file stays, and every later cut adds another | the file is gone before the store opens |
+| a run of blob collection | the file stays | nothing to remove |
+
+### Issue Title
+
+An import that does not finish leaves its temp file in the store's temp directory for good
+
+### Issue Body
+
+The file store copies an import larger than the inline limit into `temp/` and renames it into `data/` once its outboard is computed (`import_byte_stream_impl` and `import_path_impl` in `store/fs/import.rs`, `finish_import_impl` in `store/fs.rs`). When the import ends early — the source stream yields an error, a write fails, the process is killed — nothing removes the temp file: the error path drops the file handle and keeps the file, and `FsStore::load` only creates the temp directory. Each such import leaves its bytes on disk outside anything the store or its garbage collection knows of.
+
+Reproduction, at `3369597` on main:
+
+```rust
+let store = FsStore::load(&dir).await?;
+let chunk = || Ok(Bytes::from(vec![0u8; 1 << 20]));
+let source = futures_lite::stream::iter([chunk(), chunk(), Err(io::Error::other("source failed"))]);
+assert!(store.add_stream(source).await.temp_tag().await.is_err());
+store.shutdown().await?;
+// dir/temp/<name>.temp is still there, and stays after the next FsStore::load(&dir)
+```
+
+Expected: a failed import removes its temp file, and loading the store removes what a killed process left in `temp/`.
 
 ## iroh-002 · iroh 1.3: an HTTP client in the same build panics on its first request
 
