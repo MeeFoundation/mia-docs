@@ -7,7 +7,7 @@ Three words are used throughout with the meanings the runtime gives them. An *id
 ## ADDED Requirements
 
 ### Requirement: The facade covers the runtime's operations and adds none
-The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload and consuming one; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite and joining a pod by one, and writing a membership act; placing a record, appending an operation to a mergeable-document, reading a record, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
+The facade SHALL make the embedded runtime's service operations reachable from the application: creating an identity and listing the hosted ones; minting a device-linking payload, consuming one, and answering what became of one minted here; creating a pod, listing the pods an identity holds, listing a pod's members, minting a pod invite, answering what became of one minted here, and joining a pod by one, and writing a membership act; placing a record, from one buffer or in pieces, appending an operation to a mergeable-document, reading a record, whole or in pieces, reading a mergeable-document's operations, and listing a pod's records; and reporting the node id.
 
 Each exported call SHALL delegate to one service call and SHALL add no orchestration of its own. It retries no ceremony, remembers no result, and holds no rule about what a member may read. An application and a facade that each kept a view of the same thing would drift, and the drift would show as a screen contradicting the node it sits on.
 
@@ -22,7 +22,11 @@ Each exported call SHALL delegate to one service call and SHALL add no orchestra
 ### Requirement: The exported surface is exactly this set
 The facade SHALL export the operations named above and SHALL NOT export the runtime's remaining public surface. In particular it SHALL NOT export any out-of-band namespace share or import, and SHALL NOT export anything the runtime gates behind its test-only feature. The facade SHALL build with that feature disabled, so a forced write or an observation of a replica is not merely unexported but absent from the binary.
 
-Beside those operations the facade SHALL export exactly 1 value that reaches no service call: the ceiling on one record payload or operation, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
+The two calls that place and read a record in pieces SHALL hand out a writer and a reader, objects that reach nothing of the node beyond that one placing or that one payload, with exactly these methods: the writer's `write` and `finish`, the reader's `size` and `read`.
+
+Beside those operations the facade SHALL export exactly 1 function that reaches no service call: the ceiling on one payload by the kind of the record it belongs to, an operation counting as its mergeable-document's, so a caller can refuse an oversized write before making one. It is stated here rather than left to be discovered, because an export the specification does not admit is indistinguishable from one somebody added on the way past.
+
+On Android the facade SHALL export besides exactly 1 symbol the binding generator does not produce: the JNI entry `Java_uniffi_pdn_1mobile_AndroidContext_install`, which hands the runtime the application's context (the requirement on the Android context below). It reaches no service call and changes nothing a node does except where its DNS resolvers come from.
 
 #### Scenario: The withheld operations are absent, not merely undocumented
 - **WHEN** the facade's exported surface is enumerated
@@ -63,6 +67,10 @@ The second read negative [access-control-tests](../../../../code-practices/acces
 - **WHEN** a member places a claim and a joiner reads it, and a third handle whose identity holds no invite lists the pod and reads the same claim
 - **THEN** the joiner reads the claim and the third handle obtains nothing, both of its calls refused as addressing a pod it is no member of
 
+#### Scenario: An outsider is refused a placing in pieces and a reader
+- **WHEN** a member's file written in pieces reads back on a joiner's node, and a third handle whose identity holds no invite writes a record to the pod in pieces and asks for a reader of the member's file
+- **THEN** the third handle's placing and its reader are both refused as addressing a pod it is no member of
+
 ### Requirement: One handle owns one node
 One facade handle SHALL own exactly one runtime, brought up by an explicit call that names the directory the node keeps its state in and stopped by an explicit call that is safe to repeat. The embedder names the directory because it is the one that knows its own sandbox, and the runtime's spawn requires a storage choice ([durable storage](../data-layer/durable-storage.md)). A handle SHALL NOT offer a set of nodes, and SHALL refuse a second bring-up of its own while its node is up rather than silently replacing it. The constraint is on the handle rather than on the operating-system process, so a test binary holding two handles against two runtimes remains possible while an application holding one cannot grow a node set behind it.
 
@@ -76,10 +84,33 @@ A host that could hold several nodes invites a staging in which several devices 
 - **WHEN** a bring-up is requested while a node is already up
 - **THEN** the facade refuses it and the running node is untouched
 
+### Requirement: An Android host hands the runtime its application context
+An Android application SHALL call `uniffi.pdn_mobile.AndroidContext.install(context)` with its application context once, after `System.loadLibrary("pdn_mobile")` and before its first bring-up. The runtime's DNS reader asks Android for the active network's resolvers through JNI and needs that context to; without it the reader panics, the panic is caught, and the node falls back to public resolvers, which a network that answers only its own resolvers — a VPN's, a company's — then leaves unable to find its relay. The first call SHALL count and a later one SHALL change nothing. The facade SHALL take the call as a JNI entry and not through the generated bindings, because JNA loads the library without running `JNI_OnLoad`; the Kotlin declaration, `object AndroidContext { @JvmStatic external fun install(context: Any) }` in the package `uniffi.pdn_mobile`, is the application's, since the packaging carries no hand-written Kotlin. A build of the facade for Android SHALL NOT set `panic = "abort"`: a bring-up without the context would then abort the process at its first lookup instead of falling back.
+
+**Example:** an application's `Application.onCreate` calls `System.loadLibrary("pdn_mobile")`, then `AndroidContext.install(this)`, then brings its node up; on the emulator the node reads the resolvers `10.0.2.3` and `10.0.2.4`, reaches `euc1-1.relay.n0.iroh.link`, and logs no `ndk_context` panic.
+
+#### Scenario: An installed context gives the node the network's resolvers
+- **WHEN** an Android application installs its context before its first bring-up
+- **THEN** the node resolves names through the active network's DNS servers, and no JNI panic is logged
+
+#### Scenario: A bring-up without the context still runs
+- **WHEN** an Android application brings its node up without installing its context
+- **THEN** the bring-up succeeds, and the node resolves names through public DNS servers
+
+#### Scenario: A second install changes nothing
+- **WHEN** an Android application calls `install` again, with the same context or another
+- **THEN** the node keeps the context of the first call
+
 ### Requirement: Record payloads cross as bytes, unchanged and bounded
 A record's payload and a mergeable-document's operation SHALL cross the facade as raw bytes on the way in and on the way out, with no encoding, escaping or transformation between what was written and what is read.
 
-The facade SHALL bound a single payload or operation by a stated ceiling and SHALL refuse one above it before the runtime is called. A write buffers the whole payload across the binding boundary and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The HTTP host bounds its own for the same reason and a smaller one is appropriate here.
+The facade SHALL bound a single payload or operation by a ceiling stated for its record's kind and SHALL refuse one above it before the runtime is called: an immutable-document's payload at 100 MiB (104,857,600 bytes), a claim's payload and each operation of a mergeable-document, the first included, at 1 MiB (1,048,576 bytes). A write buffers the whole payload across the binding boundary and a phone is killed for memory rather than asked to swap, so an unbounded payload is the one input that ends the process instead of returning an error. The room goes to the immutable-document, a file read only when asked for; an operation stays small because every read of its document reads all its operations again, and a claim is a key and a value. The HTTP host bounds its request bodies at 16 MiB for the same reason.
+
+**Example:** a photo of 40 MB placed as an immutable-document is taken; the same bytes placed as a claim, or appended as an operation to a note's mergeable-document, are refused as malformed input before the runtime is called.
+
+A payload MAY also cross in pieces, so that neither side of the binding holds it whole: the host writes it to a writer piece by piece and reads it from a reader piece by piece, each piece a copy no larger than the host makes it on the way in and no larger than 1 MiB on the way out. The ceiling SHALL be counted as the pieces arrive and the piece that passes it refused; a writer SHALL place its record only when its `finish` answers, and a writer refused, finished with nothing written, or released before its `finish` SHALL place nothing, its refusal answering once its placing has ended. A reader SHALL answer its payload's length before its first piece and an empty piece once the payload is read whole, and SHALL be answered where `read_record` answers a value.
+
+**Example:** a video of 80,000,000 bytes written in 80 pieces of 1,000,000 bytes is placed by `finish`, and a reader of it answers 80,000,000 and then the bytes in pieces of at most 1,048,576; the same pieces written to a claim's writer are refused at the second, and nothing is placed.
 
 The bound is on what this host puts in, and SHALL NOT be applied to what a read hands back. A record another member wrote arrives in the replica whatever its size — a host over the same runtime bounds its own writes at a size a phone would not choose — and refusing to hand such a value over would make the record unreadable rather than making the device safer.
 
@@ -92,8 +123,28 @@ The bound is on what this host puts in, and SHALL NOT be applied to what a read 
 - **THEN** the facade reports malformed input, because the engine keeps no entry for one, and no record is placed
 
 #### Scenario: A payload above the ceiling is refused, not attempted
-- **WHEN** a record is placed with a payload larger than the stated ceiling
+- **WHEN** a record is placed with a payload larger than the ceiling stated for its kind
 - **THEN** the facade refuses it before calling the runtime, and the node is still up afterwards
+
+#### Scenario: A payload written in pieces reads back in pieces
+- **WHEN** an immutable-document is written to a writer in pieces, finished, and read on a member's other node through a reader
+- **THEN** the reader answers the length written and then the bytes written, piece by piece
+
+#### Scenario: A writer past its ceiling places nothing
+- **WHEN** a claim's writer is handed a piece that takes it a byte past the claim's ceiling
+- **THEN** that piece is refused as malformed input, the writer's `finish` places nothing, and the pod lists no record of it
+
+#### Scenario: A writer finished empty places nothing
+- **WHEN** a writer is finished with nothing written
+- **THEN** the facade reports malformed input and no record is placed
+
+#### Scenario: A released writer places nothing
+- **WHEN** a writer is released after some pieces and before its `finish`
+- **THEN** the placing reads the end of its pieces as an error and writes nothing
+
+#### Scenario: Each kind has its own ceiling
+- **WHEN** a payload a byte past 1 MiB is placed as a claim, appended as an operation, and placed as an immutable-document
+- **THEN** the claim and the operation are refused before the runtime is called, and the immutable-document is placed
 
 ### Requirement: A read that answers nothing is not proof of absence
 A read of a record SHALL be able to report that it has no value, and the facade SHALL state, where a caller reads about it, that this covers a record that has not arrived as well as one that does not exist.
@@ -133,6 +184,26 @@ The facade SHALL state that a payload carries a live one-time secret. Nothing in
 #### Scenario: A payload's lifetime is the application's choice
 - **WHEN** a payload is minted with a lifetime given
 - **THEN** the secret expires after it, and consuming the payload afterwards is refused
+
+### Requirement: A host learns what became of a code it minted
+The facade SHALL answer, for a linking payload and for a pod invite with the identity it was minted for, what became of the code on this node, as the runtime answers it ([device-linking](../../pdn-node/device-linking/spec.md), [pods](../../pdn-node/pods/spec.md)): pending, burned, used — naming the newcomer's node id for a linking payload and the joiner's identity for a pod invite — expired, or unknown. Each call SHALL decode the code as the call that consumes it decodes it, so a code of the other kind is refused as malformed input, and SHALL write nothing. Nothing is pushed: a screen that waits for someone to come in on the code it shows asks again, as it does for everything else it shows.
+
+**Example:** Bob's phone shows an invite to "Family" and asks about it every 2 seconds.
+
+| moment | `pod_invite_state(bob, code)` |
+|---|---|
+| shown | `Pending` |
+| Carol's phone presented it, her joined event being written | `Burned` |
+| Carol's phone holds the pod's tickets | `Used { by: <carol> }`: the screen closes |
+| the same code asked as a linking payload | refused as malformed input |
+
+#### Scenario: A code reads used once another device consumed it
+- **WHEN** a pod invite and a linking payload are minted through the facade and a second handle consumes each
+- **THEN** each reads pending before and used afterwards, naming the joiner's identity and the newcomer's node id
+
+#### Scenario: A code asked about as the other kind is refused
+- **WHEN** a pod invite is asked about as a linking payload, and a linking payload as a pod invite
+- **THEN** each call is refused as malformed input
 
 ### Requirement: A ceremony call ends within a bounded time
 An exported ceremony call SHALL either complete or fail within a bounded time, never remaining outstanding indefinitely, so a screen showing progress reaches an outcome. Consuming a linking payload SHALL take the caller's bound for the whole act — the dialogue spends from it first and the catch-up gets what remains — and SHALL report a distinct failure when the catch-up did not finish inside it, having rolled back what it imported. Joining a pod SHALL answer once both of the pod's stores caught up, and a catch-up that runs out of its bound SHALL be reported as that, the pod recorded and its catch-up continuing.

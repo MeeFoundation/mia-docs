@@ -69,6 +69,8 @@ trait PodsService {
     async fn invite(&self, identity: PdnId, pod: PodId, lifetime: Option<Duration>) -> Result<PodInvite>;
     /// Joins through the invite's dialogue and returns once both stores have caught up and its membership view lists the identity as a member; the identity joins as a plain member.
     async fn join(&self, identity: PdnId, invite: PodInvite) -> Result<PodId>;
+    /// What became of an invite this runtime minted for the identity into the pod the invite names: pending, burned, used by the joiner, expired or unknown.
+    async fn invite_state(&self, identity: PdnId, invite: &PodInvite) -> Result<InviteState<PdnId>>;
     /// Writes a membership act after checking the identity's role; the service picks both sequences.
     /// `Remove` and `Demote` name another member; `Leave` also forgets the record store on the identity's devices and keeps the membership store as the pod's tombstone.
     async fn act(&self, identity: PdnId, pod: PodId, act: PodAct) -> Result<()>;
@@ -80,6 +82,10 @@ trait PodsService {
     async fn append_op(&self, identity: PdnId, pod: PodId, record: RecordRef, op: &[u8]) -> Result<()>;
     /// A claim's or an immutable-document's payload; `None` for a record the pod does not hold.
     async fn read(&self, identity: PdnId, pod: PodId, record: RecordRef) -> Result<Option<Vec<u8>>>;
+    /// `put_record` from a stream of the payload's pieces, written once the stream ends whole; no lock of the runtime is held while it is read.
+    async fn put_record_streamed(&self, identity: PdnId, pod: PodId, kind: RecordKind, payload: PayloadStream) -> Result<RecordRef>;
+    /// `read` as a reader, read in order, holding the payload while it lives.
+    async fn read_streamed(&self, identity: PdnId, pod: PodId, record: RecordRef) -> Result<Option<PayloadReader>>;
     /// A mergeable-document's operations, each with its writer.
     async fn read_ops(&self, identity: PdnId, pod: PodId, record: RecordRef) -> Result<Vec<Operation>>;
     /// Every record the pod holds.
@@ -221,6 +227,56 @@ Any member's device SHALL mint a pod invite: a fresh one-time, short-lived secre
 
 - **WHEN** a hosted identity invites and a co-located identity joins with the invite, with no other node reachable
 - **THEN** both list each other among the members, a record one places reads back on the other, and a second presentation of the same secret is refused
+
+### Requirement: The inviting runtime answers what became of a pod invite it minted
+
+The pods service SHALL answer, for a hosted identity and a pod invite, what became of the invite's secret on this runtime: pending while it is unpresented and its lifetime runs; expired once its lifetime ended unpresented; burned once a presentation verified and burned it, until the serving half of that join hands the newcomer both stores' write tickets; used, naming the joiner's `PdnId`, from then on; and unknown for a secret this runtime does not hold for that identity and the pod the invite names — never minted here, minted for another identity of this runtime or into another pod, swept after its lifetime, or minted before the runtime last started. An identity this runtime does not host SHALL be refused as unknown, as every pods operation refuses it. The answer SHALL be read alone: asking writes nothing, and a presentation before or after the question is verified, burned and refused exactly as without it, so a refused presentation leaves a pending invite pending. A presentation by an identity the pod already lists, which writes no joined event and hands both tickets over again, SHALL mark the invite used by that member as a first join does. A serving half cut short once the secret burned — a storage failure, a refused offer, a connection lost before the tickets went out — SHALL leave the invite burned. An invite's state SHALL be kept while its lifetime runs; once it has ended, an invite never presented reads expired, one presented keeps reading burned or used, and the next pod invite this runtime mints sweeps it, after which it reads unknown.
+
+**Example:** Bob's phone b1 mints two invites to "Family" as Bob at 10:00, the first with a 10-minute lifetime, the second with 2 minutes, and asks `invite_state` about them as the day goes on.
+
+| at | what happened | the first invite reads | the second invite reads |
+|---|---|---|---|
+| 10:01 | nothing yet | pending | pending |
+| 10:02 | Carol's phone c1 presented the first; b1 burned it and is writing Carol's joined event | burned | pending |
+| 10:02 | b1 handed c1 both stores' write tickets | used by Carol | pending |
+| 10:03 | | used by Carol | expired |
+| 10:03 | asked as another identity b1 hosts | unknown | unknown |
+| 10:04 | b1 restarted | unknown | unknown |
+
+#### Scenario: A served join marks the invite used by the joiner
+
+- **WHEN** a member mints two invites, and a hosted identity on another runtime joins with the first
+- **THEN** the first reads pending before the join and used by the joiner's `PdnId` once the join returned, and the second reads pending throughout
+
+#### Scenario: A join cut short after the burn leaves the invite burned
+
+- **WHEN** the inviter's write of the joined event fails once the secret burned
+- **THEN** the invite reads burned, and a later invite the newcomer joins with reads used by it
+
+#### Scenario: A refused presentation leaves a pending invite pending
+
+- **WHEN** a dialer presents a secret that was never minted while an invite is pending
+- **THEN** the pending invite still reads pending, and the dialer's secret reads unknown
+
+#### Scenario: A member whose join lost the reply is named by the second invite
+
+- **WHEN** the connection drops after the inviter wrote newcomer C's joined event and before its reply reached C, and C then presents a second invite
+- **THEN** the first invite reads burned and the second used by C
+
+#### Scenario: Between two identities of one node the invite is answered for its own identity alone
+
+- **WHEN** a hosted identity invites and a co-located identity joins with the invite inside the process
+- **THEN** the inviting identity reads the invite used by the co-located one, and the co-located identity asking about the same invite reads unknown
+
+#### Scenario: An invite never presented reads expired after its lifetime
+
+- **WHEN** an invite minted with a lifetime of 1 second is asked about 2 seconds later, and again after a further invite was minted
+- **THEN** it reads expired the first time and unknown the second
+
+#### Scenario: A restart forgets every invite's state
+
+- **WHEN** an invite was used, and the inviting runtime stops and starts again on its directory
+- **THEN** the invite reads unknown
 
 ### Requirement: A pod reaches a member's other devices
 
@@ -435,6 +491,45 @@ The pods service SHALL place a record as one of three kinds — claim, mergeable
 
 - **WHEN** a hosted identity that is no member of the pod appends an operation to its mergeable-document
 - **THEN** the edit fails with the unknown-pod error and no member's device holds such an operation
+
+### Requirement: A record's payload is placed from a stream and read as one
+
+The pods service SHALL place a claim or an immutable-document from a stream of its payload's pieces, in order, as `put_record` places one from a buffer: under the placing identity's name, at a fresh id, read back by every member as the bytes the stream yielded. The service SHALL check that the identity is a member before it reads the stream and again when it writes the entry, SHALL hold no lock of the runtime while it reads the stream, and SHALL write nothing for a stream that yields an error. The service SHALL also answer a reader of a claim's or an immutable-document's payload, read in order, for a member alone, answering no reader where `read` answers no value. No copy of the whole payload SHALL be held in memory on either path.
+
+**Example:** Bob places a scan of 3 MiB in "Family" from 3 pieces of 1 MiB, and Alice reads it on her laptop in pieces of 64 KiB; Erin is hosted on Bob's phone and is no member.
+
+| call | result |
+|---|---|
+| `put_record_streamed(Bob, Family, ImmutableDocument, 3 pieces)` | a `RecordRef` under Bob; `read` on Alice's laptop answers the 3,145,728 bytes |
+| `read_streamed(Alice, Family, that record)` | a reader of length 3,145,728 answering 48 pieces and then an empty one |
+| `put_record_streamed(Bob, Family, ImmutableDocument, 2 pieces and an error)` | an error; the pod lists what it listed before |
+| `put_record_streamed(Erin, Family, ImmutableDocument, …)` | the unknown-pod error, the stream never read |
+| `read_streamed(Erin, Family, the scan)` | the unknown-pod error |
+
+#### Scenario: A streamed payload round-trips
+
+- **WHEN** member B places an immutable-document from a stream of several pieces and member A reads it, whole and through a reader
+- **THEN** A reads the bytes B's stream yielded, and the reader answers their length before the first piece
+
+#### Scenario: A stream that fails places nothing
+
+- **WHEN** member B places an immutable-document from a stream that yields an error after some pieces
+- **THEN** the call fails and B's device lists the records it listed before
+
+#### Scenario: A non-member's stream is not read
+
+- **WHEN** a hosted identity that is no member of the pod places a record from a stream
+- **THEN** the call fails with the unknown-pod error and the stream is never read
+
+#### Scenario: A non-member opens no reader
+
+- **WHEN** a hosted identity that is no member of the pod asks for a reader of one of its records
+- **THEN** the call fails with the unknown-pod error
+
+#### Scenario: A stream that waits holds up no other call
+
+- **WHEN** member B's stream waits on its host, and B places a claim meanwhile
+- **THEN** the claim is written while the stream still waits
 
 ### Requirement: Hosted pods survive a restart
 
