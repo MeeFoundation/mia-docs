@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The CESR 2.00 primitives [kerita](../../kerita/crate/spec.md) reads, as a crate of their own, `kerita-cesr`: what it depends on and what it never does, the license it carries, and what it took from whom. Like kerita, it is usable on its own, outside the platform, within its subset. What it reads and writes is in the [primitives](../primitives/spec.md) spec; it is held to keripy by the corpus the [kerita conformance](../../kerita/conformance/spec.md) spec describes.
+The [CESR](https://trustoverip.github.io/kswg-cesr-specification/) 2.00 primitives [kerita](../../kerita/crate/spec.md) reads, as a crate of their own, `kerita-cesr`: what it depends on and what it never does, the license it carries, and what it took from whom. Like kerita, it is usable on its own, outside the platform, within its subset. What it reads and writes is in the [primitives](../primitives/spec.md) spec; it is held to keripy by the corpus the [kerita conformance](../../kerita/conformance/spec.md) spec describes.
 
 ## Requirements
 
