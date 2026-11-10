@@ -32,7 +32,7 @@ The oracle SHALL be keripy at one commit of its main line, named in one file of 
 - **THEN** the regenerated corpus names it, and the corpus check fails
 
 ### Requirement: Every corpus vector names its source and its expected outcome
-Every vector of the corpus SHALL name where it came from — a keripy test copied verbatim, a keripy test whose scenario the oracle replayed in KERI 2.00, a generator of the oracle, or a corpus of `cesr-rs` — with the keripy commit, and the file and test or generator it came from. It SHALL hold keripy's outcome and the crate's expected one: the same outcome, or unsupported for a vector outside the subset the crate reads.
+Every vector of the corpus SHALL name where it came from — a keripy test copied verbatim, a keripy test whose scenario the oracle replayed in KERI 2.00, a generator of the oracle, or a corpus of `cesr-rs` — with the keripy commit, and the file and test or generator it came from. It SHALL hold keripy's outcome and the crate's expected one: the same outcome, or unsupported for a vector outside the subset the crate reads. An event a keripy test builds with keripy's checks turned off, as a test builds one for the key state to refuse, SHALL hold the outcome those checks give, which is how keripy's parser reads it.
 
 **Example:** 2 vectors of the corpus.
 
@@ -49,8 +49,12 @@ Every vector of the corpus SHALL name where it came from — a keripy test copie
 - **WHEN** a keripy test carries an event the crate does not read, such as one signed with a secp256k1 key
 - **THEN** its vector holds keripy's outcome and the crate's expected outcome unsupported, and the crate answers unsupported
 
+#### Scenario: An event built with keripy's checks off holds what its checks answer
+- **WHEN** a keripy test builds an event with its checks turned off, such as `test_kever`'s inception under a non-transferable prefix that lists a next-key digest
+- **THEN** its vector holds keripy's refusal, and the crate refuses it
+
 ### Requirement: The crate and keripy agree in both directions
-For every [KEL](../../../../architecture/language/kel.md) of the corpus that keripy produced, the crate SHALL reach the [key state](../../../../architecture/language/key-state.md) keripy reached, and SHALL refuse every event keripy refused. For every KEL the crate's own tests produce, keripy SHALL reach the key state the crate reached, and SHALL refuse every event the crate refused. The corpus SHALL hold, among the crate's KELs, the cases of ADR-0017 the [key-state](../key-state/spec.md) spec names: an establishment-only identity, a partial rotation under weighted thresholds, a device [AID](../../../../architecture/language/aid.md) approved by a [key event seal](../../../../architecture/language/key-event-seal.md) in a rotation, and a change of [witness](../../../../architecture/language/witness.md). It SHALL hold as well, for each rule of the key state that refuses an event, a KEL of the crate's holding an event the rule refuses beside one keripy accepts. One rule of keripy's stays outside the comparison: keripy holds apart an event of a validator's own, witnessed or delegated AID that arrives from another source (`MisfitEventSourceError`), a rule the key-state spec gives the caller; the KELs resting on it, from keripy's `test_misfit_escrow` and `test_misfit_escrow_delegated`, are held apart, and none of their steps is compared.
+For every [KEL](../../../../architecture/language/kel.md) of the corpus that keripy produced, the crate SHALL reach the [key state](../../../../architecture/language/key-state.md) keripy reached, and SHALL refuse every event keripy refused; an event keripy refuses as it reads it, before any key state, the crate SHALL refuse as it reads it too. For every KEL the crate's own tests produce, keripy SHALL reach the key state the crate reached, and SHALL refuse every event the crate refused. The corpus SHALL hold, among the crate's KELs, the cases of ADR-0017 the [key-state](../key-state/spec.md) spec names: an establishment-only identity, a partial rotation under weighted thresholds, a device [AID](../../../../architecture/language/aid.md) approved by a [key event seal](../../../../architecture/language/key-event-seal.md) in a rotation, and a change of [witness](../../../../architecture/language/witness.md). It SHALL hold as well, for each rule of the key state that refuses an event, a KEL of the crate's holding an event the rule refuses beside one keripy accepts. One rule of keripy's stays outside the comparison: keripy holds apart an event of a validator's own, witnessed or delegated AID that arrives from another source (`MisfitEventSourceError`), a rule the key-state spec gives the caller; the KELs resting on it, from keripy's `test_misfit_escrow` and `test_misfit_escrow_delegated`, are held apart, and none of their steps is compared.
 
 **Example:** one KEL in each direction.
 
@@ -75,6 +79,10 @@ For every [KEL](../../../../architecture/language/kel.md) of the corpus that ker
 #### Scenario: An event keripy refuses, the crate refuses
 - **WHEN** the crate is given an event of the corpus that keripy refused, such as a rotation signed by a key the prior event never committed to
 - **THEN** the crate refuses it or answers that it waits, as keripy did
+
+#### Scenario: An event keripy refuses as it reads it, the crate refuses as it reads it
+- **WHEN** keripy, folding a KEL the crate wrote, refuses one of its events as it reads it, such as an inception under another key's basic prefix
+- **THEN** the crate refuses the same event as it reads it
 
 ### Requirement: The oracle runs every night against the committed corpus
 A nightly job SHALL regenerate the corpus from the pinned keripy and SHALL run the check in both directions. A regenerated corpus that differs from the committed one, and a disagreement in either direction, SHALL fail the job. The pin SHALL move only through a change that commits the regenerated corpus with it.

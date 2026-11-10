@@ -29,7 +29,7 @@ The key state of an [AID](../../../../architecture/language/aid.md) SHALL be det
 - **THEN** the key state names each index that signed once, with the slot its key was committed in
 
 ### Requirement: An inception establishes the key state
-An `icp` or `dip` SHALL establish the AID's key state: its current keys and their threshold, the digests of its next keys and their threshold, its witness list and witness threshold, and its configuration traits. A self-addressing prefix SHALL be the event's SAID, and a basic prefix SHALL be the event's one key. The event SHALL be signed by current keys meeting the current threshold.
+An `icp` or `dip` SHALL establish the AID's key state: its current keys and their threshold, the digests of its next keys and their threshold, its witness list and witness threshold, and its configuration traits. Its prefix SHALL derive from it, as the [encoding](../encoding/spec.md) spec requires of every event the crate reads: a self-addressing prefix its SAID, a basic prefix its one key. The event SHALL be signed by current keys meeting the current threshold.
 
 **Example:** the inception of Alice's identity on her phone, with a paper sheet and no co-signer.
 
@@ -52,7 +52,7 @@ signed by the phone alone: 1 >= 1, accepted once W-tellipod's receipt is attache
 
 #### Scenario: Another key under a basic prefix is refused
 - **WHEN** an inception names a basic prefix and lists a key other than the prefix
-- **THEN** the crate refuses it, and accepts the inception that lists the prefix's own key
+- **THEN** the crate refuses it as it reads it, and accepts the inception that lists the prefix's own key
 
 ### Requirement: A rotation exposes committed keys and meets both thresholds
 A `rot` or `drt` SHALL follow the last accepted event: its sequence number one higher, its prior digest that event's SAID. Each signature SHALL verify under the key at its index into the rotation's own current keys, and SHALL count toward the rotation's current threshold. A signature SHALL count toward the prior establishment event's next threshold only when its key matches, by its digest, the next-key digest at its index into the prior next keys; one that does not match, or that carries no such index, SHALL count toward the current threshold alone, as keripy counts it, since a rotation may add keys that were never committed. The signatures SHALL meet both thresholds. The crate SHALL accept next-key digests carried over unchanged from the prior establishment event, as a controller carries them for keys that do not sign. A delegated AID SHALL rotate by `drt` alone, and its `rot` SHALL be refused; a `drt` of an AID nothing delegates SHALL be accepted as its rotation, needing no approval, as keripy accepts it.

@@ -7,7 +7,7 @@ How kerita reads and writes key events: one protocol version, one body and one d
 ## Requirements
 
 ### Requirement: Events are KERI 2.00 in the native CESR body, in the text domain
-The crate SHALL read and write key events of KERI protocol version 2.00 whose body is the native CESR fixed-field body under CESR genus version 2.00, in the text domain. It SHALL refuse every other event as unsupported — another protocol version, another body kind, a version field without a genus version, the binary domain — and SHALL keep that refusal apart from the refusal of an event that is malformed. A message MAY follow the genus-version code a stream carries to name the CESR version of what follows it: the crate SHALL read past one naming CESR 2.00, `-_AAACAA`, and SHALL refuse as unsupported one naming another version, and a second code right after the first, as keripy reads nothing past either.
+The crate SHALL read and write key events of KERI protocol version 2.00 whose body is the native CESR fixed-field body under CESR genus version 2.00, in the text domain. It SHALL refuse every other event as unsupported — another protocol version, another body kind, a version field without a genus version, the binary domain — and SHALL keep that refusal apart from the refusal of an event that is malformed. A message MAY follow the genus-version code a stream carries to name the CESR version of what follows it: the crate SHALL read past one naming CESR 2.00, `-_AAACAA`, and SHALL refuse as unsupported one naming another version, and a second code right after the first, as keripy reads no native message past either.
 
 **Example:** one inception, as 4 producers write it.
 
@@ -134,3 +134,34 @@ An event the crate reads SHALL encode back to the same bytes, and an event whose
 #### Scenario: A draft field the event type does not carry is refused
 - **WHEN** a draft for an event type carries a field that type does not carry, such as a delegator for an inception or keys for an interaction event, or drafts a receipt
 - **THEN** the crate refuses to build it
+
+### Requirement: An event's prefix keeps the rules keripy checks as it reads the event
+The crate SHALL refuse as invalid, as it reads the event and before any key state, an event whose prefix breaks a rule keripy checks as it reads an event: a prefix under a code no AID takes, which within the subset is every code but `D`, `B`, `1AAJ`, `1AAI` and `E`; a delegated inception or delegated rotation whose prefix is not self-addressing; an inception or delegated inception under a basic prefix that does not list that prefix as its one key under a current threshold of 1; an establishment event under a non-transferable prefix that lists a next-key digest, a witness or a seal; and a delegated inception whose delegator is under a code no AID takes. An event the crate builds SHALL keep these rules, since it reads back as itself.
+
+**Example:** keripy's inception from `test_kever`, the crate's inception under another key's basic prefix, and the inception of that key.
+
+| input | keripy | the crate |
+|---|---|---|
+| `-FA50OKERICAACAAXicpEHD_3J5SRltS1dpppsgkQi5LUh25O2qoFgyb2d6CjtTK…`, an inception under the non-transferable prefix `BAUDqkmn-hqlQKD8W-FAEa5JUvJC2I9yarEem-AAEg3e` that lists a next-key digest | refuses it as it reads it | refuses it as it reads it: a non-transferable AID that commits to more |
+| an inception under the basic prefix of one P-256 key that lists another key | refuses it as it reads it | refuses it as it reads it: a basic prefix that is not the event's one key |
+| the inception under that key's basic prefix, listing that key alone under a threshold of 1 | reads it | reads it |
+
+#### Scenario: An inception under a basic prefix that is not its one key is refused as read
+- **WHEN** the crate reads an inception under a basic prefix that lists another key, a second key, or its own key under a weighted threshold
+- **THEN** it refuses the event as invalid, before any key state
+
+#### Scenario: A non-transferable prefix that commits to more is refused as read
+- **WHEN** the crate reads an inception or a rotation under a non-transferable prefix that lists a next-key digest, a witness or a seal
+- **THEN** it refuses the event as invalid
+
+#### Scenario: A delegated event under a basic prefix is refused as read
+- **WHEN** the crate reads a delegated inception or a delegated rotation whose prefix is a key
+- **THEN** it refuses the event as invalid
+
+#### Scenario: A prefix or delegator under a code no AID takes is refused as read
+- **WHEN** the crate reads an event whose prefix, or whose delegator, is under a signature's code
+- **THEN** it refuses the event as invalid
+
+#### Scenario: An event keeping the prefix rules is read
+- **WHEN** the crate reads the inception under a key's basic prefix that lists that key alone under a threshold of 1, a non-transferable one that lists no next-key digest, witness or seal, or a self-addressing delegated inception
+- **THEN** it reads the event

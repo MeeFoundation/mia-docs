@@ -12,7 +12,7 @@ The witness is a server, and the KERI crate `kerita` is a library a phone embeds
 |---|---|---|
 | validating rotation 9 against Alice's KEL | decides | asks `kerita` |
 | a rival rotation at position 9 | answers likely duplicitous | refuses to receipt it, having receipted the first |
-| the receipt of rotation 9 | builds the receipt message, verifies it | signs it with the witness's key and sends it |
+| the receipt of rotation 9 | verifies it attached to rotation 9, builds none | signs rotation 9 with the witness's key and sends the receipt |
 | the stamp the phone asks for | | signs it at position 9, the latest it receipted |
 | state | none | Alice's latest receipted position, durable, never restored backward |
 
@@ -33,11 +33,20 @@ A new crate, `crates/pdn-witness`, holding what ADR-0017 gives the witness:
 
 How devices reach the witness, what it stores its state in, how a restore from a backup is kept from setting it back, the form a stamp takes on the wire, the receipt form it sends and its key type belong to this change's design.
 
+The receipt form decides what `kerita` gains. `kerita` verifies a receipt attached to the receipted event, as the witness's indexed signature or as a receipt couple, and reads an `rct`, but builds no receipt, since an event draft names no event to receipt. A receipt sent as an event of its own, `rct`, needs a function of `kerita` that builds it from the receipted event, with a vector of the crate's that keripy reads. A receipt sent as the witness's indexed signature attached to the receipted event needs nothing more of `kerita`.
+
+**Example:** W-tellipod receipts Alice's rotation 9.
+
+| receipt form | what the witness sends | what `kerita` needs |
+|---|---|---|
+| an `rct` of its own | an `rct` naming rotation 9's AID, sequence number and SAID, with W-tellipod's signature | a function building that `rct` from rotation 9 |
+| an indexed signature | rotation 9 with W-tellipod's indexed signature attached (`-L`) | nothing more |
+
 ## Out of Scope
 
 - **What devices do with stamps** — when a device asks for one, publishing it into pods, and the acceptance of a revoked device's records (DR-20, DR-21) belong to the platform's crates over `kerita`, `pdn-keri` among them.
 - **The co-signer and the recovery service** (DR-25 to DR-31) — servers of their own.
-- **KERI itself** — validation, receipts as KERI messages and the answer to a rival event are `kerita`'s.
+- **KERI itself** — validation, the receipts attached to an event and the answer to a rival event are `kerita`'s.
 
 ## Impact
 
