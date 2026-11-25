@@ -14,7 +14,7 @@ The engine hands a materialization the pod-tool's records one key at a time, eac
 
 ### Requirement: A pod-tool exposes its data by registering a materialization
 
-A pod-tool whose data reaches the graph SHALL register a materialization made of three parts. The first is its kind, which names its zone in every pod. The second is its tool ontology: the types its zone holds, each marked embeddable or not, and the relations its zone holds, each with its name, the type it leads from and the type it leads to. The third is a function that turns the records under one key into the nodes and relations they stand for, or into nothing. What records stand for SHALL be the materialization's alone: the engine SHALL NOT make a node or a relation of a record by any other means, and SHALL read a pod-tool's records only to hand them to that pod-tool's materialization. A pod-tool that registers no materialization SHALL contribute nothing to the graph. Registering a materialization for a kind already registered SHALL replace the earlier one, from the next catch-up on. The tool ontologies a reader is told SHALL be those of the zones it may read.
+A pod-tool whose data reaches the graph SHALL register a materialization made of three parts. The first is its kind, which names its zone in every pod. The second is its tool ontology: the types its zone holds, each marked embeddable or not, and the relations its zone holds, each with its name, the type it leads from and the type it leads to. The third is a function that turns the records under one key into the nodes and relations they stand for, or into nothing. What records stand for SHALL be the materialization's alone: the engine SHALL NOT make a node or a relation of a record by any other means, and SHALL read a pod-tool's records only to hand them to that pod-tool's materialization. A pod-tool that registers no materialization SHALL contribute nothing to the graph. Registering a materialization for a kind already registered SHALL replace the earlier one, from the next catch-up on. A view SHALL tell its reader the tool ontologies of the zones it was made for, and no others.
 
 **Example:** a pod-tool keeping flea-treatment notes registers its materialization, and this is what it makes of one key's records.
 
@@ -30,9 +30,9 @@ A pod-tool whose data reaches the graph SHALL register a materialization made of
 - **WHEN** a pod-tool the engine was not built with, keeping flea-treatment notes as `app:Note:v1`, registers its materialization, and Alice writes the note "Ginger's flea treatment is due on the 3rd"
 - **THEN** a reader of Alice's pod finds that note beside the data of the pod's other pod-tools, with nothing in the reader written for that pod-tool
 
-#### Scenario: A reader is told the tool ontology of the zones it may read and no other
+#### Scenario: A view tells the tool ontologies of its zones and no other
 
-- **WHEN** two pod-tools of the pod "Ginger" have registered their materializations, and Alice may read both and Dan only the second
+- **WHEN** two pod-tools of the pod "Ginger" have registered their materializations, Alice's view is made for both zones and Dan's for the second alone
 - **THEN** Alice is told both tool ontologies, with their types and relations, and Dan only the second's
 
 #### Scenario: A pod-tool that registers no materialization is not read

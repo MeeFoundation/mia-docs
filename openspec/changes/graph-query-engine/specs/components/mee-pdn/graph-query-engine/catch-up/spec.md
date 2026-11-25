@@ -10,7 +10,7 @@ How the graph query engine brings its graph up to date with what pod-tools expos
 
 ### Requirement: Each identity on a device has one graph for every pod it reads
 
-Each identity hosted on a device SHALL have one graph, holding every pod and every zone that identity has read, and SHALL read no other identity's graph. Pods in one graph SHALL be kept apart by the pod each node, relation, subject and value carries, and zones by the zone each node, relation and value carries. Nothing of a pod SHALL be built into the graph of an identity that is not its member, and a node for some members alone SHALL be built only into the graphs of those members' identities, with the relations that lead from it.
+Each identity hosted on a device SHALL have one graph, holding every pod and every zone that identity has read, and SHALL read no other identity's graph. Pods in one graph SHALL be kept apart by the pod each node, relation, subject and value carries, and zones by the zone each node, relation and value carries. A graph SHALL hold only the zones its handles were made for; which zones an identity's handles are made for is the application's, which makes none of a pod for an identity that is not its member. A node for some members alone SHALL be built only into the graphs of those members' identities, with the relations that lead from it.
 
 **Example:** Alice and Bob are both members of "Ginger", and Alice alone of "Travel".
 
@@ -30,10 +30,10 @@ Each identity hosted on a device SHALL have one graph, holding every pod and eve
 - **WHEN** Alice's direct message to Bob in "Ginger", a node for Alice and Bob, is caught up in the graphs of Alice, Bob and Dan, all members of "Ginger"
 - **THEN** Alice's and Bob's graphs hold it, Dan's does not, and a relation to it from the group stream leads to nothing in Dan's graph
 
-#### Scenario: Nothing of a pod is built for a non-member
+#### Scenario: Nothing is built of a zone no handle was made for
 
-- **WHEN** Carol, who is not a member of "Ginger", asks to read it
-- **THEN** she is refused, and her graph holds no pod
+- **WHEN** Alice's graph has read "Ginger", and Carol's graph, made for no zone of "Ginger", is read
+- **THEN** Carol's graph holds no pod
 
 ### Requirement: A read catches up first
 

@@ -181,7 +181,7 @@ Not all of a pod-tool's data is for every member. A direct message in a pod's ch
 - **The process ends without warning, the device restarts:** the graph is in memory (D3), so a kill loses nothing the records do not hold, and the first read after a start pays the catch-up of every zone it reads. A vector index goes with its process too, and its owner makes it again (D9).
 - **The disk fills:** a bulk load stages its rows as files, and a full disk fails it. The engine then applies the keys one at a time, in memory. This path has no scenario yet (tasks, 2.3).
 - **Clocks disagree, and step back:** a key's records are handed over oldest first by time, so for a materialization that takes the newest record, an edit made on a device whose clock is behind loses to an older edit made elsewhere. The record store orders a key's entries by the same dates, so the graph agrees with the store (Risks).
-- **Membership moves:** a reader that is no member of a pod is refused a view of it. Nodes of that pod already in its graph stay in memory until the process ends (Open Questions).
+- **Membership moves:** which zones a reader's handles are made for is the application's. Nodes of a pod already in an identity's graph stay in memory until the process ends, and a handle reads what it was made for for as long as it is held.
 - **An unstable connection, a device linking late:** no effect. The engine reads only what its device holds; what arrives later is read on the next read.
 
 ## Risks / Trade-offs
@@ -200,4 +200,4 @@ The crate is new, and nothing in mee-pdn depends on it or changes with it. An ap
 
 ## Open Questions
 
-**1. A handle made before its reader's removal.** A removed member gets no new view, and the nodes its graph holds of the pod stay in memory until the process ends. Whether a handle made before the removal reads them is untested. Recommendation: a test of it, and a requirement that matches.
+None. Who may read a pod, and what becomes of a reader's handles when its membership changes, are the application's.

@@ -10,7 +10,7 @@ What the graph query engine answers, and for whom ([ADR-0019](../../../../archit
 
 ### Requirement: A handle reaches only the pods and zones it was made for
 
-A handle SHALL read only the pods and zones fixed when it was made, whatever else the graph holds. A handle made for one zone of one pod SHALL read that zone of that pod; a view SHALL read the zones of the pods it was made for that its reader may read. A reader SHALL be refused a view of a pod it is not a member of. The same node id in two pods SHALL be two nodes, each read only through its own pod.
+A handle SHALL read only the pods and zones fixed when it was made, whatever else the graph holds. A handle made for one zone of one pod SHALL read that zone of that pod, and a view the zones it was made for. Which pods and zones a reader's handle is made for is the application's: it makes a reader handles on the zones it may read, and none on a pod it is not a member of. The same node id in two pods SHALL be two nodes, each read only through its own pod.
 
 **Example:** "Ginger" (pod-tools `notes` and `meds`) has Alice, Bob and Dan as members, Dan with `meds` alone; "Travel" (`notes`) has Alice alone. Bob has written the note "vet on Friday" in "Ginger", Alice "passport in the top drawer" in "Travel".
 
@@ -19,8 +19,8 @@ A handle SHALL read only the pods and zones fixed when it was made, whatever els
 | Alice's view of "Ginger" and "Travel" | 2 notes |
 | Alice's view of "Ginger", the `notes` zone | "vet on Friday", in "Ginger" |
 | Alice's handle on the `meds` zone of "Ginger" | no node and no subject, though the `notes` zone is in her graph |
-| Dan's view of "Ginger" | no node: the `notes` zone is not his to read |
-| Carol's view of "Ginger" | refused: she is not a member |
+| Dan's view of "Ginger", made for the `meds` zone alone | no node: the `notes` zone is not his to read |
+| Carol | no handle on "Ginger": she is not a member |
 
 #### Scenario: A pod reads only itself
 
@@ -32,20 +32,15 @@ A handle SHALL read only the pods and zones fixed when it was made, whatever els
 - **WHEN** one pod-tool's zone of a pod is in Alice's graph, and she reads through her handle on another pod-tool's zone of that pod
 - **THEN** she reads no node and no subject
 
-#### Scenario: A zone the reader may not read is not in its view
+#### Scenario: A zone a view was not made for is not read
 
-- **WHEN** Dan, who may read `meds` and not `notes`, reads a view of a pod whose `notes` zone holds a note
-- **THEN** he reads no node, while Alice, who may read `notes`, reads the note
+- **WHEN** Dan's view of a pod is made for its `meds` zone alone, and the pod's `notes` zone holds a note
+- **THEN** he reads no node, while Alice's view, made for both zones, reads the note
 
 #### Scenario: A pod-tool reads another pod-tool's zone through a view
 
 - **WHEN** a pod-tool of "Ginger" reads a view of "Ginger" for Alice, and the `notes` pod-tool's zone holds "vet on Friday"
 - **THEN** it reads the note, though the note is not in its own zone
-
-#### Scenario: A non-member is refused
-
-- **WHEN** Carol, who is not a member of a pod, asks for a view of it
-- **THEN** she is refused
 
 #### Scenario: Two pods with the same node ids keep them apart
 
@@ -78,7 +73,7 @@ A find SHALL return the nodes in scope, oldest first by time and then by node id
 
 ### Requirement: A node's relations are followed
 
-A reader SHALL follow the relations of a node in scope: the nodes its relations of a given name lead to, and the nodes whose relations of a given name lead to it, each with the name of the relation, oldest first by time and then by node id. A relation SHALL lead only to a node in scope: one that leads into a zone or a pod the handle does not reach, or to a node the graph does not hold, SHALL return nothing.
+A reader SHALL follow the relations of a node in scope: the nodes its relations of a given name lead to, and the nodes whose relations of a given name lead to it, oldest first by time and then by node id. A relation SHALL lead only to a node in scope: one that leads into a zone or a pod the handle does not reach, or to a node the graph does not hold, SHALL return nothing.
 
 **Example:** in "Ginger", the chat's message `m2` `follows` `m1`, and the text `t1` of the zone `ocr` is `read-from` the photo `p7` of the zone `photos`.
 
@@ -141,7 +136,7 @@ A page SHALL return, of the nodes in scope (of one pod-tool where one is named, 
 
 ### Requirement: Everything read says where it is from
 
-Each node read SHALL carry its pod, its pod-tool, its member, its time in RFC 3339 in UTC, the device it was written on where its record carries one, its type and the type's name, its subject where it is a claim, the members it is for where it names them, its root value's id as readers address it, `<node id>/value`, and its value as a document, as it was written. Each relation read SHALL carry its name and the node it leads from and to. Each subject read SHALL carry its pod.
+Each node read SHALL carry its pod, its pod-tool, its member, its time in RFC 3339 in UTC, the device it was written on where its record carries one, its type and the type's name, its subject where it is a claim, the members it is for where it names them, its root value's id as readers address it, `<node id>/value`, and its value as a document, as it was written. Each subject read SHALL carry its pod.
 
 **Example:** the calendar's node `e1` about Ginger, of type `app:CalendarEvent:v1`, written by Alice on her phone with the value `{"title": "vet", "starts_at": "2026-11-21T10:00:00Z", "place": "Linden Street clinic"}`, is read back with the same value, the pod-tool `calendar` and the device `phone`.
 
