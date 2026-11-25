@@ -35,6 +35,22 @@ The registry's relation of a type to the type it extends SHALL be loaded into th
 - **WHEN** a reader asks for the generalizations of `app:Message:v1`
 - **THEN** it gets `app:Message:v1` and `app:UnstructuredText:v1`, in that order
 
+### Requirement: A value is checked against its type's shape
+
+The engine SHALL check a value against a type's shape for any code that asks, and SHALL refuse it, naming the field at fault, when it has a field the shape does not have, lacks a required field, holds a list where the shape holds one value or one value where it holds a list, or holds a value of the wrong primitive. It SHALL coerce nothing. A type with no fields SHALL take no value.
+
+**Example:** a pod-tool keeping medication records checks each value against `mee:PetMedicationRecord:v1` before it writes the record. `{"species": "cat"}` is refused at `value.species`, which `PetMedicationRecord` does not have, and the pod-tool writes nothing.
+
+#### Scenario: A value with a field its type does not have is refused
+
+- **WHEN** a pod-tool checks `{"species": "cat"}` against `mee:PetMedicationRecord:v1`
+- **THEN** it is refused, the refusal names `species`, and nothing is written
+
+#### Scenario: A value is refused for a missing field, a wrong cardinality or a wrong primitive
+
+- **WHEN** values are checked against a type's shape that lack a required field, hold a list where one value belongs, or hold a number where text belongs
+- **THEN** each is refused, naming its field, and none is coerced
+
 ### Requirement: Types and shapes are read from the graph
 
 A type, its shape (its fields, and theirs, down to the values), the entity types that carry fields and the subject types, which carry none, SHALL be read from the registry as it is loaded into the graph. A type MAY be looked up by its id or by its display name, and a name the registry does not hold SHALL be refused with the names of the entity types it does hold.
