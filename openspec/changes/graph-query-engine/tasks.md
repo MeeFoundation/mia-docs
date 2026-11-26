@@ -24,12 +24,12 @@ Every scenario in this change's deltas is a test of `crates/graph-query-engine`,
 
 ## 3. The crate
 
-- [ ] 3.1 `crates/graph-query-engine` in mee-pdn, named in the workspace's members, with its tests; nothing else in mee-pdn changes
-- [ ] 3.2 The crate passes mee-pdn's toolchain, lints and dependency policy (`rust-toolchain.toml`, `clippy.toml`, `deny.toml`)
-- [ ] 3.3 The crate pins LadybugDB, `lbug = "=0.22.1"`, chosen for its vector index on Android, and no type of LadybugDB's is in its interface (D8)
-- [ ] 3.4 A binary built against the crate for Android links the vector extension and searches an index (design, Risks)
+- [x] 3.1 `crates/graph-query-engine` in mee-pdn, named in the workspace's members, with its tests; nothing else in mee-pdn changes but the workspace's build of LadybugDB: the member line and an optimized `lbug` in debug builds (`Cargo.toml`), the source tree the lbug crate builds from (`.cargo/config.toml`, `scripts/lbug-vector-source.sh`, `scripts/lbug_ndk_atomic_ref.py`, `just lbug-vector-source`), that recipe in CI, and the crate's line in `CLAUDE.md`
+- [x] 3.2 The crate passes mee-pdn's toolchain, lints and dependency policy (`rust-toolchain.toml`, `clippy.toml`, `deny.toml`): clippy with the workspace's lints, `cargo fmt --check` and `cargo doc` clean on the pinned toolchain; every crate it adds comes from crates.io under a license `deny.toml` allows, and CI's `cargo deny check` checks advisories
+- [x] 3.3 The crate pins LadybugDB, `lbug = "=0.22.1"`, chosen for its vector index on Android, and no type of LadybugDB's is in its interface (D8)
+- [x] 3.4 A binary built against the crate for Android links the vector extension and searches an index (design, Risks): pdn-agent's Android app, built against the crate in mee-pdn, indexed 584 texts and answered from vector search on a phone (RMX3710)
 
 ## 4. Gates
 
-- [ ] 4.1 `openspec validate graph-query-engine --strict` and `python3 -I scripts/check-docs.py`
-- [ ] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application
+- [x] 4.1 `openspec validate graph-query-engine --strict` and `python3 -I scripts/check-docs.py`
+- [x] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application: `cargo test -p graph-query-engine`, 49 passed
