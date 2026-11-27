@@ -8,7 +8,7 @@
 - `src/materialize.rs` holds the materialization interface and the registry of materializations, which starts empty (D7); `src/record.rs` the interface the engine reads a zone's records through (D11).
 - `src/lib.rs` holds the read interfaces `GraphReader`, `PodGraph` and `GraphView` and the types they return; `src/ontology.rs` the registry, `src/shape.rs` shapes, `src/query.rs` the query builder and `src/conform.rs` the check of a value against a shape.
 - `src/vector.rs` holds the vector index.
-- `build.rs` builds LadybugDB with its vector extension linked in.
+- LadybugDB, its vector extension linked in, comes as a release of MeeFoundation/ladybug, which the workspace's Cargo configuration names (D8).
 
 Every scenario in this change's deltas is a test of the crate, on pod-tools its tests define, and the crate's tests need no application.
 
@@ -105,12 +105,15 @@ The engine carries no materialization of its own. Every pod-tool registers its m
 
 ### D8. The engine owns the graph database
 
-The crate is the only code that depends on LadybugDB. Its interfaces carry none of LadybugDB's types, its query language or its schema, and no code outside it opens a LadybugDB database, for the graph or for anything else. The crate pins LadybugDB's version and builds it with the vector extension linked in, for every platform the app is built for.
+The crate is the only code that depends on LadybugDB. Its interfaces carry none of LadybugDB's types, its query language or its schema, and no code outside it opens a LadybugDB database, for the graph or for anything else. The crate pins LadybugDB's version and links it as a release of MeeFoundation/ladybug: LadybugDB built with the vector extension linked in, for every platform the app is built for, published as immutable GitHub releases with build provenance.
 
 **Example:** an application built on the crate names no `lbug`. Its pod-tools register materializations and check values through the crate, it makes each identity's graph through the crate, and it indexes and searches texts through the crate.
 
 **Rejected alternatives:**
 
+- LadybugDB built from source in the workspace, with the vector extension assembled into its source tree.
+  - **Pros:** nothing outside mee-pdn to keep.
+  - **Cons:** about 20 minutes of compiling LadybugDB in every clean build and in every CI job that tests the crate, and build plumbing in mee-pdn that is about LadybugDB, not about mee-pdn. mee-pdn's developers decided against it.
 - The vector index left with the application, on a LadybugDB database of its own.
   - **Pros:** the engine stays about the graph alone.
   - **Cons:** a second client of LadybugDB outside the engine, which pins the version and links the vector extension a second time, and which a change of database breaks.
@@ -191,8 +194,8 @@ Not all of a pod-tool's data is for every member. A direct message in a pod's ch
 - **A materialization that depends on the device** makes two members' graphs differ, and nothing detects it.
 - **A first read pays the backlog.** A device with many records builds its graph on its first read after every start.
 - **A vector index is scoped by its owner alone.** A search reaches every entry its owner put in, with no pod filter of the engine's. An owner that indexes a pod its reader may not read lets that reader search it.
-- **The vector extension's linking.** The crate's build script links the extension's archive with a link-library directive, which Cargo passes to every binary built against the crate, an application for Android among them; a link argument would reach the crate's own linking alone.
-- **LadybugDB in the workspace's build.** The crate builds LadybugDB, a C++ library, from source, which lengthens every build of the workspace and adds its dependencies to the lockfile.
+- **The vector extension's linking.** The extension is merged into the engine's archive, which the lbug crate links whole into every binary built against the crate, an application for Android among them.
+- **LadybugDB from a release.** A build downloads the release's archive for its machine from MeeFoundation/ladybug, which therefore stays public, its releases immutable. The lbug crate checks no digest: a release that cannot change stands in for one. A build for Android names the release's Android archive itself, since the lbug crate picks an archive by the build machine.
 
 ## Migration Plan
 
