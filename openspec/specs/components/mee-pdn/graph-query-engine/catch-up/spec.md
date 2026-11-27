@@ -132,7 +132,7 @@ What is left out SHALL NOT keep out the nodes and relations beside it, and SHALL
 
 ### Requirement: A backlog loads in bulk, and the rest one key at a time
 
-A zone with nothing applied yet whose catch-up brings at least 32 nodes SHALL load its nodes and relations in one bulk load. Zones with nothing applied yet that are caught up together SHALL load in one bulk load when there are at least 2 of them and their nodes number at least 32 between them. Every other key SHALL be applied in a transaction of its own. A bulk load and applying key by key SHALL give the same graph. A bulk load that fails SHALL leave nothing of the zones it was loading, which are then applied key by key.
+A zone with nothing applied yet whose catch-up brings at least 32 nodes SHALL load its nodes and relations in one bulk load. Zones with nothing applied yet that are caught up together SHALL load in one bulk load when there are at least 2 of them and their nodes number at least 32 between them. Every other key SHALL be applied in a transaction of its own. A bulk load and applying key by key SHALL give the same graph. A bulk load that fails SHALL leave nothing it wrote, the subjects it made among them, and its zones SHALL then be applied key by key into the graph applying them key by key gives.
 
 **Example:** with the threshold set to 10, five pods `a` to `e`, new to the graph, each bring 4 nodes to one catch-up. None reaches 10 alone; together they bring 20, and load in one bulk load. Each pod then reads the same nodes, relations and subjects as in a graph that applied the same keys one at a time.
 
@@ -150,3 +150,13 @@ A zone with nothing applied yet whose catch-up brings at least 32 nodes SHALL lo
 
 - **WHEN** the same 40 keys, with relations between their nodes, are bulk-loaded into one graph and applied one at a time into another
 - **THEN** both return the same nodes, relations, subjects, finds and counts
+
+#### Scenario: A bulk load that fails after writing leaves nothing
+
+- **WHEN** a pod new to the graph is caught up with 40 claims about 5 subjects, at a threshold of 10, and its bulk load fails after its subjects and nodes are written
+- **THEN** the 40 keys are applied one at a time, each claim is read once, and the claims and the 5 subjects, each with its type, read as they do in a graph that applied the keys one at a time
+
+#### Scenario: A bulk load that cannot stage its files falls back to one key at a time
+
+- **WHEN** a pod new to the graph is caught up with 40 notes, at a threshold of 10, and the temporary directory cannot hold the bulk load's files, as on a full disk
+- **THEN** the 40 keys are applied one at a time, and each note is read once

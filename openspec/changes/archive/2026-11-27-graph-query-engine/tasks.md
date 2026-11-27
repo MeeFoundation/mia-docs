@@ -13,8 +13,8 @@ Every scenario in this change's deltas is a test of `crates/graph-query-engine`,
 ## 2. Scenarios written as tests of the crate
 
 - [x] 2.1 A pod-tool with no registered materialization contributes nothing to the graph (materialization interface)
-- [x] 2.2 A bulk load that fails leaves nothing of its zones, whose keys are then applied one at a time (catch-up), tested as a load that cannot stage its files
-- [x] 2.3 A full disk fails a bulk load, and the keys are applied one at a time (design, operating conditions)
+- [x] 2.2 A bulk load that fails after its subjects and nodes are written leaves nothing it wrote, and its keys are applied one at a time into the graph key by key gives, subjects' types included (catch-up), tested by failing the load at a named table
+- [x] 2.3 A full disk fails a bulk load, and the keys are applied one at a time (design, operating conditions), tested as a load that cannot stage its files
 - [x] 2.4 The engine with no materialization registered loads its registry and answers with no nodes (materialization interface, D7)
 - [x] 2.5 A zone whose record source offers a version is not read again until the version moves (catch-up)
 - [x] 2.6 The types present are counted per pod, within the view (queries)
@@ -32,4 +32,4 @@ Every scenario in this change's deltas is a test of `crates/graph-query-engine`,
 ## 4. Gates
 
 - [x] 4.1 `openspec validate graph-query-engine --strict` and `python3 -I scripts/check-docs.py`
-- [x] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application: `cargo test -p graph-query-engine`, 52 passed
+- [x] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application: `cargo test -p graph-query-engine`, 53 passed
