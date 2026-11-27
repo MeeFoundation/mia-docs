@@ -32,4 +32,4 @@ Every scenario in this change's deltas is a test of `crates/graph-query-engine`,
 ## 4. Gates
 
 - [x] 4.1 `openspec validate graph-query-engine --strict` and `python3 -I scripts/check-docs.py`
-- [x] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application: `cargo test -p graph-query-engine`, 49 passed
+- [x] 4.2 Every scenario of the deltas is a passing test of the crate, run in mee-pdn with no application: `cargo test -p graph-query-engine`, 52 passed

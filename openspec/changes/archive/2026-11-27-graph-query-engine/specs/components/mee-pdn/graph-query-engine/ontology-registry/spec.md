@@ -37,7 +37,7 @@ The registry's relation of a type to the type it extends SHALL be loaded into th
 
 ### Requirement: A value is checked against its type's shape
 
-The engine SHALL check a value against a type's shape for any code that asks, and SHALL refuse it, naming the field at fault, when it has a field the shape does not have, lacks a required field, holds a list where the shape holds one value or one value where it holds a list, or holds a value of the wrong primitive. It SHALL coerce nothing. A type with no fields SHALL take no value.
+The engine SHALL check a value against a type's shape for any code that asks, and SHALL refuse it, naming the field at fault, when it has a field the shape does not have, lacks a required field, holds a list where the shape holds one value or one value where it holds a list, or holds a value of the wrong primitive. A date SHALL be written `2026-11-21`; a timestamp SHALL be RFC 3339, or the same date and time with no zone, after a `T` or a space; a decimal SHALL be a finite number of at most 28 digits before the point. It SHALL coerce nothing. A type with no fields SHALL take no value.
 
 **Example:** a pod-tool keeping medication records checks each value against `mee:PetMedicationRecord:v1` before it writes the record. `{"species": "cat"}` is refused at `value.species`, which `PetMedicationRecord` does not have, and the pod-tool writes nothing.
 
@@ -50,6 +50,11 @@ The engine SHALL check a value against a type's shape for any code that asks, an
 
 - **WHEN** values are checked against a type's shape that lack a required field, hold a list where one value belongs, or hold a number where text belongs
 - **THEN** each is refused, naming its field, and none is coerced
+
+#### Scenario: A time that is not ISO 8601 is refused
+
+- **WHEN** the `starts_at` of an `app:CalendarEvent:v1` is checked as `next Tuesday`, `2026-11-21T25:00:00Z`, `21.11.2026 10:00`, `2026-11-21T10:00:00Z`, `2026-11-21T10:00:00+01:00` and `2026-11-21 10:00:00`
+- **THEN** the first three are refused at `value.starts_at`, and the last three are taken as they were written
 
 ### Requirement: Types and shapes are read from the graph
 

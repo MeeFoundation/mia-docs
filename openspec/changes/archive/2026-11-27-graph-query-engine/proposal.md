@@ -4,7 +4,7 @@
 
 ## Why
 
-[ADR-0019](../../specs/architecture/adr/0019-pods-read-through-a-graph-query-engine.md) puts a graph query engine between the graph database and all code that uses it: pod-tools write records, every device builds its own graph from them, and every reader queries that graph through the engine. This change specifies the engine, as the mee-pdn crate `graph-query-engine`.
+[ADR-0019](../../../specs/architecture/adr/0019-pods-read-through-a-graph-query-engine.md) puts a graph query engine between the graph database and all code that uses it: pod-tools write records, every device builds its own graph from them, and every reader queries that graph through the engine. This change specifies the engine, as the mee-pdn crate `graph-query-engine`.
 
 The engine is written and its tests pass: the specification states what its code does and its tests prove, and the code is added to mee-pdn as one crate, `crates/graph-query-engine`, in a pull request reviewed together with this change. The crate knows nothing of the application built on it: an application registers its pod-tools' materializations, hands the engine each zone's records, and reads the graph through the engine's handles, and none of LadybugDB is in what it sees.
 
@@ -40,7 +40,7 @@ None.
 
 ## Impact
 
-- **A new crate in mee-pdn**, `crates/graph-query-engine`, on LadybugDB ([ADR-0001](../../specs/architecture/adr/0001-ai-assistant-data-storage.md)), which brings a C++ library behind a foreign-function boundary into the workspace, built with its vector extension linked in. The crate is the only code that depends on LadybugDB; none of LadybugDB's types are in its interface.
+- **A new crate in mee-pdn**, `crates/graph-query-engine`, on LadybugDB ([ADR-0001](../../../specs/architecture/adr/0001-ai-assistant-data-storage.md)), which brings a C++ library behind a foreign-function boundary into the workspace, built with its vector extension linked in. The crate is the only code that depends on LadybugDB; none of LadybugDB's types are in its interface.
 - **Records reach the engine through an interface the application implements.** The engine reads each zone's records, each with the key its pod-tool chose, its member, its time, its device where it carries one, and its bytes; how the application keeps them in mee-pdn's record store is the application's (design, D11).
 - **The workspace's build.** LadybugDB is built from source with the crate, a long step in every build of the workspace, and its dependencies add to the lockfile. A script assembles the source tree it builds from, with the vector extension in it; the workspace's Cargo configuration points the lbug crate at that tree, and CI runs the script before it builds. Nothing else in mee-pdn changes.
 - **The SDK** exposes the engine's reads to the app; that is the SDK's change, not this one.

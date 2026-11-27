@@ -117,6 +117,16 @@ What is left out SHALL NOT keep out the nodes and relations beside it, and SHALL
 - **WHEN** the keys `a` and `b` of one zone both return a node `x`
 - **THEN** the zone holds the node `x` from key `a`, the one from key `b` is skipped, and every device keeps the same one
 
+#### Scenario: A node id that moves to an earlier key is read from it
+
+- **WHEN** the node `x` is caught up from key `b`, and a later catch-up brings key `a` returning `x` as well
+- **THEN** the zone holds `x` from key `a`, the one from key `b` is skipped, the graph reads as one built from the same records anew, and the same records again apply nothing
+
+#### Scenario: A time that is not a time costs its own node alone
+
+- **WHEN** a zone of 12 calendar events is caught up, in one bulk load and key by key, and the event `e05` starts `next Tuesday`
+- **THEN** 11 events load and `e05` is skipped, the same records try nothing again, and once `e05` gets a record starting `2026-11-28T10:00:00Z` it loads
+
 #### Scenario: A relation to a zone not yet read leads to nothing until it is
 
 - **WHEN** the text node `t1` of the zone `ocr` is `read-from` the photo `p7`, and Alice's graph has not read the zone `photos` yet

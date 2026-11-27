@@ -2,7 +2,7 @@
 
 ## Context
 
-[ADR-0019](../../specs/architecture/adr/0019-pods-read-through-a-graph-query-engine.md) puts a graph query engine between the graph database and all code that uses it. The engine is the crate `crates/graph-query-engine`:
+[ADR-0019](../../../specs/architecture/adr/0019-pods-read-through-a-graph-query-engine.md) puts a graph query engine between the graph database and all code that uses it. The engine is the crate `crates/graph-query-engine`:
 
 - `src/db.rs` holds the graph on LadybugDB, its catch-up, its queries, the loading of the registry and the read handles.
 - `src/materialize.rs` holds the materialization interface and the registry of materializations, which starts empty (D7); `src/record.rs` the interface the engine reads a zone's records through (D11).
